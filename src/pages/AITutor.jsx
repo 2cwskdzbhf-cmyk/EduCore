@@ -263,28 +263,92 @@ export default function AITutor() {
     return context;
   };
 
+  // ============================================================================
+  // SEND MESSAGE MUTATION
+  // Constructs the final prompt with all personalisation data and sends to LLM
+  // ============================================================================
+  
   const sendMessageMutation = useMutation({
     mutationFn: async (userMessage) => {
+      // Build the personalised context (includes all student data)
       const contextPrompt = buildContextPrompt();
       
+      // Build conversation history for context continuity
       const conversationHistory = messages.map(m => 
         `${m.role === 'user' ? 'Student' : 'Tutor'}: ${m.content}`
       ).join('\n\n');
 
       let fullPrompt = contextPrompt;
-      if (conversationHistory) {
-        fullPrompt += `\n\nConversation so far:\n${conversationHistory}`;
-      }
-      fullPrompt += `\n\nStudent: ${userMessage}\n\nProvide a helpful, encouraging response:`;
 
+      // ----------------------------------------------------------------------------
+      // CHAT MODE: Normal tutoring conversation
+      // ----------------------------------------------------------------------------
+      if (mode === 'chat') {
+        if (conversationHistory) {
+          fullPrompt += `\n\n## CONVERSATION HISTORY:\n${conversationHistory}`;
+        }
+        
+        // Check if student is asking about a weak topic - adjust response style
+        const weakTopicNames = (progress?.weak_areas || [])
+          .map(id => topics.find(t => t.id === id)?.name?.toLowerCase())
+          .filter(Boolean);
+        
+        const isAskingAboutWeakTopic = weakTopicNames.some(topicName => 
+          userMessage.toLowerCase().includes(topicName)
+        );
+        
+        fullPrompt += `\n\n## STUDENT MESSAGE: "${userMessage}"`;
+        
+        if (isAskingAboutWeakTopic) {
+          fullPrompt += `\n\n>> NOTE: Student is asking about a WEAK TOPIC. Use extra simple step-by-step explanations!`;
+        }
+        
+        fullPrompt += `\n\nProvide a helpful, encouraging, personalised response based on this student's data above:`;
+      }
+      
+      // ----------------------------------------------------------------------------
+      // REVISION MODE: Structured revision session
+      // Adapts difficulty based on student's mastery of the revision topic
+      // ----------------------------------------------------------------------------
       if (mode === 'revision') {
-        fullPrompt = contextPrompt;
-        fullPrompt += `\n\nThe student wants to revise: ${revisionTopic || userMessage}`;
-        fullPrompt += `\n\nCreate a mini revision session:
-1. Start with a brief, clear explanation of the key concepts
-2. Give 2-3 important points to remember
-3. Include 1-2 practice questions at the end
-4. Keep it concise and student-friendly`;
+        const revisionTopicName = revisionTopic || userMessage;
+        
+        // Check if this revision topic is weak or strong for the student
+        const weakTopicNames = (progress?.weak_areas || [])
+          .map(id => topics.find(t => t.id === id)?.name?.toLowerCase())
+          .filter(Boolean);
+        const strongTopicNames = (progress?.strong_areas || [])
+          .map(id => topics.find(t => t.id === id)?.name?.toLowerCase())
+          .filter(Boolean);
+        
+        const isWeakTopic = weakTopicNames.some(t => revisionTopicName.toLowerCase().includes(t));
+        const isStrongTopic = strongTopicNames.some(t => revisionTopicName.toLowerCase().includes(t));
+        
+        fullPrompt += `\n\n## REVISION REQUEST: "${revisionTopicName}"`;
+        
+        if (isWeakTopic) {
+          // Weak topic revision - simpler, more supportive
+          fullPrompt += `\n\n>> This is a WEAK TOPIC for this student. Create an EASY revision session:`;
+          fullPrompt += `\n1. Start with the most basic explanation using simple words`;
+          fullPrompt += `\n2. Use everyday examples and analogies`;
+          fullPrompt += `\n3. Break everything into tiny, manageable steps`;
+          fullPrompt += `\n4. Give 2-3 EASY practice questions with hints`;
+          fullPrompt += `\n5. Be extra encouraging and supportive`;
+        } else if (isStrongTopic) {
+          // Strong topic revision - more challenging
+          fullPrompt += `\n\n>> This is a STRONG TOPIC for this student. Create a CHALLENGING revision session:`;
+          fullPrompt += `\n1. Quick recap of key concepts (they already know basics)`;
+          fullPrompt += `\n2. Introduce advanced applications or edge cases`;
+          fullPrompt += `\n3. Give 2-3 CHALLENGING practice questions`;
+          fullPrompt += `\n4. Include extension problems to stretch their thinking`;
+        } else {
+          // Normal revision
+          fullPrompt += `\n\nCreate a balanced mini revision session:`;
+          fullPrompt += `\n1. Start with a brief, clear explanation of the key concepts`;
+          fullPrompt += `\n2. Give 2-3 important points to remember`;
+          fullPrompt += `\n3. Include 2-3 practice questions at the end`;
+          fullPrompt += `\n4. Keep it concise and student-friendly`;
+        }
       }
 
       const response = await base44.integrations.Core.InvokeLLM({
