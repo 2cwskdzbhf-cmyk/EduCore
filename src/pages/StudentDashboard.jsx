@@ -246,12 +246,33 @@ export default function StudentDashboard() {
               )}
             </motion.div>
 
+            {/* Join Class */}
+            <motion.div
+              className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.35 }}
+            >
+              <div className="flex items-center gap-3 mb-3">
+                <Users className="w-5 h-5 text-indigo-500" />
+                <h3 className="font-semibold text-slate-800">Join a Class</h3>
+              </div>
+              <p className="text-slate-500 text-sm mb-4">
+                Enter a code from your teacher to join their class.
+              </p>
+              <Link to={createPageUrl('JoinClass')}>
+                <Button variant="outline" className="w-full">
+                  Enter Code
+                </Button>
+              </Link>
+            </motion.div>
+
             {/* Quick Actions */}
             <motion.div
               className="bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl p-6 text-white"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.35 }}
+              transition={{ delay: 0.4 }}
             >
               <h3 className="font-semibold mb-2">Need help?</h3>
               <p className="text-indigo-100 text-sm mb-4">
