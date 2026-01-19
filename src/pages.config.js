@@ -6,6 +6,9 @@ import Topic from './pages/Topic';
 import Lesson from './pages/Lesson';
 import Quiz from './pages/Quiz';
 import AITutor from './pages/AITutor';
+import TeacherDashboard from './pages/TeacherDashboard';
+import CreateAssignment from './pages/CreateAssignment';
+import ClassDetails from './pages/ClassDetails';
 
 
 export const PAGES = {
@@ -17,6 +20,9 @@ export const PAGES = {
     "Lesson": Lesson,
     "Quiz": Quiz,
     "AITutor": AITutor,
+    "TeacherDashboard": TeacherDashboard,
+    "CreateAssignment": CreateAssignment,
+    "ClassDetails": ClassDetails,
 }
 
 export const pagesConfig = {
