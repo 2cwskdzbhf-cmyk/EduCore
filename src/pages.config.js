@@ -10,6 +10,7 @@ import TeacherDashboard from './pages/TeacherDashboard';
 import CreateAssignment from './pages/CreateAssignment';
 import ClassDetails from './pages/ClassDetails';
 import AdminPanel from './pages/AdminPanel';
+import JoinClass from './pages/JoinClass';
 import __Layout from './Layout.jsx';
 
 
@@ -26,6 +27,7 @@ export const PAGES = {
     "CreateAssignment": CreateAssignment,
     "ClassDetails": ClassDetails,
     "AdminPanel": AdminPanel,
+    "JoinClass": JoinClass,
 }
 
 export const pagesConfig = {
