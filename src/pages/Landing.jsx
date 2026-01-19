@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
+import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
 import { 
   GraduationCap, 
@@ -17,6 +18,28 @@ import {
 } from 'lucide-react';
 
 export default function Landing() {
+  const navigate = useNavigate();
+
+  // If user is already logged in and has completed onboarding, redirect to their dashboard
+  useEffect(() => {
+    const checkExistingAuth = async () => {
+      const isAuthenticated = await base44.auth.isAuthenticated();
+      if (isAuthenticated) {
+        const user = await base44.auth.me();
+        if (user.user_type === 'student') {
+          navigate(createPageUrl('StudentDashboard'));
+        } else if (user.user_type === 'teacher') {
+          navigate(createPageUrl('TeacherDashboard'));
+        } else if (user.user_type === 'admin' || user.role === 'admin') {
+          navigate(createPageUrl('AdminPanel'));
+        } else {
+          // User is logged in but hasn't completed onboarding
+          navigate(createPageUrl('Onboarding'));
+        }
+      }
+    };
+    checkExistingAuth();
+  }, [navigate]);
   const features = [
     {
       icon: Brain,
