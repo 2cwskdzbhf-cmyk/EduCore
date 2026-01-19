@@ -9,6 +9,8 @@ import AITutor from './pages/AITutor';
 import TeacherDashboard from './pages/TeacherDashboard';
 import CreateAssignment from './pages/CreateAssignment';
 import ClassDetails from './pages/ClassDetails';
+import AdminPanel from './pages/AdminPanel';
+import __Layout from './Layout.jsx';
 
 
 export const PAGES = {
@@ -23,9 +25,11 @@ export const PAGES = {
     "TeacherDashboard": TeacherDashboard,
     "CreateAssignment": CreateAssignment,
     "ClassDetails": ClassDetails,
+    "AdminPanel": AdminPanel,
 }
 
 export const pagesConfig = {
     mainPage: "Landing",
     Pages: PAGES,
+    Layout: __Layout,
 };
