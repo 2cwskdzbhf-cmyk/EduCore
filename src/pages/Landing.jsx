@@ -81,16 +81,19 @@ export default function Landing() {
             </span>
           </div>
           <div className="flex items-center gap-4">
-            <Link to={createPageUrl('StudentDashboard')}>
-              <Button variant="ghost" className="text-slate-600 hover:text-slate-900">
-                Login
-              </Button>
-            </Link>
-            <Link to={createPageUrl('Onboarding')}>
-              <Button className="bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white shadow-lg shadow-indigo-500/25">
-                Get Started
-              </Button>
-            </Link>
+            <Button 
+              variant="ghost" 
+              className="text-slate-600 hover:text-slate-900"
+              onClick={() => base44.auth.redirectToLogin()}
+            >
+              Login
+            </Button>
+            <Button 
+              className="bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white shadow-lg shadow-indigo-500/25"
+              onClick={() => base44.auth.redirectToLogin()}
+            >
+              Get Started
+            </Button>
           </div>
         </div>
       </header>
