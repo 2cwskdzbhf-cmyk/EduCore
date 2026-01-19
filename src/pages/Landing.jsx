@@ -121,12 +121,14 @@ export default function Landing() {
                 to master your subjects.
               </p>
               <div className="flex flex-wrap gap-4">
-                <Link to={createPageUrl('Onboarding')}>
-                  <Button size="lg" className="bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white shadow-xl shadow-indigo-500/25 h-14 px-8 text-lg">
-                    Start Learning Free
-                    <ChevronRight className="w-5 h-5 ml-2" />
-                  </Button>
-                </Link>
+                <Button 
+                  size="lg" 
+                  className="bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white shadow-xl shadow-indigo-500/25 h-14 px-8 text-lg"
+                  onClick={() => base44.auth.redirectToLogin()}
+                >
+                  Start Learning Free
+                  <ChevronRight className="w-5 h-5 ml-2" />
+                </Button>
                 <Button size="lg" variant="outline" className="h-14 px-8 text-lg border-2">
                   Watch Demo
                 </Button>
