@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import { base44 } from '@/api/base44Client';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -8,8 +8,6 @@ import {
   LayoutDashboard, 
   BookOpen, 
   MessageSquare, 
-  Trophy,
-  Settings,
   Menu,
   X,
   LogOut,
@@ -19,33 +17,178 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
+/*
+================================================================================
+AUTHENTICATION & ROLE-BASED ACCESS CONTROL
+================================================================================
+
+This Layout handles three key responsibilities:
+
+1. AUTHENTICATION CHECK
+   - Checks if user is logged in via base44.auth.isAuthenticated()
+   - Unauthenticated users are redirected to Landing page
+   - Public pages (Landing) don't require authentication
+
+2. ONBOARDING CHECK  
+   - After login, checks if user has completed onboarding (has user_type set)
+   - Users without user_type are forced to Onboarding page
+   - This ensures every user has a role before accessing the app
+
+3. ROLE-BASED ROUTING
+   - Students can only access: StudentDashboard, Subject, Topic, Lesson, Quiz, AITutor, JoinClass
+   - Teachers can only access: TeacherDashboard, ClassDetails, CreateAssignment
+   - Admins can access: AdminPanel + all teacher pages
+   - Unauthorized access redirects to the user's appropriate dashboard
+
+Page access matrix:
+- Landing, Onboarding: PUBLIC (no auth required)
+- StudentDashboard, Subject, Topic, Lesson, Quiz, AITutor, JoinClass: STUDENT ONLY
+- TeacherDashboard, ClassDetails, CreateAssignment: TEACHER + ADMIN
+- AdminPanel: ADMIN ONLY
+
+================================================================================
+*/
+
 export default function Layout({ children, currentPageName }) {
+  const navigate = useNavigate();
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
+  // ============================================================================
+  // STEP 1: Define page access rules
+  // ============================================================================
+  
+  // Pages that don't require authentication at all
+  const publicPages = ['Landing'];
+  
+  // Pages that require auth but no specific role (like onboarding)
+  const authOnlyPages = ['Onboarding'];
+  
+  // Pages accessible only by students
+  const studentPages = ['StudentDashboard', 'Subject', 'Topic', 'Lesson', 'Quiz', 'AITutor', 'JoinClass'];
+  
+  // Pages accessible by teachers (and admins)
+  const teacherPages = ['TeacherDashboard', 'ClassDetails', 'CreateAssignment'];
+  
+  // Pages accessible only by admins
+  const adminPages = ['AdminPanel'];
+
+  // ============================================================================
+  // STEP 2: Check authentication and user data on mount
+  // ============================================================================
+  
   useEffect(() => {
     const checkAuth = async () => {
-      try {
-        const isAuthenticated = await base44.auth.isAuthenticated();
-        if (isAuthenticated) {
-          const userData = await base44.auth.me();
-          setUser(userData);
-        }
-      } catch (e) {
-        console.error(e);
+      // Skip auth check for public pages - they can be viewed by anyone
+      if (publicPages.includes(currentPageName)) {
+        setLoading(false);
+        return;
       }
+
+      try {
+        // Check if user is authenticated
+        const isAuthenticated = await base44.auth.isAuthenticated();
+        
+        if (!isAuthenticated) {
+          // REDIRECT: Unauthenticated users go to Landing page
+          // They need to log in before accessing any protected content
+          navigate(createPageUrl('Landing'));
+          return;
+        }
+
+        // User is authenticated - fetch their data
+        const userData = await base44.auth.me();
+        setUser(userData);
+
+        // ============================================================================
+        // STEP 3: Check if onboarding is complete
+        // ============================================================================
+        
+        // If user has no user_type, they haven't completed onboarding
+        // Force them to onboarding (unless they're already there)
+        if (!userData.user_type && currentPageName !== 'Onboarding') {
+          navigate(createPageUrl('Onboarding'));
+          return;
+        }
+
+        // ============================================================================
+        // STEP 4: Enforce role-based access control
+        // ============================================================================
+        
+        // Skip role check for onboarding page (user_type might not be set yet)
+        if (currentPageName === 'Onboarding') {
+          setLoading(false);
+          return;
+        }
+
+        const userRole = userData.user_type || userData.role; // user_type is our custom field, role is built-in
+        const isAdmin = userRole === 'admin' || userData.role === 'admin';
+        const isTeacher = userRole === 'teacher';
+        const isStudent = userRole === 'student';
+
+        // Check if user is trying to access a page they're not allowed to
+        let hasAccess = false;
+        let redirectPage = null;
+
+        if (studentPages.includes(currentPageName)) {
+          // Student pages - only students can access
+          hasAccess = isStudent;
+          if (!hasAccess) {
+            // Redirect teachers/admins to their dashboard
+            redirectPage = isTeacher ? 'TeacherDashboard' : 'AdminPanel';
+          }
+        } else if (teacherPages.includes(currentPageName)) {
+          // Teacher pages - teachers and admins can access
+          hasAccess = isTeacher || isAdmin;
+          if (!hasAccess) {
+            // Redirect students to their dashboard
+            redirectPage = 'StudentDashboard';
+          }
+        } else if (adminPages.includes(currentPageName)) {
+          // Admin pages - only admins can access
+          hasAccess = isAdmin;
+          if (!hasAccess) {
+            // Redirect to appropriate dashboard based on role
+            redirectPage = isTeacher ? 'TeacherDashboard' : 'StudentDashboard';
+          }
+        } else {
+          // Unknown page - allow access (might be a new page)
+          hasAccess = true;
+        }
+
+        // REDIRECT: If user doesn't have access, send them to their dashboard
+        if (!hasAccess && redirectPage) {
+          navigate(createPageUrl(redirectPage));
+          return;
+        }
+
+      } catch (e) {
+        console.error('Auth check error:', e);
+        // On error, redirect to Landing for safety
+        navigate(createPageUrl('Landing'));
+        return;
+      }
+      
       setLoading(false);
     };
+    
     checkAuth();
-  }, []);
+  }, [currentPageName, navigate]);
 
-  // Pages that don't need layout
-  const noLayoutPages = ['Landing', 'Onboarding'];
-  if (noLayoutPages.includes(currentPageName)) {
+  // ============================================================================
+  // STEP 5: Render public pages without layout
+  // ============================================================================
+  
+  // Public pages and onboarding don't need the sidebar layout
+  if (publicPages.includes(currentPageName) || currentPageName === 'Onboarding') {
     return children;
   }
 
+  // ============================================================================
+  // STEP 6: Define navigation items based on user role
+  // ============================================================================
+  
   const studentNav = [
     { name: 'Dashboard', icon: LayoutDashboard, page: 'StudentDashboard' },
     { name: 'Subjects', icon: BookOpen, page: 'Subject' },
@@ -60,19 +203,25 @@ export default function Layout({ children, currentPageName }) {
 
   const adminNav = [
     { name: 'Admin Panel', icon: Shield, page: 'AdminPanel' },
-    { name: 'Dashboard', icon: LayoutDashboard, page: 'StudentDashboard' },
+    { name: 'Teacher View', icon: LayoutDashboard, page: 'TeacherDashboard' },
   ];
 
   const getNavItems = () => {
-    if (user?.user_type === 'admin' || user?.role === 'admin') return adminNav;
-    if (user?.user_type === 'teacher') return teacherNav;
+    if (!user) return [];
+    const userRole = user.user_type || user.role;
+    if (userRole === 'admin' || user.role === 'admin') return adminNav;
+    if (userRole === 'teacher') return teacherNav;
     return studentNav;
   };
 
   const handleLogout = () => {
-    base44.auth.logout();
+    base44.auth.logout(createPageUrl('Landing'));
   };
 
+  // ============================================================================
+  // STEP 7: Show loading state while checking auth
+  // ============================================================================
+  
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
@@ -81,7 +230,16 @@ export default function Layout({ children, currentPageName }) {
     );
   }
 
+  // If no user at this point, don't render anything (redirect should happen)
+  if (!user) {
+    return null;
+  }
+
   const navItems = getNavItems();
+
+  // ============================================================================
+  // STEP 8: Render the layout with sidebar navigation
+  // ============================================================================
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -104,7 +262,7 @@ export default function Layout({ children, currentPageName }) {
           <div className="space-y-1">
             {navItems.map(item => (
               <Link
-                key={item.page}
+                key={item.page + item.name}
                 to={createPageUrl(item.page)}
                 className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
                   currentPageName === item.page
@@ -119,28 +277,26 @@ export default function Layout({ children, currentPageName }) {
           </div>
         </nav>
 
-        {/* User */}
-        {user && (
-          <div className="p-4 border-t border-slate-100">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center text-white font-bold">
-                {user.full_name?.charAt(0) || user.email?.charAt(0) || '?'}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-medium text-slate-800 truncate">{user.full_name || 'User'}</p>
-                <p className="text-xs text-slate-500 truncate">{user.email}</p>
-              </div>
+        {/* User info and logout */}
+        <div className="p-4 border-t border-slate-100">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center text-white font-bold">
+              {user.full_name?.charAt(0) || user.email?.charAt(0) || '?'}
             </div>
-            <Button 
-              variant="ghost" 
-              className="w-full justify-start text-slate-500 hover:text-red-600"
-              onClick={handleLogout}
-            >
-              <LogOut className="w-4 h-4 mr-2" />
-              Sign Out
-            </Button>
+            <div className="flex-1 min-w-0">
+              <p className="font-medium text-slate-800 truncate">{user.full_name || 'User'}</p>
+              <p className="text-xs text-slate-500 truncate capitalize">{user.user_type || user.role || 'User'}</p>
+            </div>
           </div>
-        )}
+          <Button 
+            variant="ghost" 
+            className="w-full justify-start text-slate-500 hover:text-red-600"
+            onClick={handleLogout}
+          >
+            <LogOut className="w-4 h-4 mr-2" />
+            Sign Out
+          </Button>
+        </div>
       </aside>
 
       {/* Mobile Header */}
@@ -183,7 +339,7 @@ export default function Layout({ children, currentPageName }) {
                 <nav className="space-y-1">
                   {navItems.map(item => (
                     <Link
-                      key={item.page}
+                      key={item.page + item.name}
                       to={createPageUrl(item.page)}
                       onClick={() => setMobileMenuOpen(false)}
                       className={`flex items-center gap-3 px-4 py-3 rounded-xl ${
@@ -198,27 +354,25 @@ export default function Layout({ children, currentPageName }) {
                   ))}
                 </nav>
 
-                {user && (
-                  <div className="mt-8 pt-6 border-t border-slate-100">
-                    <div className="flex items-center gap-3 mb-4 px-4">
-                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center text-white font-bold">
-                        {user.full_name?.charAt(0) || '?'}
-                      </div>
-                      <div>
-                        <p className="font-medium text-slate-800">{user.full_name}</p>
-                        <p className="text-xs text-slate-500">{user.user_type || 'Student'}</p>
-                      </div>
+                <div className="mt-8 pt-6 border-t border-slate-100">
+                  <div className="flex items-center gap-3 mb-4 px-4">
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center text-white font-bold">
+                      {user.full_name?.charAt(0) || '?'}
                     </div>
-                    <Button 
-                      variant="ghost" 
-                      className="w-full justify-start text-red-500"
-                      onClick={handleLogout}
-                    >
-                      <LogOut className="w-4 h-4 mr-2" />
-                      Sign Out
-                    </Button>
+                    <div>
+                      <p className="font-medium text-slate-800">{user.full_name}</p>
+                      <p className="text-xs text-slate-500 capitalize">{user.user_type || 'User'}</p>
+                    </div>
                   </div>
-                )}
+                  <Button 
+                    variant="ghost" 
+                    className="w-full justify-start text-red-500"
+                    onClick={handleLogout}
+                  >
+                    <LogOut className="w-4 h-4 mr-2" />
+                    Sign Out
+                  </Button>
+                </div>
               </div>
             </motion.div>
           </motion.div>
