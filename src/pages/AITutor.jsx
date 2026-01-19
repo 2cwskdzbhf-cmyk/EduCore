@@ -87,48 +87,178 @@ export default function AITutor() {
     scrollToBottom();
   }, [messages]);
 
+  // ============================================================================
+  // BUILD PERSONALISED AI CONTEXT PROMPT
+  // This function injects real student data into the AI prompt for personalisation
+  // ============================================================================
+  
   const buildContextPrompt = () => {
+    // ----------------------------------------------------------------------------
+    // SECTION 1: Base AI personality and behaviour rules
+    // ----------------------------------------------------------------------------
     let context = "You are a friendly, encouraging AI tutor for secondary school students (ages 11-16). ";
     context += "Use simple language, step-by-step explanations, and relatable examples. ";
-    context += "Be supportive and patient. Use emojis sparingly to keep things engaging. ";
-    
+    context += "Be supportive and patient. Use emojis sparingly to keep things engaging.\n";
+
+    // ----------------------------------------------------------------------------
+    // SECTION 2: Inject student profile data (level, XP, experience)
+    // This helps AI understand student's overall progress
+    // ----------------------------------------------------------------------------
     if (progress) {
-      context += `\n\nStudent profile:`;
-      context += `\n- Level: ${progress.level || 1}`;
+      context += `\n## STUDENT PROFILE DATA:`;
+      context += `\n- Current Level: ${progress.level || 1}`;
       context += `\n- Total XP: ${progress.total_xp || 0}`;
-      
-      if (progress.strong_areas?.length > 0) {
-        const strongTopicNames = progress.strong_areas
-          .map(id => topics.find(t => t.id === id)?.name)
-          .filter(Boolean);
-        if (strongTopicNames.length > 0) {
-          context += `\n- Strong areas: ${strongTopicNames.join(', ')}`;
-        }
-      }
-      
-      if (progress.weak_areas?.length > 0) {
-        const weakTopicNames = progress.weak_areas
-          .map(id => topics.find(t => t.id === id)?.name)
-          .filter(Boolean);
-        if (weakTopicNames.length > 0) {
-          context += `\n- Areas needing practice: ${weakTopicNames.join(', ')}`;
-        }
-      }
+      context += `\n- Current Streak: ${progress.current_streak || 0} days`;
+      context += `\n- Lessons Completed: ${progress.completed_lessons?.length || 0}`;
     }
 
-    if (topic) {
-      context += `\n\nCurrent topic context: ${topic.name} - ${topic.description || ''}`;
+    // ----------------------------------------------------------------------------
+    // SECTION 3: Inject weak areas - topics where student struggles
+    // AI will simplify explanations and offer more support for these topics
+    // ----------------------------------------------------------------------------
+    const weakTopicNames = [];
+    const weakTopicIds = progress?.weak_areas || [];
+    
+    if (weakTopicIds.length > 0) {
+      weakTopicIds.forEach(id => {
+        const t = topics.find(top => top.id === id);
+        if (t) weakTopicNames.push(t.name);
+      });
+    }
+    
+    // Also check recent quiz attempts for low scores (below 60%)
+    const recentLowScoreTopics = [];
+    quizAttempts.forEach(attempt => {
+      if (attempt.score < 60) {
+        const t = topics.find(top => top.id === attempt.topic_id);
+        if (t && !weakTopicNames.includes(t.name) && !recentLowScoreTopics.includes(t.name)) {
+          recentLowScoreTopics.push(t.name);
+        }
+      }
+    });
+
+    if (weakTopicNames.length > 0 || recentLowScoreTopics.length > 0) {
+      context += `\n\n## WEAK AREAS (student struggles with these - USE SIMPLER EXPLANATIONS):`;
+      if (weakTopicNames.length > 0) {
+        context += `\n- Identified weak topics: ${weakTopicNames.join(', ')}`;
+      }
+      if (recentLowScoreTopics.length > 0) {
+        context += `\n- Recent low quiz scores in: ${recentLowScoreTopics.join(', ')}`;
+      }
+      context += `\n\n>> INSTRUCTION: For these weak areas, you MUST:`;
+      context += `\n   - Break down concepts into very small steps`;
+      context += `\n   - Use simpler vocabulary and more examples`;
+      context += `\n   - Check understanding frequently`;
+      context += `\n   - Offer encouragement and positive reinforcement`;
     }
 
+    // ----------------------------------------------------------------------------
+    // SECTION 4: Inject strong areas - topics where student excels
+    // AI can provide more challenging content for these topics
+    // ----------------------------------------------------------------------------
+    const strongTopicNames = [];
+    const strongTopicIds = progress?.strong_areas || [];
+    
+    if (strongTopicIds.length > 0) {
+      strongTopicIds.forEach(id => {
+        const t = topics.find(top => top.id === id);
+        if (t) strongTopicNames.push(t.name);
+      });
+    }
+
+    // Also check recent quiz attempts for high scores (80%+)
+    const recentHighScoreTopics = [];
+    quizAttempts.forEach(attempt => {
+      if (attempt.score >= 80) {
+        const t = topics.find(top => top.id === attempt.topic_id);
+        if (t && !strongTopicNames.includes(t.name) && !recentHighScoreTopics.includes(t.name)) {
+          recentHighScoreTopics.push(t.name);
+        }
+      }
+    });
+
+    if (strongTopicNames.length > 0 || recentHighScoreTopics.length > 0) {
+      context += `\n\n## STRONG AREAS (student excels here - CAN GIVE HARDER CONTENT):`;
+      if (strongTopicNames.length > 0) {
+        context += `\n- Mastered topics: ${strongTopicNames.join(', ')}`;
+      }
+      if (recentHighScoreTopics.length > 0) {
+        context += `\n- Recent high quiz scores in: ${recentHighScoreTopics.join(', ')}`;
+      }
+      context += `\n\n>> INSTRUCTION: For these strong areas, you CAN:`;
+      context += `\n   - Provide more challenging practice problems`;
+      context += `\n   - Introduce advanced concepts or extensions`;
+      context += `\n   - Move faster through basic explanations`;
+    }
+
+    // ----------------------------------------------------------------------------
+    // SECTION 5: Inject recent quiz performance data
+    // Helps AI understand current confidence levels per topic
+    // ----------------------------------------------------------------------------
     if (quizAttempts.length > 0) {
-      context += `\n\nRecent quiz performance:`;
-      quizAttempts.slice(0, 3).forEach(attempt => {
+      context += `\n\n## RECENT QUIZ PERFORMANCE (last ${Math.min(quizAttempts.length, 5)} attempts):`;
+      quizAttempts.slice(0, 5).forEach(attempt => {
         const attemptTopic = topics.find(t => t.id === attempt.topic_id);
         if (attemptTopic) {
-          context += `\n- ${attemptTopic.name}: ${attempt.score}%`;
+          const scoreLevel = attempt.score >= 80 ? 'CONFIDENT' : attempt.score >= 60 ? 'DEVELOPING' : 'NEEDS SUPPORT';
+          context += `\n- ${attemptTopic.name}: ${attempt.score}% (${scoreLevel})`;
         }
       });
     }
+
+    // ----------------------------------------------------------------------------
+    // SECTION 6: Inject topic mastery percentages
+    // Shows AI the student's confidence level per topic
+    // ----------------------------------------------------------------------------
+    if (progress?.topic_mastery && Object.keys(progress.topic_mastery).length > 0) {
+      context += `\n\n## TOPIC MASTERY LEVELS:`;
+      Object.entries(progress.topic_mastery).forEach(([topicId, mastery]) => {
+        const t = topics.find(top => top.id === topicId);
+        if (t) {
+          const masteryLevel = mastery >= 80 ? 'HIGH' : mastery >= 50 ? 'MEDIUM' : 'LOW';
+          context += `\n- ${t.name}: ${mastery}% mastery (${masteryLevel})`;
+        }
+      });
+    }
+
+    // ----------------------------------------------------------------------------
+    // SECTION 7: Current topic context (if student came from a specific topic/lesson)
+    // ----------------------------------------------------------------------------
+    if (topic) {
+      const isWeakTopic = weakTopicNames.includes(topic.name) || recentLowScoreTopics.includes(topic.name);
+      const isStrongTopic = strongTopicNames.includes(topic.name) || recentHighScoreTopics.includes(topic.name);
+      
+      context += `\n\n## CURRENT TOPIC CONTEXT: ${topic.name}`;
+      context += `\n- Description: ${topic.description || 'No description'}`;
+      context += `\n- Difficulty: ${topic.difficulty_level || 'unknown'}`;
+      
+      if (isWeakTopic) {
+        context += `\n- ⚠️ This is a WEAK AREA for this student - use extra simple explanations!`;
+      } else if (isStrongTopic) {
+        context += `\n- ✓ This is a STRONG AREA - can provide more challenging content`;
+      }
+    }
+
+    // ----------------------------------------------------------------------------
+    // SECTION 8: Auto-suggest revision for weak topics
+    // AI should proactively suggest revision when detecting weak areas
+    // ----------------------------------------------------------------------------
+    if (weakTopicNames.length > 0 || recentLowScoreTopics.length > 0) {
+      const allWeakTopics = [...new Set([...weakTopicNames, ...recentLowScoreTopics])];
+      context += `\n\n## AUTO-REVISION SUGGESTION:`;
+      context += `\nIf the student seems unsure or asks general questions, proactively suggest revising: ${allWeakTopics.join(', ')}`;
+      context += `\nYou can say something like: "I noticed you might benefit from some practice with [topic]. Would you like me to help you revise that?"`;
+    }
+
+    // ----------------------------------------------------------------------------
+    // SECTION 9: Quiz protection rules
+    // Prevent AI from giving direct answers during active quizzes
+    // ----------------------------------------------------------------------------
+    context += `\n\n## IMPORTANT RULES:`;
+    context += `\n1. NEVER give direct answers to quiz questions. Instead, guide the student to find the answer themselves.`;
+    context += `\n2. If a student asks for a specific quiz answer, say: "I can't give you the answer directly, but let me help you understand the concept..."`;
+    context += `\n3. When helping with problems, use hints and guiding questions rather than solutions.`;
+    context += `\n4. Always encourage the student and celebrate their efforts.`;
 
     return context;
   };
