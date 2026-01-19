@@ -20,11 +20,41 @@ export default function Onboarding() {
   const navigate = useNavigate();
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
+  const [checkingAuth, setCheckingAuth] = useState(true);
   const [formData, setFormData] = useState({
     user_type: '',
     year_group: null,
     subjects: []
   });
+
+  // Check if user is authenticated and if they've already completed onboarding
+  useEffect(() => {
+    const checkAuth = async () => {
+      const isAuthenticated = await base44.auth.isAuthenticated();
+      if (!isAuthenticated) {
+        // Not logged in - redirect to login
+        base44.auth.redirectToLogin(createPageUrl('Onboarding'));
+        return;
+      }
+      
+      // Check if user already has a user_type (already onboarded)
+      const user = await base44.auth.me();
+      if (user.user_type) {
+        // Already onboarded - redirect to appropriate dashboard
+        if (user.user_type === 'student') {
+          navigate(createPageUrl('StudentDashboard'));
+        } else if (user.user_type === 'teacher') {
+          navigate(createPageUrl('TeacherDashboard'));
+        } else {
+          navigate(createPageUrl('AdminPanel'));
+        }
+        return;
+      }
+      
+      setCheckingAuth(false);
+    };
+    checkAuth();
+  }, [navigate]);
 
   const userTypes = [
     { id: 'student', label: 'Student', icon: User, description: 'I want to learn and practice' },
