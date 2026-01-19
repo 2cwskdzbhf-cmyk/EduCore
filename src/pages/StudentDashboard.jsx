@@ -14,7 +14,8 @@ import {
   MessageSquare,
   Award,
   ChevronRight,
-  Calendar
+  Calendar,
+  Users
 } from 'lucide-react';
 
 import StatsCard from '@/components/dashboard/StatsCard';
