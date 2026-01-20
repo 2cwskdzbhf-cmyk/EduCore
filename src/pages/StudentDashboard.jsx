@@ -15,8 +15,11 @@ import {
   Award,
   ChevronRight,
   Calendar,
-  Users
+  Users,
+  Play,
+  GraduationCap
 } from 'lucide-react';
+import { Input } from '@/components/ui/input';
 
 import StatsCard from '@/components/dashboard/StatsCard';
 import SubjectCard from '@/components/dashboard/SubjectCard';
@@ -27,6 +30,7 @@ import StreakBadge from '@/components/ui/StreakBadge';
 
 export default function StudentDashboard() {
   const [user, setUser] = useState(null);
+  const [liveQuizCode, setLiveQuizCode] = useState('');
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -56,9 +60,32 @@ export default function StudentDashboard() {
     enabled: !!user?.email
   });
 
-  const { data: assignments = [] } = useQuery({
-    queryKey: ['assignments'],
-    queryFn: () => base44.entities.Assignment.list('-created_date', 5)
+  // Fetch classes where student is enrolled
+  const { data: classes = [], isLoading: loadingClasses } = useQuery({
+    queryKey: ['studentClasses', user?.email],
+    queryFn: async () => {
+      if (!user?.email) return [];
+      const allClasses = await base44.entities.Class.list();
+      return allClasses.filter(c => c.student_emails?.includes(user.email));
+    },
+    enabled: !!user?.email
+  });
+
+  // Fetch assignments for student's classes
+  const { data: assignments = [], isLoading: loadingAssignments } = useQuery({
+    queryKey: ['studentAssignments', classes],
+    queryFn: async () => {
+      if (classes.length === 0) return [];
+      const classIds = classes.map(c => c.id);
+      const allAssignments = await base44.entities.Assignment.list('-due_date', 20);
+      // Filter assignments for student's classes and not past due
+      return allAssignments.filter(a => 
+        classIds.includes(a.class_id) && 
+        a.status === 'published' &&
+        new Date(a.due_date) >= new Date()
+      );
+    },
+    enabled: classes.length > 0
   });
 
   const calculateLevelXP = (level) => level * 100;
@@ -153,51 +180,102 @@ export default function StudentDashboard() {
         </div>
 
         <div className="grid lg:grid-cols-3 gap-6">
-          {/* Left Column - Subjects */}
+          {/* Left Column */}
           <div className="lg:col-span-2 space-y-6">
-            <div className="flex items-center justify-between">
-              <h2 className="text-xl font-bold text-slate-900">Your Subjects</h2>
-              <Link to={createPageUrl('Subject')} className="text-indigo-600 text-sm font-medium hover:underline">
-                View all
-              </Link>
+            
+            {/* My Classes Section */}
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-bold text-slate-900">My Classes</h2>
+              </div>
+              {loadingClasses ? (
+                <div className="grid md:grid-cols-2 gap-4">
+                  {[1, 2].map(i => (
+                    <Skeleton key={i} className="h-24 rounded-2xl" />
+                  ))}
+                </div>
+              ) : classes.length > 0 ? (
+                <div className="grid md:grid-cols-2 gap-4">
+                  {classes.map(cls => {
+                    const classSubject = subjects.find(s => s.id === cls.subject_id);
+                    return (
+                      <Link 
+                        key={cls.id} 
+                        to={createPageUrl('ClassDetails') + `?id=${cls.id}`}
+                        className="bg-white rounded-2xl p-4 border border-slate-100 hover:border-indigo-200 transition-colors"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-xl bg-indigo-100 flex items-center justify-center">
+                            <GraduationCap className="w-5 h-5 text-indigo-600" />
+                          </div>
+                          <div className="flex-1">
+                            <p className="font-medium text-slate-800">{cls.name}</p>
+                            <p className="text-xs text-slate-500">{classSubject?.name || 'No subject'}</p>
+                          </div>
+                          <ChevronRight className="w-4 h-4 text-slate-400" />
+                        </div>
+                      </Link>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="bg-white rounded-2xl p-6 text-center border border-slate-100">
+                  <Users className="w-10 h-10 text-slate-300 mx-auto mb-3" />
+                  <h3 className="font-semibold text-slate-700 mb-1">No classes yet</h3>
+                  <p className="text-slate-500 text-sm mb-3">Join a class using a code from your teacher.</p>
+                  <Link to={createPageUrl('JoinClass')}>
+                    <Button variant="outline" size="sm">Join Class</Button>
+                  </Link>
+                </div>
+              )}
             </div>
 
-            {loadingSubjects ? (
-              <div className="grid md:grid-cols-2 gap-4">
-                {[1, 2].map(i => (
-                  <Skeleton key={i} className="h-48 rounded-2xl" />
-                ))}
+            {/* Self Learning Section */}
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-bold text-slate-900">Self Learning</h2>
+                <Link to={createPageUrl('Subject')} className="text-indigo-600 text-sm font-medium hover:underline">
+                  View all
+                </Link>
               </div>
-            ) : subjects.length > 0 ? (
-              <div className="grid md:grid-cols-2 gap-4">
-                {subjects.slice(0, 4).map((subject, idx) => {
-                  const subjectTopics = topics.filter(t => t.subject_id === subject.id);
-                  const completedTopics = subjectTopics.filter(t => 
-                    progress?.topic_mastery?.[t.id] >= 80
-                  ).length;
-                  
-                  return (
-                    <SubjectCard
-                      key={subject.id}
-                      subject={subject}
-                      progress={getSubjectProgress(subject.id)}
-                      topicsCount={subjectTopics.length}
-                      completedTopics={completedTopics}
-                      delay={idx * 0.1}
-                    />
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="bg-white rounded-2xl p-8 text-center border border-slate-100">
-                <BookOpen className="w-12 h-12 text-slate-300 mx-auto mb-4" />
-                <h3 className="font-semibold text-slate-700 mb-2">No subjects yet</h3>
-                <p className="text-slate-500 text-sm">Subjects will appear here once added.</p>
-              </div>
-            )}
+
+              {loadingSubjects ? (
+                <div className="grid md:grid-cols-2 gap-4">
+                  {[1, 2].map(i => (
+                    <Skeleton key={i} className="h-48 rounded-2xl" />
+                  ))}
+                </div>
+              ) : subjects.length > 0 ? (
+                <div className="grid md:grid-cols-2 gap-4">
+                  {subjects.slice(0, 4).map((subject, idx) => {
+                    const subjectTopics = topics.filter(t => t.subject_id === subject.id);
+                    const completedTopics = subjectTopics.filter(t => 
+                      progress?.topic_mastery?.[t.id] >= 80
+                    ).length;
+                    
+                    return (
+                      <SubjectCard
+                        key={subject.id}
+                        subject={subject}
+                        progress={getSubjectProgress(subject.id)}
+                        topicsCount={subjectTopics.length}
+                        completedTopics={completedTopics}
+                        delay={idx * 0.1}
+                      />
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="bg-white rounded-2xl p-8 text-center border border-slate-100">
+                  <BookOpen className="w-12 h-12 text-slate-300 mx-auto mb-4" />
+                  <h3 className="font-semibold text-slate-700 mb-2">No subjects yet</h3>
+                  <p className="text-slate-500 text-sm">Subjects will appear here once added.</p>
+                </div>
+              )}
+            </div>
 
             {/* Weak/Strong Areas */}
-            <div className="mt-6">
+            <div>
               <h2 className="text-xl font-bold text-slate-900 mb-4">Your Performance</h2>
               <WeakStrongAreas
                 weakAreas={progress?.weak_areas || []}
@@ -216,43 +294,74 @@ export default function StudentDashboard() {
             />
 
             {/* Upcoming Assignments */}
-            <motion.div
-              className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.3 }}
-            >
+            <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="font-semibold text-slate-800">Upcoming Work</h3>
+                <h3 className="font-semibold text-slate-800">Upcoming Assignments</h3>
                 <Calendar className="w-5 h-5 text-slate-400" />
               </div>
-              {assignments.length > 0 ? (
+              {loadingAssignments ? (
                 <div className="space-y-3">
-                  {assignments.slice(0, 3).map(assignment => (
-                    <div key={assignment.id} className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl">
-                      <div className="w-2 h-2 rounded-full bg-indigo-500" />
-                      <div className="flex-1">
-                        <p className="text-sm font-medium text-slate-700">{assignment.title}</p>
-                        <p className="text-xs text-slate-500">
-                          Due: {new Date(assignment.due_date).toLocaleDateString()}
-                        </p>
+                  {[1, 2].map(i => <Skeleton key={i} className="h-16 rounded-xl" />)}
+                </div>
+              ) : assignments.length > 0 ? (
+                <div className="space-y-3">
+                  {assignments.slice(0, 5).map(assignment => {
+                    const assignmentClass = classes.find(c => c.id === assignment.class_id);
+                    const dueDate = new Date(assignment.due_date);
+                    const isUrgent = dueDate - new Date() < 2 * 24 * 60 * 60 * 1000; // 2 days
+                    return (
+                      <div 
+                        key={assignment.id} 
+                        className={`flex items-center gap-3 p-3 rounded-xl ${isUrgent ? 'bg-red-50' : 'bg-slate-50'}`}
+                      >
+                        <div className={`w-2 h-2 rounded-full ${isUrgent ? 'bg-red-500' : 'bg-indigo-500'}`} />
+                        <div className="flex-1">
+                          <p className="text-sm font-medium text-slate-700">{assignment.title}</p>
+                          <p className="text-xs text-slate-500">
+                            {assignmentClass?.name} • Due: {dueDate.toLocaleDateString()}
+                          </p>
+                        </div>
+                        <span className={`text-xs px-2 py-1 rounded-full ${
+                          assignment.assignment_type === 'quiz' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'
+                        }`}>
+                          {assignment.assignment_type || 'Task'}
+                        </span>
                       </div>
-                      <ChevronRight className="w-4 h-4 text-slate-400" />
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               ) : (
                 <p className="text-sm text-slate-500 text-center py-4">No upcoming assignments</p>
               )}
-            </motion.div>
+            </div>
+
+            {/* Join Live Quiz */}
+            <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm">
+              <div className="flex items-center gap-3 mb-3">
+                <Play className="w-5 h-5 text-green-500" />
+                <h3 className="font-semibold text-slate-800">Join Live Quiz</h3>
+              </div>
+              <p className="text-slate-500 text-sm mb-4">
+                Enter a code from your teacher to join a live quiz session.
+              </p>
+              <div className="flex gap-2">
+                <Input
+                  placeholder="Enter quiz code"
+                  value={liveQuizCode}
+                  onChange={(e) => setLiveQuizCode(e.target.value.toUpperCase())}
+                  className="flex-1"
+                  maxLength={6}
+                />
+                <Link to={liveQuizCode ? createPageUrl('LiveQuiz') + `?code=${liveQuizCode}` : '#'}>
+                  <Button disabled={!liveQuizCode.trim()} className="bg-green-500 hover:bg-green-600">
+                    Join
+                  </Button>
+                </Link>
+              </div>
+            </div>
 
             {/* Join Class */}
-            <motion.div
-              className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.35 }}
-            >
+            <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm">
               <div className="flex items-center gap-3 mb-3">
                 <Users className="w-5 h-5 text-indigo-500" />
                 <h3 className="font-semibold text-slate-800">Join a Class</h3>
@@ -265,7 +374,7 @@ export default function StudentDashboard() {
                   Enter Code
                 </Button>
               </Link>
-            </motion.div>
+            </div>
 
             {/* Quick Actions */}
             <motion.div
