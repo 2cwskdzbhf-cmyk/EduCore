@@ -39,74 +39,12 @@ export default function ContentUploader({ onContentExtracted, onCancel }) {
       const { file_url } = await base44.integrations.Core.UploadFile({ file });
 
       // Extract content from the uploaded file using OpenAI vision
-      const extractedContent = await callOpenAI(
-        `Analyze this uploaded file and extract all key concepts, vocabulary, definitions, and facts that would be useful for revision.
+      const extractedContent = await callOpenAI({
+        prompt: `Analyze this uploaded file and extract all key concepts, vocabulary, definitions, and facts that would be useful for revision.
 
 Return the extracted content as JSON with topics array, key_concepts array (with term and definition), facts array, vocabulary array (with word and meaning), and a summary string.`,
-        {
-          type: "object",
-          properties: {
-            topics: { type: "array", items: { type: "string" } },
-            key_concepts: { 
-              type: "array", 
-              items: { 
-                type: "object",
-                properties: {
-                  term: { type: "string" },
-                  definition: { type: "string" }
-                },
-                required: ["term", "definition"],
-                additionalProperties: false
-              } 
-            },
-            facts: { type: "array", items: { type: "string" } },
-            vocabulary: { 
-              type: "array", 
-              items: { 
-                type: "object",
-                properties: {
-                  word: { type: "string" },
-                  meaning: { type: "string" }
-                },
-                required: ["word", "meaning"],
-                additionalProperties: false
-              } 
-            },
-            summary: { type: "string" }
-          },
-          required: ["topics", "key_concepts", "facts", "vocabulary", "summary"],
-          additionalProperties: false
-        },
-        [file_url]
-      );
-
-      onContentExtracted(extractedContent, file_url);
-    } catch (error) {
-      console.error('Error processing file:', error);
-    }
-
-    setIsProcessing(false);
-  };
-
-  /**
-   * Handle text content submission
-   * Parse the text to extract key concepts
-   */
-  const handleTextSubmit = async () => {
-    if (!textContent.trim()) return;
-
-    setIsProcessing(true);
-
-    try {
-      // Use OpenAI to extract and structure the text content
-      const extractedContent = await callOpenAI(
-        `Analyze this revision content and extract all key concepts, vocabulary, definitions, and facts.
-
-Content:
-${textContent}
-
-Return the extracted content as JSON with topics array, key_concepts array (with term and definition), facts array, vocabulary array (with word and meaning), and a summary string.`,
-        {
+        file_urls: [file_url],
+        response_json_schema: {
           type: "object",
           properties: {
             topics: { type: "array", items: { type: "string" } },
@@ -140,7 +78,69 @@ Return the extracted content as JSON with topics array, key_concepts array (with
           required: ["topics", "key_concepts", "facts", "vocabulary", "summary"],
           additionalProperties: false
         }
-      );
+      });
+
+      onContentExtracted(extractedContent, file_url);
+    } catch (error) {
+      console.error('Error processing file:', error);
+    }
+
+    setIsProcessing(false);
+  };
+
+  /**
+   * Handle text content submission
+   * Parse the text to extract key concepts
+   */
+  const handleTextSubmit = async () => {
+    if (!textContent.trim()) return;
+
+    setIsProcessing(true);
+
+    try {
+      // Use OpenAI to extract and structure the text content
+      const extractedContent = await callOpenAI({
+        prompt: `Analyze this revision content and extract all key concepts, vocabulary, definitions, and facts.
+
+Content:
+${textContent}
+
+Return the extracted content as JSON with topics array, key_concepts array (with term and definition), facts array, vocabulary array (with word and meaning), and a summary string.`,
+        response_json_schema: {
+          type: "object",
+          properties: {
+            topics: { type: "array", items: { type: "string" } },
+            key_concepts: { 
+              type: "array", 
+              items: { 
+                type: "object",
+                properties: {
+                  term: { type: "string" },
+                  definition: { type: "string" }
+                },
+                required: ["term", "definition"],
+                additionalProperties: false
+              } 
+            },
+            facts: { type: "array", items: { type: "string" } },
+            vocabulary: { 
+              type: "array", 
+              items: { 
+                type: "object",
+                properties: {
+                  word: { type: "string" },
+                  meaning: { type: "string" }
+                },
+                required: ["word", "meaning"],
+                additionalProperties: false
+              } 
+            },
+            summary: { type: "string" }
+          },
+          required: ["topics", "key_concepts", "facts", "vocabulary", "summary"],
+          additionalProperties: false
+        }
+      });
 
       onContentExtracted(extractedContent, null);
     } catch (error) {
