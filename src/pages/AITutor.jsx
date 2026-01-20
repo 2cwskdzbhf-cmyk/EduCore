@@ -10,7 +10,6 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import ReactMarkdown from 'react-markdown';
-import { callOpenAI } from '@/components/utils/openai';
 import { 
   ChevronLeft, 
   Send,
@@ -176,8 +175,8 @@ export default function AITutor() {
 
     try {
       // Use OpenAI to generate flashcards based on extracted content
-      const flashcardsData = await callOpenAI(
-        `Create flashcards for revision from this content. Each flashcard should have a front (question/term) and back (answer/definition).
+      const flashcardsData = await callOpenAI({
+        prompt: `Create flashcards for revision from this content. Each flashcard should have a front (question/term) and back (answer/definition).
 
 Subject: ${subject}
 
@@ -188,7 +187,7 @@ Vocabulary: ${JSON.stringify(extractedContent.vocabulary || [])}
 Facts: ${JSON.stringify(extractedContent.facts || [])}
 
 Create 8-12 flashcards that cover the most important points.`,
-        {
+        response_json_schema: {
           type: "object",
           properties: {
             flashcards: {
@@ -207,7 +206,7 @@ Create 8-12 flashcards that cover the most important points.`,
           required: ["flashcards"],
           additionalProperties: false
         }
-      );
+      });
 
       setRevisionState(prev => ({ ...prev, generatedFlashcards: flashcardsData.flashcards }));
       setIsTyping(false);
@@ -245,8 +244,8 @@ Create 8-12 flashcards that cover the most important points.`,
       // Consider weak skills from progress to focus questions
       const weakSkills = progress?.weak_skills || [];
       
-      const quizData = await callOpenAI(
-        `Create a revision quiz from this content. Mix multiple-choice and short-answer questions.
+      const quizData = await callOpenAI({
+        prompt: `Create a revision quiz from this content. Mix multiple-choice and short-answer questions.
 
 Subject: ${subject}
 ${weakSkills.length > 0 ? `Student weak areas to focus on: ${weakSkills.join(', ')}` : ''}
@@ -258,7 +257,7 @@ Vocabulary: ${JSON.stringify(extractedContent.vocabulary || [])}
 Facts: ${JSON.stringify(extractedContent.facts || [])}
 
 Create 6-8 questions. For multiple choice, provide 4 options with id and text fields.`,
-        {
+        response_json_schema: {
           type: "object",
           properties: {
             questions: {
@@ -292,7 +291,7 @@ Create 6-8 questions. For multiple choice, provide 4 options with id and text fi
           required: ["questions"],
           additionalProperties: false
         }
-      );
+      });
 
       setRevisionState(prev => ({ ...prev, generatedQuiz: quizData.questions }));
       setIsTyping(false);
@@ -326,8 +325,8 @@ Create 6-8 questions. For multiple choice, provide 4 options with id and text fi
     setIsTyping(true);
 
     try {
-      const gameData = await callOpenAI(
-        `Create quick-fire questions for a revision game. Questions should be answerable in a few seconds.
+      const gameData = await callOpenAI({
+        prompt: `Create quick-fire questions for a revision game. Questions should be answerable in a few seconds.
 
 Subject: ${subject}
 
@@ -338,7 +337,7 @@ Vocabulary: ${JSON.stringify(extractedContent.vocabulary || [])}
 Facts: ${JSON.stringify(extractedContent.facts || [])}
 
 Create 10-15 short questions. For multiple choice questions provide 4 options with id and text. Leave options empty array for text answer questions.`,
-        {
+        response_json_schema: {
           type: "object",
           properties: {
             questions: {
@@ -370,7 +369,7 @@ Create 10-15 short questions. For multiple choice questions provide 4 options wi
           required: ["questions"],
           additionalProperties: false
         }
-      );
+      });
 
       setRevisionState(prev => ({ ...prev, generatedGameQuestions: gameData.questions }));
       setIsTyping(false);
@@ -780,7 +779,10 @@ Create 10-15 short questions. For multiple choice questions provide 4 options wi
         }
       }
 
-      const response = await callOpenAI(fullPrompt);
+      const response = await callOpenAI({
+        prompt: fullPrompt
+      });
+
       return response;
     }
   });
