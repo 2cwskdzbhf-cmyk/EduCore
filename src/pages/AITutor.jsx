@@ -19,8 +19,18 @@ import {
   Lightbulb,
   MessageSquare,
   RefreshCw,
-  Loader2
+  Loader2,
+  Upload,
+  Layers,
+  HelpCircle,
+  Gamepad2
 } from 'lucide-react';
+
+// Revision components
+import FlashcardModal from '@/components/revision/FlashcardModal';
+import QuizModal from '@/components/revision/QuizModal';
+import RevisionGameModal from '@/components/revision/RevisionGameModal';
+import ContentUploader from '@/components/revision/ContentUploader';
 
 export default function AITutor() {
   const queryClient = useQueryClient();
@@ -36,6 +46,26 @@ export default function AITutor() {
   const [revisionTopic, setRevisionTopic] = useState('');
   const [conversation, setConversation] = useState(null);
   const [messages, setMessages] = useState([]);
+
+  // ============================================================================
+  // REVISION BOT STATE
+  // Tracks the revision flow: subject selection -> content upload -> activity choice
+  // ============================================================================
+  const [revisionState, setRevisionState] = useState({
+    step: 'idle', // idle, select_subject, upload_content, choose_activity, activity_running
+    subject: null,
+    extractedContent: null,
+    fileUrl: null,
+    generatedFlashcards: null,
+    generatedQuiz: null,
+    generatedGameQuestions: null
+  });
+  
+  // Modal states
+  const [showFlashcards, setShowFlashcards] = useState(false);
+  const [showQuiz, setShowQuiz] = useState(false);
+  const [showGame, setShowGame] = useState(false);
+  const [showUploader, setShowUploader] = useState(false);
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -78,6 +108,387 @@ export default function AITutor() {
     },
     enabled: !!user?.email
   });
+
+  // ============================================================================
+  // REVISION BOT: Start revision flow
+  // ============================================================================
+  const startRevisionBot = () => {
+    setRevisionState({ ...revisionState, step: 'select_subject' });
+    setMessages(prev => [...prev, {
+      role: 'assistant',
+      content: `👋 **Welcome to Revision Mode!**\n\nI'll help you revise any subject effectively. First, which subject would you like to revise?\n\nClick one of the options below or type the subject name:`
+    }]);
+  };
+
+  // Subject options for revision
+  const subjectOptions = ['French', 'Maths', 'Science', 'English', 'History', 'Geography'];
+
+  // ============================================================================
+  // REVISION BOT: Handle subject selection
+  // ============================================================================
+  const selectSubject = (subject) => {
+    setRevisionState({ ...revisionState, step: 'upload_content', subject });
+    setMessages(prev => [...prev, 
+      { role: 'user', content: subject },
+      { role: 'assistant', content: `Great choice! **${subject}** it is! 📚\n\nNow, please share the content you want to revise. You can:\n- **Paste text** (notes, vocabulary, definitions)\n- **Upload an image** (screenshot of notes, textbook page)\n\nClick the button below to upload your content:` }
+    ]);
+    setShowUploader(true);
+  };
+
+  // ============================================================================
+  // REVISION BOT: Handle extracted content from uploader
+  // Content is parsed by LLM to extract topics, vocabulary, facts, etc.
+  // ============================================================================
+  const handleContentExtracted = async (extractedContent, fileUrl) => {
+    setShowUploader(false);
+    setRevisionState({ 
+      ...revisionState, 
+      step: 'choose_activity', 
+      extractedContent,
+      fileUrl 
+    });
+
+    // Show summary of extracted content
+    const summary = extractedContent.summary || 'Content extracted successfully!';
+    const topicsList = extractedContent.topics?.join(', ') || 'Various topics';
+    const conceptCount = (extractedContent.key_concepts?.length || 0) + (extractedContent.vocabulary?.length || 0);
+
+    setMessages(prev => [...prev, {
+      role: 'assistant',
+      content: `✅ **Content Extracted!**\n\n**Topics:** ${topicsList}\n**Key concepts found:** ${conceptCount}\n**Summary:** ${summary}\n\nHow would you like to revise this content? Choose an activity:\n\n🎴 **Flashcards** - Review terms and definitions\n📝 **Quiz** - Test your knowledge\n🎮 **Game** - Learn while playing\n\nClick an option below:`
+    }]);
+  };
+
+  // ============================================================================
+  // REVISION BOT: Generate flashcards from extracted content
+  // Converts key_concepts and vocabulary into front/back flashcard format
+  // ============================================================================
+  const generateFlashcards = async () => {
+    const { extractedContent, subject } = revisionState;
+    
+    setMessages(prev => [...prev, 
+      { role: 'user', content: 'Flashcards' },
+      { role: 'assistant', content: '🎴 Generating flashcards from your content...' }
+    ]);
+    setIsTyping(true);
+
+    try {
+      // Use LLM to generate flashcards based on extracted content
+      const flashcardsData = await base44.integrations.Core.InvokeLLM({
+        prompt: `Create flashcards for revision from this content. Each flashcard should have a front (question/term) and back (answer/definition).
+
+Subject: ${subject}
+
+Content to convert to flashcards:
+Topics: ${JSON.stringify(extractedContent.topics || [])}
+Key Concepts: ${JSON.stringify(extractedContent.key_concepts || [])}
+Vocabulary: ${JSON.stringify(extractedContent.vocabulary || [])}
+Facts: ${JSON.stringify(extractedContent.facts || [])}
+
+Create 8-12 flashcards that cover the most important points.`,
+        response_json_schema: {
+          type: "object",
+          properties: {
+            flashcards: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  front: { type: "string" },
+                  back: { type: "string" }
+                }
+              }
+            }
+          }
+        }
+      });
+
+      setRevisionState(prev => ({ ...prev, generatedFlashcards: flashcardsData.flashcards }));
+      setIsTyping(false);
+      setMessages(prev => {
+        const newMessages = [...prev];
+        newMessages[newMessages.length - 1] = {
+          role: 'assistant',
+          content: `🎴 **${flashcardsData.flashcards?.length || 0} flashcards ready!**\n\nClick the button below to start studying. Flip each card to see the answer, then use arrows to navigate.`
+        };
+        return newMessages;
+      });
+      
+      // Open flashcard modal
+      setShowFlashcards(true);
+    } catch (error) {
+      console.error('Error generating flashcards:', error);
+      setIsTyping(false);
+    }
+  };
+
+  // ============================================================================
+  // REVISION BOT: Generate quiz from extracted content
+  // Creates multiple-choice and written questions based on content
+  // ============================================================================
+  const generateQuiz = async () => {
+    const { extractedContent, subject } = revisionState;
+    
+    setMessages(prev => [...prev, 
+      { role: 'user', content: 'Quiz' },
+      { role: 'assistant', content: '📝 Generating quiz questions...' }
+    ]);
+    setIsTyping(true);
+
+    try {
+      // Consider weak skills from progress to focus questions
+      const weakSkills = progress?.weak_skills || [];
+      
+      const quizData = await base44.integrations.Core.InvokeLLM({
+        prompt: `Create a revision quiz from this content. Mix multiple-choice and short-answer questions.
+
+Subject: ${subject}
+${weakSkills.length > 0 ? `Student weak areas to focus on: ${weakSkills.join(', ')}` : ''}
+
+Content:
+Topics: ${JSON.stringify(extractedContent.topics || [])}
+Key Concepts: ${JSON.stringify(extractedContent.key_concepts || [])}
+Vocabulary: ${JSON.stringify(extractedContent.vocabulary || [])}
+Facts: ${JSON.stringify(extractedContent.facts || [])}
+
+Create 6-8 questions. For multiple choice, provide 4 options.`,
+        response_json_schema: {
+          type: "object",
+          properties: {
+            questions: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  question: { type: "string" },
+                  type: { type: "string", enum: ["multiple_choice", "short_answer"] },
+                  options: { 
+                    type: "array", 
+                    items: { 
+                      type: "object",
+                      properties: {
+                        id: { type: "string" },
+                        text: { type: "string" }
+                      }
+                    } 
+                  },
+                  correct_answer: { type: "string" },
+                  explanation: { type: "string" },
+                  skill: { type: "string" }
+                }
+              }
+            }
+          }
+        }
+      });
+
+      setRevisionState(prev => ({ ...prev, generatedQuiz: quizData.questions }));
+      setIsTyping(false);
+      setMessages(prev => {
+        const newMessages = [...prev];
+        newMessages[newMessages.length - 1] = {
+          role: 'assistant',
+          content: `📝 **Quiz ready with ${quizData.questions?.length || 0} questions!**\n\nLet's test your knowledge. I'll mark your answers and give feedback.`
+        };
+        return newMessages;
+      });
+      
+      setShowQuiz(true);
+    } catch (error) {
+      console.error('Error generating quiz:', error);
+      setIsTyping(false);
+    }
+  };
+
+  // ============================================================================
+  // REVISION BOT: Generate game questions from extracted content
+  // Questions are used when player hits obstacles in the game
+  // ============================================================================
+  const generateGameQuestions = async () => {
+    const { extractedContent, subject } = revisionState;
+    
+    setMessages(prev => [...prev, 
+      { role: 'user', content: 'Game' },
+      { role: 'assistant', content: '🎮 Preparing your revision game...' }
+    ]);
+    setIsTyping(true);
+
+    try {
+      const gameData = await base44.integrations.Core.InvokeLLM({
+        prompt: `Create quick-fire questions for a revision game. Questions should be answerable in a few seconds.
+
+Subject: ${subject}
+
+Content:
+Topics: ${JSON.stringify(extractedContent.topics || [])}
+Key Concepts: ${JSON.stringify(extractedContent.key_concepts || [])}
+Vocabulary: ${JSON.stringify(extractedContent.vocabulary || [])}
+Facts: ${JSON.stringify(extractedContent.facts || [])}
+
+Create 10-15 short questions. Mix multiple choice (with 4 options) and short text answers.`,
+        response_json_schema: {
+          type: "object",
+          properties: {
+            questions: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  question: { type: "string" },
+                  options: { 
+                    type: "array", 
+                    items: { 
+                      type: "object",
+                      properties: {
+                        id: { type: "string" },
+                        text: { type: "string" }
+                      }
+                    } 
+                  },
+                  correct_answer: { type: "string" },
+                  skill: { type: "string" }
+                }
+              }
+            }
+          }
+        }
+      });
+
+      setRevisionState(prev => ({ ...prev, generatedGameQuestions: gameData.questions }));
+      setIsTyping(false);
+      setMessages(prev => {
+        const newMessages = [...prev];
+        newMessages[newMessages.length - 1] = {
+          role: 'assistant',
+          content: `🎮 **Game ready!**\n\nCollect stars while avoiding obstacles. When you hit an obstacle, answer a revision question to continue!\n\nUse arrow keys or buttons to move. Good luck!`
+        };
+        return newMessages;
+      });
+      
+      setShowGame(true);
+    } catch (error) {
+      console.error('Error generating game questions:', error);
+      setIsTyping(false);
+    }
+  };
+
+  // ============================================================================
+  // REVISION BOT: Handle flashcard completion
+  // ============================================================================
+  const handleFlashcardsComplete = (cardsReviewed) => {
+    setShowFlashcards(false);
+    setMessages(prev => [...prev, {
+      role: 'assistant',
+      content: `🎉 **Great job!** You reviewed ${cardsReviewed} flashcards.\n\nWould you like to:\n- Try the **Quiz** to test yourself\n- Play the **Game** for more practice\n- **Upload new content** to revise something else\n- Or type a question if you need help with anything!`
+    }]);
+  };
+
+  // ============================================================================
+  // REVISION BOT: Handle quiz completion
+  // Updates StudentProgress with performance data
+  // ============================================================================
+  const handleQuizComplete = async (results) => {
+    setShowQuiz(false);
+
+    // Update StudentProgress with quiz results
+    if (user?.email && progress) {
+      const skillResults = {};
+      results.results.forEach(r => {
+        const skill = r.skill || 'general';
+        if (!skillResults[skill]) {
+          skillResults[skill] = { correct: 0, total: 0 };
+        }
+        skillResults[skill].total++;
+        if (r.correct) skillResults[skill].correct++;
+      });
+
+      // Update skill mastery
+      const updatedSkillMastery = { ...progress.skill_mastery };
+      const newWeakSkills = [...(progress.weak_skills || [])];
+      const newStrongSkills = [...(progress.strong_skills || [])];
+
+      Object.entries(skillResults).forEach(([skill, data]) => {
+        const percentage = (data.correct / data.total) * 100;
+        updatedSkillMastery[skill] = {
+          correct: (updatedSkillMastery[skill]?.correct || 0) + data.correct,
+          total: (updatedSkillMastery[skill]?.total || 0) + data.total,
+          mastery: percentage,
+          last_practiced: new Date().toISOString()
+        };
+
+        // Update weak/strong skills
+        if (percentage < 50 && !newWeakSkills.includes(skill)) {
+          newWeakSkills.push(skill);
+          const strongIdx = newStrongSkills.indexOf(skill);
+          if (strongIdx > -1) newStrongSkills.splice(strongIdx, 1);
+        } else if (percentage >= 80 && !newStrongSkills.includes(skill)) {
+          newStrongSkills.push(skill);
+          const weakIdx = newWeakSkills.indexOf(skill);
+          if (weakIdx > -1) newWeakSkills.splice(weakIdx, 1);
+        }
+      });
+
+      // Save updated progress
+      await base44.entities.StudentProgress.update(progress.id, {
+        skill_mastery: updatedSkillMastery,
+        weak_skills: newWeakSkills,
+        strong_skills: newStrongSkills,
+        total_xp: (progress.total_xp || 0) + (results.correct * 5),
+        today_xp: (progress.today_xp || 0) + (results.correct * 5)
+      });
+
+      // Invalidate progress query
+      queryClient.invalidateQueries({ queryKey: ['studentProgress'] });
+    }
+
+    setMessages(prev => [...prev, {
+      role: 'assistant',
+      content: `📊 **Quiz Complete!**\n\n**Score:** ${results.correct}/${results.total} (${results.percentage}%)\n\n${results.percentage >= 80 
+        ? '🌟 Excellent work! You really know this content!' 
+        : results.percentage >= 60 
+          ? '👍 Good effort! A bit more practice and you\'ll master it.' 
+          : '💪 Keep practicing! Would you like to review the flashcards again?'}\n\nWhat would you like to do next?`
+    }]);
+  };
+
+  // ============================================================================
+  // REVISION BOT: Handle game completion
+  // ============================================================================
+  const handleGameComplete = async (results) => {
+    setShowGame(false);
+
+    // Update progress with game results
+    if (user?.email && progress) {
+      await base44.entities.StudentProgress.update(progress.id, {
+        total_xp: (progress.total_xp || 0) + results.score,
+        today_xp: (progress.today_xp || 0) + results.score
+      });
+      queryClient.invalidateQueries({ queryKey: ['studentProgress'] });
+    }
+
+    setMessages(prev => [...prev, {
+      role: 'assistant',
+      content: `🎮 **Game Over!**\n\n**Score:** ${results.score} points\n**Level reached:** ${results.level}\n**Questions correct:** ${results.correctAnswers}/${results.correctAnswers + results.wrongAnswers}\n\n${results.livesRemaining > 0 
+        ? '🏆 Well played!' 
+        : 'Nice try! Practice makes perfect.'}\n\nWant to play again or try a different activity?`
+    }]);
+  };
+
+  // ============================================================================
+  // REVISION BOT: Reset to start new revision session
+  // ============================================================================
+  const resetRevision = () => {
+    setRevisionState({
+      step: 'idle',
+      subject: null,
+      extractedContent: null,
+      fileUrl: null,
+      generatedFlashcards: null,
+      generatedQuiz: null,
+      generatedGameQuestions: null
+    });
+    setShowUploader(false);
+  };
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -384,6 +795,32 @@ export default function AITutor() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-purple-50/30 flex flex-col">
+      {/* Modals */}
+      {showFlashcards && revisionState.generatedFlashcards && (
+        <FlashcardModal
+          flashcards={revisionState.generatedFlashcards}
+          onClose={() => setShowFlashcards(false)}
+          onComplete={handleFlashcardsComplete}
+        />
+      )}
+
+      {showQuiz && revisionState.generatedQuiz && (
+        <QuizModal
+          questions={revisionState.generatedQuiz}
+          onClose={() => setShowQuiz(false)}
+          onComplete={handleQuizComplete}
+        />
+      )}
+
+      {showGame && revisionState.generatedGameQuestions && (
+        <RevisionGameModal
+          questions={revisionState.generatedGameQuestions}
+          subject={revisionState.subject}
+          onClose={() => setShowGame(false)}
+          onComplete={handleGameComplete}
+        />
+      )}
+
       {/* Header */}
       <div className="bg-white border-b border-slate-100 px-6 py-4">
         <div className="max-w-4xl mx-auto flex items-center justify-between">
@@ -398,7 +835,11 @@ export default function AITutor() {
               <div>
                 <h1 className="font-semibold text-slate-800">AI Tutor</h1>
                 <p className="text-xs text-slate-500">
-                  {topic ? `Helping with ${topic.name}` : 'Ready to help'}
+                  {revisionState.subject 
+                    ? `Revising ${revisionState.subject}` 
+                    : topic 
+                      ? `Helping with ${topic.name}` 
+                      : 'Ready to help'}
                 </p>
               </div>
             </div>
@@ -407,7 +848,7 @@ export default function AITutor() {
           {/* Mode Toggle */}
           <div className="flex items-center gap-2 bg-slate-100 rounded-lg p-1">
             <button
-              onClick={() => setMode('chat')}
+              onClick={() => { setMode('chat'); resetRevision(); }}
               className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
                 mode === 'chat' 
                   ? 'bg-white text-slate-800 shadow-sm' 
@@ -418,7 +859,7 @@ export default function AITutor() {
               Chat
             </button>
             <button
-              onClick={() => setMode('revision')}
+              onClick={() => { setMode('revision'); if (revisionState.step === 'idle') startRevisionBot(); }}
               className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
                 mode === 'revision' 
                   ? 'bg-white text-slate-800 shadow-sm' 
@@ -493,6 +934,19 @@ export default function AITutor() {
                     ))}
                   </div>
                 )}
+
+                {/* Revision mode empty state */}
+                {mode === 'revision' && revisionState.step === 'idle' && (
+                  <div className="mt-6">
+                    <Button
+                      onClick={startRevisionBot}
+                      className="bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700"
+                    >
+                      <Sparkles className="w-4 h-4 mr-2" />
+                      Start Revision Session
+                    </Button>
+                  </div>
+                )}
               </motion.div>
             ) : (
               <div className="space-y-6">
@@ -563,12 +1017,123 @@ export default function AITutor() {
                     </div>
                   </motion.div>
                 )}
+                {/* Revision Bot: Subject Selection Buttons */}
+                {mode === 'revision' && revisionState.step === 'select_subject' && (
+                  <div className="flex flex-wrap gap-2 mt-4">
+                    {subjectOptions.map(subj => (
+                      <Button
+                        key={subj}
+                        variant="outline"
+                        onClick={() => selectSubject(subj)}
+                        className="hover:bg-indigo-50 hover:border-indigo-300"
+                      >
+                        {subj}
+                      </Button>
+                    ))}
+                  </div>
+                )}
+
+                {/* Revision Bot: Content Uploader */}
+                {mode === 'revision' && showUploader && (
+                  <div className="mt-4">
+                    <ContentUploader
+                      onContentExtracted={handleContentExtracted}
+                      onCancel={() => setShowUploader(false)}
+                    />
+                  </div>
+                )}
+
+                {/* Revision Bot: Activity Choice Buttons */}
+                {mode === 'revision' && revisionState.step === 'choose_activity' && !showFlashcards && !showQuiz && !showGame && (
+                  <div className="flex flex-wrap gap-2 mt-4">
+                    <Button
+                      variant="outline"
+                      onClick={generateFlashcards}
+                      disabled={isTyping}
+                      className="hover:bg-yellow-50 hover:border-yellow-300"
+                    >
+                      <Layers className="w-4 h-4 mr-2" />
+                      Flashcards
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={generateQuiz}
+                      disabled={isTyping}
+                      className="hover:bg-blue-50 hover:border-blue-300"
+                    >
+                      <HelpCircle className="w-4 h-4 mr-2" />
+                      Quiz
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={generateGameQuestions}
+                      disabled={isTyping}
+                      className="hover:bg-green-50 hover:border-green-300"
+                    >
+                      <Gamepad2 className="w-4 h-4 mr-2" />
+                      Game
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      onClick={() => { resetRevision(); startRevisionBot(); }}
+                      className="text-slate-500"
+                    >
+                      <RefreshCw className="w-4 h-4 mr-2" />
+                      New Content
+                    </Button>
+                  </div>
+                )}
+
+                {/* Quick activity buttons after completing an activity */}
+                {mode === 'revision' && revisionState.extractedContent && !showFlashcards && !showQuiz && !showGame && !isTyping && revisionState.step !== 'choose_activity' && revisionState.step !== 'select_subject' && revisionState.step !== 'upload_content' && (
+                  <div className="flex flex-wrap gap-2 mt-4">
+                    {revisionState.generatedFlashcards && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setShowFlashcards(true)}
+                      >
+                        <Layers className="w-4 h-4 mr-2" />
+                        Flashcards
+                      </Button>
+                    )}
+                    {revisionState.generatedQuiz && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setShowQuiz(true)}
+                      >
+                        <HelpCircle className="w-4 h-4 mr-2" />
+                        Quiz
+                      </Button>
+                    )}
+                    {revisionState.generatedGameQuestions && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setShowGame(true)}
+                      >
+                        <Gamepad2 className="w-4 h-4 mr-2" />
+                        Game
+                      </Button>
+                    )}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => { resetRevision(); startRevisionBot(); }}
+                    >
+                      <RefreshCw className="w-4 h-4 mr-2" />
+                      New Topic
+                    </Button>
+                  </div>
+                )}
+
                 <div ref={messagesEndRef} />
-              </div>
-            )}
-          </div>
-        </ScrollArea>
-      </div>
+                </div>
+                )}
+                </div>
+                </ScrollArea>
+                </div>
 
       {/* Input */}
       {mode === 'chat' && (
