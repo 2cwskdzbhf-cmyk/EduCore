@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { base44 } from '@/api/base44Client';
+import { callOpenAI } from '@/utils/openai';
 import { Upload, FileText, Image, Loader2, X } from 'lucide-react';
 
 /**
@@ -37,25 +38,12 @@ export default function ContentUploader({ onContentExtracted, onCancel }) {
       // Upload the file
       const { file_url } = await base44.integrations.Core.UploadFile({ file });
 
-      // Extract content from the uploaded file using LLM
-      const extractedContent = await base44.integrations.Core.InvokeLLM({
-        prompt: `Analyze this uploaded file and extract all key concepts, vocabulary, definitions, and facts that would be useful for revision.
+      // Extract content from the uploaded file using OpenAI vision
+      const extractedContent = await callOpenAI(
+        `Analyze this uploaded file and extract all key concepts, vocabulary, definitions, and facts that would be useful for revision.
 
-Return the extracted content in this JSON format:
-{
-  "topics": ["topic1", "topic2"],
-  "key_concepts": [
-    {"term": "term1", "definition": "definition1"},
-    {"term": "term2", "definition": "definition2"}
-  ],
-  "facts": ["fact1", "fact2"],
-  "vocabulary": [
-    {"word": "word1", "meaning": "meaning1"}
-  ],
-  "summary": "A brief summary of the content"
-}`,
-        file_urls: [file_url],
-        response_json_schema: {
+Return the extracted content as JSON with topics array, key_concepts array (with term and definition), facts array, vocabulary array (with word and meaning), and a summary string.`,
+        {
           type: "object",
           properties: {
             topics: { type: "array", items: { type: "string" } },
@@ -66,7 +54,9 @@ Return the extracted content in this JSON format:
                 properties: {
                   term: { type: "string" },
                   definition: { type: "string" }
-                }
+                },
+                required: ["term", "definition"],
+                additionalProperties: false
               } 
             },
             facts: { type: "array", items: { type: "string" } },
@@ -77,13 +67,18 @@ Return the extracted content in this JSON format:
                 properties: {
                   word: { type: "string" },
                   meaning: { type: "string" }
-                }
+                },
+                required: ["word", "meaning"],
+                additionalProperties: false
               } 
             },
             summary: { type: "string" }
-          }
-        }
-      });
+          },
+          required: ["topics", "key_concepts", "facts", "vocabulary", "summary"],
+          additionalProperties: false
+        },
+        [file_url]
+      );
 
       onContentExtracted(extractedContent, file_url);
     } catch (error) {
@@ -103,27 +98,15 @@ Return the extracted content in this JSON format:
     setIsProcessing(true);
 
     try {
-      // Use LLM to extract and structure the text content
-      const extractedContent = await base44.integrations.Core.InvokeLLM({
-        prompt: `Analyze this revision content and extract all key concepts, vocabulary, definitions, and facts.
+      // Use OpenAI to extract and structure the text content
+      const extractedContent = await callOpenAI(
+        `Analyze this revision content and extract all key concepts, vocabulary, definitions, and facts.
 
 Content:
 ${textContent}
 
-Return the extracted content in this JSON format:
-{
-  "topics": ["topic1", "topic2"],
-  "key_concepts": [
-    {"term": "term1", "definition": "definition1"},
-    {"term": "term2", "definition": "definition2"}
-  ],
-  "facts": ["fact1", "fact2"],
-  "vocabulary": [
-    {"word": "word1", "meaning": "meaning1"}
-  ],
-  "summary": "A brief summary of the content"
-}`,
-        response_json_schema: {
+Return the extracted content as JSON with topics array, key_concepts array (with term and definition), facts array, vocabulary array (with word and meaning), and a summary string.`,
+        {
           type: "object",
           properties: {
             topics: { type: "array", items: { type: "string" } },
@@ -134,7 +117,9 @@ Return the extracted content in this JSON format:
                 properties: {
                   term: { type: "string" },
                   definition: { type: "string" }
-                }
+                },
+                required: ["term", "definition"],
+                additionalProperties: false
               } 
             },
             facts: { type: "array", items: { type: "string" } },
@@ -145,13 +130,17 @@ Return the extracted content in this JSON format:
                 properties: {
                   word: { type: "string" },
                   meaning: { type: "string" }
-                }
+                },
+                required: ["word", "meaning"],
+                additionalProperties: false
               } 
             },
             summary: { type: "string" }
-          }
+          },
+          required: ["topics", "key_concepts", "facts", "vocabulary", "summary"],
+          additionalProperties: false
         }
-      });
+      );
 
       onContentExtracted(extractedContent, null);
     } catch (error) {

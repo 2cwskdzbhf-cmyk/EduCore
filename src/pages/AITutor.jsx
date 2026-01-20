@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { callOpenAI } from '@/utils/openai';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import { Button } from '@/components/ui/button';
@@ -173,9 +174,9 @@ export default function AITutor() {
     setIsTyping(true);
 
     try {
-      // Use LLM to generate flashcards based on extracted content
-      const flashcardsData = await base44.integrations.Core.InvokeLLM({
-        prompt: `Create flashcards for revision from this content. Each flashcard should have a front (question/term) and back (answer/definition).
+      // Use OpenAI to generate flashcards based on extracted content
+      const flashcardsData = await callOpenAI(
+        `Create flashcards for revision from this content. Each flashcard should have a front (question/term) and back (answer/definition).
 
 Subject: ${subject}
 
@@ -186,7 +187,7 @@ Vocabulary: ${JSON.stringify(extractedContent.vocabulary || [])}
 Facts: ${JSON.stringify(extractedContent.facts || [])}
 
 Create 8-12 flashcards that cover the most important points.`,
-        response_json_schema: {
+        {
           type: "object",
           properties: {
             flashcards: {
@@ -196,12 +197,16 @@ Create 8-12 flashcards that cover the most important points.`,
                 properties: {
                   front: { type: "string" },
                   back: { type: "string" }
-                }
+                },
+                required: ["front", "back"],
+                additionalProperties: false
               }
             }
-          }
+          },
+          required: ["flashcards"],
+          additionalProperties: false
         }
-      });
+      );
 
       setRevisionState(prev => ({ ...prev, generatedFlashcards: flashcardsData.flashcards }));
       setIsTyping(false);
@@ -239,8 +244,8 @@ Create 8-12 flashcards that cover the most important points.`,
       // Consider weak skills from progress to focus questions
       const weakSkills = progress?.weak_skills || [];
       
-      const quizData = await base44.integrations.Core.InvokeLLM({
-        prompt: `Create a revision quiz from this content. Mix multiple-choice and short-answer questions.
+      const quizData = await callOpenAI(
+        `Create a revision quiz from this content. Mix multiple-choice and short-answer questions.
 
 Subject: ${subject}
 ${weakSkills.length > 0 ? `Student weak areas to focus on: ${weakSkills.join(', ')}` : ''}
@@ -251,8 +256,8 @@ Key Concepts: ${JSON.stringify(extractedContent.key_concepts || [])}
 Vocabulary: ${JSON.stringify(extractedContent.vocabulary || [])}
 Facts: ${JSON.stringify(extractedContent.facts || [])}
 
-Create 6-8 questions. For multiple choice, provide 4 options.`,
-        response_json_schema: {
+Create 6-8 questions. For multiple choice, provide 4 options with id and text fields.`,
+        {
           type: "object",
           properties: {
             questions: {
@@ -269,18 +274,24 @@ Create 6-8 questions. For multiple choice, provide 4 options.`,
                       properties: {
                         id: { type: "string" },
                         text: { type: "string" }
-                      }
+                      },
+                      required: ["id", "text"],
+                      additionalProperties: false
                     } 
                   },
                   correct_answer: { type: "string" },
                   explanation: { type: "string" },
                   skill: { type: "string" }
-                }
+                },
+                required: ["question", "type", "correct_answer", "explanation", "skill"],
+                additionalProperties: false
               }
             }
-          }
+          },
+          required: ["questions"],
+          additionalProperties: false
         }
-      });
+      );
 
       setRevisionState(prev => ({ ...prev, generatedQuiz: quizData.questions }));
       setIsTyping(false);
@@ -314,8 +325,8 @@ Create 6-8 questions. For multiple choice, provide 4 options.`,
     setIsTyping(true);
 
     try {
-      const gameData = await base44.integrations.Core.InvokeLLM({
-        prompt: `Create quick-fire questions for a revision game. Questions should be answerable in a few seconds.
+      const gameData = await callOpenAI(
+        `Create quick-fire questions for a revision game. Questions should be answerable in a few seconds.
 
 Subject: ${subject}
 
@@ -325,8 +336,8 @@ Key Concepts: ${JSON.stringify(extractedContent.key_concepts || [])}
 Vocabulary: ${JSON.stringify(extractedContent.vocabulary || [])}
 Facts: ${JSON.stringify(extractedContent.facts || [])}
 
-Create 10-15 short questions. Mix multiple choice (with 4 options) and short text answers.`,
-        response_json_schema: {
+Create 10-15 short questions. For multiple choice questions provide 4 options with id and text. Leave options empty array for text answer questions.`,
+        {
           type: "object",
           properties: {
             questions: {
@@ -342,17 +353,23 @@ Create 10-15 short questions. Mix multiple choice (with 4 options) and short tex
                       properties: {
                         id: { type: "string" },
                         text: { type: "string" }
-                      }
+                      },
+                      required: ["id", "text"],
+                      additionalProperties: false
                     } 
                   },
                   correct_answer: { type: "string" },
                   skill: { type: "string" }
-                }
+                },
+                required: ["question", "options", "correct_answer", "skill"],
+                additionalProperties: false
               }
             }
-          }
+          },
+          required: ["questions"],
+          additionalProperties: false
         }
-      });
+      );
 
       setRevisionState(prev => ({ ...prev, generatedGameQuestions: gameData.questions }));
       setIsTyping(false);
@@ -762,10 +779,7 @@ Create 10-15 short questions. Mix multiple choice (with 4 options) and short tex
         }
       }
 
-      const response = await base44.integrations.Core.InvokeLLM({
-        prompt: fullPrompt
-      });
-
+      const response = await callOpenAI(fullPrompt);
       return response;
     }
   });
