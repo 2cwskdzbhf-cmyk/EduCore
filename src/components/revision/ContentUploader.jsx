@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { base44 } from '@/api/base44Client';
-import { callOpenAI } from '@/utils/openai';
+import { callOpenAI } from '@/components/utils/openai';
 import { Upload, FileText, Image, Loader2, X } from 'lucide-react';
 
 /**
