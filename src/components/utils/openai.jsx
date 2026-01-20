@@ -1,99 +1,33 @@
-import OpenAI from 'openai';
+import { base44 } from '@/api/base44Client';
 
 /**
- * OpenAI Helper for AI Tutor
+ * Call OpenAI via secure backend function
+ * This keeps the API key safe on the server side
  * 
- * Provides a wrapper around OpenAI API with similar interface to base44.integrations.Core.InvokeLLM
- * Supports text prompts, vision (images), and structured JSON responses
+ * @param {Object} options
+ * @param {string} options.prompt - The prompt text
+ * @param {Object} [options.response_json_schema] - Optional JSON schema for structured output
+ * @param {string|string[]} [options.file_urls] - Optional file URLs for vision
+ * @returns {Promise<Object|string>} - Parsed JSON object if schema provided, otherwise string
  */
+export async function callOpenAI({ prompt, response_json_schema, file_urls }) {
+  try {
+    // Call backend function which securely uses the OpenAI API key
+    const response = await base44.functions.invoke('callOpenAI', {
+      prompt,
+      response_json_schema,
+      file_urls
+    });
 
-let openaiClient = null;
-
-const getOpenAI = () => {
-  if (!openaiClient) {
-    const apiKey = import.meta.env.VITE_OPENAI_API_KEY;
-    if (!apiKey) {
-      throw new Error('OPENAI_API_KEY not configured. Please add it in Settings > Secrets.');
+    // If JSON schema was provided, response.data is already the parsed object
+    if (response_json_schema) {
+      return response.data;
     }
-    openaiClient = new OpenAI({
-      apiKey,
-      dangerouslyAllowBrowser: true // Required for client-side usage
-    });
+
+    // Otherwise, return the response text
+    return response.data.response;
+  } catch (error) {
+    console.error('OpenAI call failed:', error);
+    throw new Error(`AI call failed: ${error.message}`);
   }
-  return openaiClient;
-};
-
-/**
- * Call OpenAI with prompt and optional vision/JSON schema
- * 
- * @param {Object} params
- * @param {string} params.prompt - The prompt to send to OpenAI
- * @param {string[]} [params.file_urls] - Optional image URLs for vision
- * @param {Object} [params.response_json_schema] - Optional JSON schema for structured output
- * @returns {Promise<string|Object>} - Returns string or parsed JSON based on response_json_schema
- */
-export async function callOpenAI({ prompt, file_urls, response_json_schema }) {
-  const openai = getOpenAI();
-
-  // Build messages array
-  const messages = [];
-  
-  // If we have images, use vision model
-  if (file_urls && file_urls.length > 0) {
-    const content = [
-      { type: 'text', text: prompt }
-    ];
-    
-    // Add images
-    file_urls.forEach(url => {
-      content.push({
-        type: 'image_url',
-        image_url: { url }
-      });
-    });
-    
-    messages.push({
-      role: 'user',
-      content
-    });
-  } else {
-    messages.push({
-      role: 'user',
-      content: prompt
-    });
-  }
-
-  // Choose model based on requirements
-  const model = file_urls && file_urls.length > 0 
-    ? 'gpt-4o' // Vision model
-    : 'gpt-4o-mini'; // Standard model
-
-  // Build request parameters
-  const params = {
-    model,
-    messages
-  };
-
-  // If JSON schema requested, use structured output
-  if (response_json_schema) {
-    params.response_format = {
-      type: 'json_schema',
-      json_schema: {
-        name: 'response',
-        strict: true,
-        schema: response_json_schema
-      }
-    };
-  }
-
-  // Make API call
-  const completion = await openai.chat.completions.create(params);
-  const responseText = completion.choices[0].message.content;
-
-  // Parse JSON if schema was provided
-  if (response_json_schema) {
-    return JSON.parse(responseText);
-  }
-
-  return responseText;
 }
