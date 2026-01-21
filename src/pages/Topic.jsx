@@ -1,4 +1,4 @@
-// src/pages/Topic.jsx (or wherever your Topic.jsx lives)
+// src/pages/Topic.jsx
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { base44 } from '@/api/base44Client';
@@ -22,7 +22,13 @@ import {
 export default function TopicPage() {
   const [user, setUser] = useState(null);
   const urlParams = new URLSearchParams(window.location.search);
-  const topicId = urlParams.get('id');
+
+  // Support multiple param names just in case
+  const topicIdFromUrl =
+    urlParams.get('id') ||
+    urlParams.get('topicId') ||
+    urlParams.get('topic_id') ||
+    urlParams.get('topic');
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -33,14 +39,17 @@ export default function TopicPage() {
   }, []);
 
   const { data: topic, isLoading: loadingTopic } = useQuery({
-    queryKey: ['topic', topicId],
+    queryKey: ['topic', topicIdFromUrl],
     queryFn: async () => {
-      if (!topicId) return null;
-      const topics = await base44.entities.Topic.filter({ id: topicId });
+      if (!topicIdFromUrl) return null;
+      const topics = await base44.entities.Topic.filter({ id: topicIdFromUrl });
       return topics[0] || null;
     },
-    enabled: !!topicId
+    enabled: !!topicIdFromUrl
   });
+
+  // ✅ Source-of-truth topic id (prevents “looks similar” id issues)
+  const topicId = topic?.id || topicIdFromUrl;
 
   const { data: subject } = useQuery({
     queryKey: ['subject', topic?.subject_id],
@@ -61,25 +70,51 @@ export default function TopicPage() {
     enabled: !!topicId
   });
 
-  // ✅ FIXED: load quiz questions via lesson_id (matches your schema)
+  // ✅ Robust quizzes loader:
+  // 1) try by topic_id
+  // 2) fallback by lesson_id IN [lesson ids]
   const { data: quizzes = [] } = useQuery({
-    queryKey: ['quizzes', topicId],
+    queryKey: ['quizzes', topicId, lessons.map(l => l.id).join(',')],
     queryFn: async () => {
       if (!topicId) return [];
 
-      const quizzesData = await base44.entities.Quiz.filter({ topic_id: topicId });
+      // Attempt #1: by topic_id (ideal)
+      let quizzesData = await base44.entities.Quiz.filter({ topic_id: topicId });
 
+      // Attempt #2: fallback by lesson_id (if topic_id filter is flaky / mismatched)
+      if (!Array.isArray(quizzesData) || quizzesData.length === 0) {
+        const lessonIds = lessons.map(l => l.id).filter(Boolean);
+        if (lessonIds.length > 0) {
+          // Base44 filter supports $in on many entities; if it doesn’t, this will just return []
+          const fallback = await base44.entities.Quiz.filter({
+            lesson_id: { $in: lessonIds }
+          });
+          quizzesData = Array.isArray(fallback) ? fallback : [];
+        } else {
+          quizzesData = [];
+        }
+      }
+
+      // Attach questions robustly
       const quizzesWithQuestions = await Promise.all(
-        quizzesData.map(async (quiz) => {
-          if (!quiz.lesson_id) {
-            return { ...quiz, questions: [] };
+        (quizzesData || []).map(async (quiz) => {
+          let questions = [];
+
+          // Best: link by lesson_id (your schema shows this clearly)
+          if (quiz.lesson_id) {
+            questions = await base44.entities.Question.filter({ lesson_id: quiz.lesson_id });
           }
 
-          const questions = await base44.entities.Question.filter({
-            lesson_id: quiz.lesson_id
-          });
+          // Fallback: link by ids stored on quiz (some schemas store ids in quiz.questions or quiz.question_ids)
+          if (!questions || questions.length === 0) {
+            const ids = quiz.question_ids || quiz.questions || [];
+            if (Array.isArray(ids) && ids.length > 0) {
+              const byIds = await base44.entities.Question.filter({ id: { $in: ids } });
+              questions = Array.isArray(byIds) ? byIds : [];
+            }
+          }
 
-          return { ...quiz, questions };
+          return { ...quiz, questions: questions || [] };
         })
       );
 
@@ -105,7 +140,7 @@ export default function TopicPage() {
   const completedLessonsCount = lessons.filter((l) => isLessonCompleted(l.id)).length;
   const overallProgress = lessons.length > 0 ? (completedLessonsCount / lessons.length) * 100 : 0;
 
-  if (!topicId) {
+  if (!topicIdFromUrl) {
     return (
       <div className="min-h-screen bg-slate-50 p-6 flex items-center justify-center">
         <div className="text-center">
@@ -207,7 +242,11 @@ export default function TopicPage() {
                                 completed ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-500'
                               }`}
                             >
-                              {completed ? <CheckCircle2 className="w-5 h-5" /> : <span className="font-bold">{index + 1}</span>}
+                              {completed ? (
+                                <CheckCircle2 className="w-5 h-5" />
+                              ) : (
+                                <span className="font-bold">{index + 1}</span>
+                              )}
                             </div>
                             <div className="flex-1">
                               <h3 className="font-semibold text-slate-800">{lesson.title}</h3>
@@ -311,9 +350,7 @@ export default function TopicPage() {
               transition={{ delay: 0.3 }}
             >
               <h3 className="font-semibold mb-2">Stuck on something?</h3>
-              <p className="text-purple-100 text-sm mb-4">
-                Ask the AI tutor for help with this topic.
-              </p>
+              <p className="text-purple-100 text-sm mb-4">Ask the AI tutor for help with this topic.</p>
               <Link to={createPageUrl(`AITutor?topic=${topicId}`)}>
                 <Button className="w-full bg-white text-indigo-600 hover:bg-indigo-50">
                   Get Help
