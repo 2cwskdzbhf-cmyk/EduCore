@@ -490,12 +490,11 @@ Divide the numerator by the denominator
 **Calculate:** 3.45 + 12.8
 
 **Solution:**
-\`\`\`
+
   3.45
 +12.80
 ------
  16.25
-\`\`\`
 
 ### Example 2: Multiplying decimals
 **Calculate:** 0.6 × 0.4
