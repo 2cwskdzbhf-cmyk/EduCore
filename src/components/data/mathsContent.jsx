@@ -4640,97 +4640,113 @@ export const mathsQuizzes = [
 // ============================================================================
 
 export async function importMathsContent() {
+  // ✅ Prevent duplicates (icons/topics) during dev reload / React StrictMode
+  if (globalThis.__EDUCORE_MATHS_IMPORTED__) {
+    console.log("Maths content already imported — skipping.");
+    return { success: true, skipped: true };
+  }
+  globalThis.__EDUCORE_MATHS_IMPORTED__ = true;
+
   try {
-    console.log('Starting Maths content import...');
-    
-    // 1. Create Subject
-    console.log('Creating Maths subject...');
+    console.log("Starting Maths content import...");
+
+    // 1) Create Subject
+    console.log("Creating Maths subject...");
     const subject = await base44.entities.Subject.create(mathsSubject);
     const subjectId = subject.id;
-    console.log('Subject created:', subjectId);
-    
-    // 2. Create Topics (with subject_id and prerequisite refs resolved)
-    console.log('Creating topics...');
+    console.log("Subject created:", subjectId);
+
+    // 2) Create Topics (Pass 1: create topics first)
+    console.log("Creating topics (pass 1)...");
     const topicIdMap = {};
-    
+
     for (const topicData of mathsTopics) {
       const { ref, prerequisite_refs, ...topicFields } = topicData;
-      
+
       const topic = await base44.entities.Topic.create({
         ...topicFields,
         subject_id: subjectId,
-prerequisite_topic_ids: prerequisite_refs
-  ? prerequisite_refs.map(r => topicIdMap[r]).filter(Boolean)
-  : []
-});
+        prerequisite_topic_ids: []
+      });
 
-      
       topicIdMap[ref] = topic.id;
       console.log(`Topic created: ${topicData.name} (${topic.id})`);
     }
-    
-    // 3. Create Lessons (with topic_id resolved)
-    console.log('Creating lessons...');
+
+    // 2b) Update Topics with prerequisites (Pass 2)
+    console.log("Updating topic prerequisites (pass 2)...");
+    for (const topicData of mathsTopics) {
+      const { ref, prerequisite_refs } = topicData;
+      if (!prerequisite_refs?.length) continue;
+
+      const topicId = topicIdMap[ref];
+      const prerequisite_topic_ids = prerequisite_refs
+        .map((r) => topicIdMap[r])
+        .filter(Boolean);
+
+      if (prerequisite_topic_ids.length) {
+        await base44.entities.Topic.update(topicId, { prerequisite_topic_ids });
+      }
+    }
+
+    // 3) Create Lessons
+    console.log("Creating lessons...");
     for (const [ref, lessonData] of Object.entries(mathsLessons)) {
       const topicId = topicIdMap[ref];
       if (!topicId) {
         console.warn(`No topic found for lesson ref: ${ref}`);
         continue;
       }
-      
-      const { ref: _, ...lessonFields } = lessonData;
-      
+
+      const { ref: _ignored, ...lessonFields } = lessonData;
+
       await base44.entities.Lesson.create({
         ...lessonFields,
         topic_id: topicId
       });
-      
+
       console.log(`Lesson created: ${lessonData.title}`);
     }
-    
-    // 4. Create Quizzes and Questions
-    console.log('Creating quizzes and questions...');
+
+    // 4) Create Quizzes + Questions and link them
+    console.log("Creating quizzes and questions...");
     for (const quizData of mathsQuizzes) {
       const topicId = topicIdMap[quizData.ref];
       if (!topicId) {
         console.warn(`No topic found for quiz ref: ${quizData.ref}`);
         continue;
       }
-      
-      const { ref, questions, ...quizFields } = quizData;
-      
-      // Create quiz
+
+      const { ref: _ref, questions = [], ...quizFields } = quizData;
+
       const quiz = await base44.entities.Quiz.create({
         ...quizFields,
         topic_id: topicId
       });
-      
+
       console.log(`Quiz created: ${quizData.title} (${quiz.id})`);
-      
-      // Create questions for this quiz
+
       const questionIds = [];
-      for (const questionData of questions) {
-        const question = await base44.entities.Question.create({
-          ...questionData,
-          topic_id: topicId
+      for (const q of questions) {
+        const createdQuestion = await base44.entities.Question.create({
+          ...q,
+          topic_id: topicId,
+          quiz_id: quiz.id
         });
-        questionIds.push(question.id);
+        questionIds.push(createdQuestion.id);
       }
-      
-      // Update quiz with question IDs
-      await base44.entities.Quiz.update(quiz.id, {
-        question_ids: questionIds
-      });
-      
-      console.log(`${questions.length} questions created for quiz ${quiz.id}`);
+
+      // Many UIs expect quizzes to reference question IDs
+      await base44.entities.Quiz.update(quiz.id, { question_ids: questionIds });
+
+      console.log(`${questionIds.length} questions created for quiz ${quiz.id}`);
     }
-    
-    console.log('✅ Maths content import complete!');
+
+    console.log("✅ Maths content import complete!");
     return { success: true, subjectId, topicCount: Object.keys(topicIdMap).length };
-    
   } catch (error) {
-    console.error('Error importing Maths content:', error);
-    return { success: false, error: error.message };
+    console.error("Error importing Maths content:", error);
+    return { success: false, error: error?.message || String(error) };
   }
 }
 
