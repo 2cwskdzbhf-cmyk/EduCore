@@ -4661,7 +4661,7 @@ export async function importMathsContent() {
         subject_id: subjectId,
         prerequisite_topic_ids: prerequisite_refs 
           ? prerequisite_refs.map(r => topicIdMap[r]).filter(Boolean) 
-          : []
+          
       });
       
       topicIdMap[ref] = topic.id;
