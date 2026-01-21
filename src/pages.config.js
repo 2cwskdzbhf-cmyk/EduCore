@@ -11,6 +11,7 @@ import StudentDashboard from './pages/StudentDashboard';
 import Subject from './pages/Subject';
 import TeacherDashboard from './pages/TeacherDashboard';
 import Topic from './pages/Topic';
+import ImportMathsContent from './pages/ImportMathsContent';
 import __Layout from './Layout.jsx';
 
 
@@ -28,6 +29,7 @@ export const PAGES = {
     "Subject": Subject,
     "TeacherDashboard": TeacherDashboard,
     "Topic": Topic,
+    "ImportMathsContent": ImportMathsContent,
 }
 
 export const pagesConfig = {
