@@ -1,5 +1,6 @@
+// src/pages/Topic.jsx (or wherever your Topic.jsx lives)
 import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
@@ -7,13 +8,12 @@ import { createPageUrl } from '@/utils';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
-import { 
-  ChevronLeft, 
-  ChevronRight, 
-  BookOpen, 
+import {
+  ChevronLeft,
+  ChevronRight,
+  BookOpen,
   Trophy,
   CheckCircle2,
-  Play,
   Clock,
   Zap,
   FileText
@@ -61,25 +61,28 @@ export default function TopicPage() {
     enabled: !!topicId
   });
 
+  // ✅ FIXED: load quiz questions via lesson_id (matches your schema)
   const { data: quizzes = [] } = useQuery({
     queryKey: ['quizzes', topicId],
     queryFn: async () => {
       if (!topicId) return [];
+
       const quizzesData = await base44.entities.Quiz.filter({ topic_id: topicId });
-      
-      // Fetch questions for each quiz to get accurate count
+
       const quizzesWithQuestions = await Promise.all(
         quizzesData.map(async (quiz) => {
-          if (quiz.question_ids && quiz.question_ids.length > 0) {
-            const questions = await base44.entities.Question.filter({ 
-              id: { $in: quiz.question_ids } 
-            });
-            return { ...quiz, questions };
+          if (!quiz.lesson_id) {
+            return { ...quiz, questions: [] };
           }
-          return { ...quiz, questions: [] };
+
+          const questions = await base44.entities.Question.filter({
+            lesson_id: quiz.lesson_id
+          });
+
+          return { ...quiz, questions };
         })
       );
-      
+
       return quizzesWithQuestions;
     },
     enabled: !!topicId
@@ -99,7 +102,7 @@ export default function TopicPage() {
     return progress?.completed_lessons?.includes(lessonId);
   };
 
-  const completedLessonsCount = lessons.filter(l => isLessonCompleted(l.id)).length;
+  const completedLessonsCount = lessons.filter((l) => isLessonCompleted(l.id)).length;
   const overallProgress = lessons.length > 0 ? (completedLessonsCount / lessons.length) * 100 : 0;
 
   if (!topicId) {
@@ -120,25 +123,29 @@ export default function TopicPage() {
       {/* Header */}
       <div className="bg-white border-b border-slate-100">
         <div className="max-w-5xl mx-auto px-6 py-6">
-          <Link 
-            to={subject ? createPageUrl(`Subject?id=${subject.id}`) : createPageUrl('StudentDashboard')} 
+          <Link
+            to={subject ? createPageUrl(`Subject?id=${subject.id}`) : createPageUrl('StudentDashboard')}
             className="inline-flex items-center gap-2 text-slate-500 hover:text-slate-700 mb-4 transition-colors"
           >
             <ChevronLeft className="w-5 h-5" />
             Back to {subject?.name || 'Subject'}
           </Link>
-          
+
           {loadingTopic ? (
             <Skeleton className="h-10 w-64" />
           ) : (
             <>
               <div className="flex items-center gap-3 mb-2">
                 <h1 className="text-3xl font-bold text-slate-900">{topic?.name}</h1>
-                <span className={`text-sm px-3 py-1 rounded-full ${
-                  topic?.difficulty_level === 'beginner' ? 'bg-green-100 text-green-700' :
-                  topic?.difficulty_level === 'intermediate' ? 'bg-amber-100 text-amber-700' :
-                  'bg-red-100 text-red-700'
-                }`}>
+                <span
+                  className={`text-sm px-3 py-1 rounded-full ${
+                    topic?.difficulty_level === 'beginner'
+                      ? 'bg-green-100 text-green-700'
+                      : topic?.difficulty_level === 'intermediate'
+                        ? 'bg-amber-100 text-amber-700'
+                        : 'bg-red-100 text-red-700'
+                  }`}
+                >
                   {topic?.difficulty_level}
                 </span>
               </div>
@@ -172,7 +179,7 @@ export default function TopicPage() {
 
             {loadingLessons ? (
               <div className="space-y-4">
-                {[1, 2, 3].map(i => (
+                {[1, 2, 3].map((i) => (
                   <Skeleton key={i} className="h-24 rounded-xl" />
                 ))}
               </div>
@@ -180,7 +187,7 @@ export default function TopicPage() {
               <div className="space-y-3">
                 {lessons.map((lesson, index) => {
                   const completed = isLessonCompleted(lesson.id);
-                  
+
                   return (
                     <motion.div
                       key={lesson.id}
@@ -189,20 +196,18 @@ export default function TopicPage() {
                       transition={{ delay: index * 0.05 }}
                     >
                       <Link to={createPageUrl(`Lesson?id=${lesson.id}`)}>
-                        <div className={`bg-white rounded-xl border p-5 hover:shadow-md transition-all cursor-pointer ${
-                          completed ? 'border-emerald-200 bg-emerald-50/50' : 'border-slate-100'
-                        }`}>
+                        <div
+                          className={`bg-white rounded-xl border p-5 hover:shadow-md transition-all cursor-pointer ${
+                            completed ? 'border-emerald-200 bg-emerald-50/50' : 'border-slate-100'
+                          }`}
+                        >
                           <div className="flex items-center gap-4">
-                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-                              completed 
-                                ? 'bg-emerald-500 text-white' 
-                                : 'bg-slate-100 text-slate-500'
-                            }`}>
-                              {completed ? (
-                                <CheckCircle2 className="w-5 h-5" />
-                              ) : (
-                                <span className="font-bold">{index + 1}</span>
-                              )}
+                            <div
+                              className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                                completed ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-500'
+                              }`}
+                            >
+                              {completed ? <CheckCircle2 className="w-5 h-5" /> : <span className="font-bold">{index + 1}</span>}
                             </div>
                             <div className="flex-1">
                               <h3 className="font-semibold text-slate-800">{lesson.title}</h3>
@@ -253,11 +258,15 @@ export default function TopicPage() {
                     <Link to={createPageUrl(`Quiz?id=${quiz.id}`)}>
                       <div className="bg-white rounded-xl border border-slate-100 p-5 hover:shadow-md transition-all cursor-pointer">
                         <div className="flex items-center gap-3 mb-3">
-                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-                            quiz.difficulty === 'easy' ? 'bg-green-100 text-green-600' :
-                            quiz.difficulty === 'medium' ? 'bg-amber-100 text-amber-600' :
-                            'bg-red-100 text-red-600'
-                          }`}>
+                          <div
+                            className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                              quiz.difficulty === 'easy'
+                                ? 'bg-green-100 text-green-600'
+                                : quiz.difficulty === 'medium'
+                                  ? 'bg-amber-100 text-amber-600'
+                                  : 'bg-red-100 text-red-600'
+                            }`}
+                          >
                             <Trophy className="w-5 h-5" />
                           </div>
                           <div>
@@ -266,11 +275,15 @@ export default function TopicPage() {
                           </div>
                         </div>
                         <div className="flex items-center justify-between">
-                          <span className={`text-xs px-2 py-1 rounded-full ${
-                            quiz.difficulty === 'easy' ? 'bg-green-100 text-green-700' :
-                            quiz.difficulty === 'medium' ? 'bg-amber-100 text-amber-700' :
-                            'bg-red-100 text-red-700'
-                          }`}>
+                          <span
+                            className={`text-xs px-2 py-1 rounded-full ${
+                              quiz.difficulty === 'easy'
+                                ? 'bg-green-100 text-green-700'
+                                : quiz.difficulty === 'medium'
+                                  ? 'bg-amber-100 text-amber-700'
+                                  : 'bg-red-100 text-red-700'
+                            }`}
+                          >
                             {quiz.difficulty}
                           </span>
                           <span className="text-xs text-slate-500 flex items-center gap-1">
