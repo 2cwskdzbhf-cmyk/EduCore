@@ -64,15 +64,14 @@ export default function QuizPage() {
     mutationFn: async (results) => {
       if (!progress || !quiz) return;
 
-      const xpEarned = Math.round((results.score / 100) * (quiz.xp_reward || 20));
-      const newTotalXp = (progress.total_xp || 0) + xpEarned;
-      const newTodayXp = (progress.today_xp || 0) + xpEarned;
+      const accuracyPercent = results.score;
+      const questionsAnswered = results.totalQuestions;
+      const correctAnswers = results.correctCount;
 
-      // Calculate new level
-      let newLevel = progress.level || 1;
-      while (newTotalXp >= newLevel * 100) {
-        newLevel++;
-      }
+      // Calculate new overall accuracy
+      const newTotalQuestions = (progress.total_questions_answered || 0) + questionsAnswered;
+      const newTotalCorrect = (progress.total_correct_answers || 0) + correctAnswers;
+      const newAccuracy = newTotalQuestions > 0 ? Math.round((newTotalCorrect / newTotalQuestions) * 100 * 10) / 10 : 0;
 
       // Update topic mastery based on quiz score
       const topicMastery = { ...progress.topic_mastery };
@@ -100,26 +99,28 @@ export default function QuizPage() {
         student_email: user.email,
         quiz_id: quizId,
         topic_id: quiz.topic_id,
-        score: results.score,
-        points_earned: results.correctCount,
-        xp_earned: xpEarned,
+        lesson_id: quiz.lesson_id,
+        questions_answered: questionsAnswered,
+        correct_answers: correctAnswers,
+        accuracy_percent: accuracyPercent,
         time_taken_seconds: results.totalTime,
         answers: results.answers,
-        completed: true
+        completed_at: new Date().toISOString()
       });
 
       // Update progress
       await base44.entities.StudentProgress.update(progress.id, {
-        total_xp: newTotalXp,
-        today_xp: newTodayXp,
-        level: newLevel,
+        total_questions_answered: newTotalQuestions,
+        total_correct_answers: newTotalCorrect,
+        accuracy_percent: newAccuracy,
+        quizzes_completed: (progress.quizzes_completed || 0) + 1,
         topic_mastery: topicMastery,
         weak_areas: weakAreas,
         strong_areas: strongAreas,
         last_activity_date: new Date().toISOString().split('T')[0]
       });
 
-      return { xpEarned, newLevel };
+      return { accuracy: newAccuracy };
     },
     onSuccess: () => {
       queryClient.invalidateQueries(['studentProgress']);
@@ -179,6 +180,7 @@ export default function QuizPage() {
     const results = {
       score,
       correctCount,
+      totalQuestions,
       totalTime,
       answers: Object.entries(answers).map(([id, data]) => ({
         question_id: id,
@@ -232,19 +234,20 @@ export default function QuizPage() {
               {passed ? "You've mastered this quiz!" : "You're getting there, keep going!"}
             </p>
 
-            <div className="grid grid-cols-3 gap-4 mb-8">
+            <div className="grid grid-cols-2 gap-4 mb-8">
               <div className="bg-white/20 rounded-xl p-4">
                 <p className="text-4xl font-bold">{score}%</p>
-                <p className="text-sm text-white/70">Score</p>
+                <p className="text-sm text-white/70">Accuracy</p>
               </div>
               <div className="bg-white/20 rounded-xl p-4">
                 <p className="text-4xl font-bold">{correctCount}/{totalQuestions}</p>
                 <p className="text-sm text-white/70">Correct</p>
               </div>
-              <div className="bg-white/20 rounded-xl p-4">
-                <p className="text-4xl font-bold">+{submitQuizMutation.data?.xpEarned || 0}</p>
-                <p className="text-sm text-white/70">XP Earned</p>
-              </div>
+            </div>
+
+            <div className="bg-white/20 rounded-xl p-4 mb-8">
+              <p className="text-2xl font-bold">{submitQuizMutation.data?.accuracy || 0}%</p>
+              <p className="text-sm text-white/70">Your Overall Accuracy</p>
             </div>
 
             <div className="space-y-3">
@@ -322,10 +325,6 @@ export default function QuizPage() {
               <span className="text-sm font-medium text-slate-600">
                 {currentQuestionIndex + 1} / {totalQuestions}
               </span>
-              <div className="flex items-center gap-1 text-amber-500">
-                <Zap className="w-4 h-4" />
-                <span className="text-sm font-medium">+{quiz?.xp_reward || 20} XP</span>
-              </div>
             </div>
           </div>
           <Progress value={((currentQuestionIndex + 1) / totalQuestions) * 100} className="h-2" />

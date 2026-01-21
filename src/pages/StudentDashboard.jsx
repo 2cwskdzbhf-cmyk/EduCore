@@ -9,7 +9,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { 
   BookOpen, 
   Trophy, 
-  Zap, 
   Target,
   MessageSquare,
   Award,
@@ -17,15 +16,14 @@ import {
   Calendar,
   Users,
   Play,
-  GraduationCap
+  GraduationCap,
+  TrendingUp
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 
 import StatsCard from '@/components/dashboard/StatsCard';
 import SubjectCard from '@/components/dashboard/SubjectCard';
-import DailyGoal from '@/components/dashboard/DailyGoal';
 import WeakStrongAreas from '@/components/dashboard/WeakStrongAreas';
-import XPBar from '@/components/ui/XPBar';
 import StreakBadge from '@/components/ui/StreakBadge';
 
 export default function StudentDashboard() {
@@ -88,7 +86,7 @@ export default function StudentDashboard() {
     enabled: classes.length > 0
   });
 
-  const calculateLevelXP = (level) => level * 100;
+
 
   const getSubjectProgress = (subjectId) => {
     const subjectTopics = topics.filter(t => t.subject_id === subjectId);
@@ -129,30 +127,37 @@ export default function StudentDashboard() {
           </div>
         </motion.div>
 
-        {/* XP Progress */}
+        {/* Overall Accuracy */}
         {isLoading ? (
-          <Skeleton className="h-20 rounded-2xl mb-8" />
+          <Skeleton className="h-32 rounded-2xl mb-8" />
         ) : (
           <motion.div
-            className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 mb-8"
+            className="bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl p-8 shadow-lg border border-indigo-400 mb-8 text-white"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
           >
-            <XPBar
-              currentXP={progress?.total_xp % calculateLevelXP(progress?.level || 1) || 0}
-              levelXP={calculateLevelXP(progress?.level || 1)}
-              level={progress?.level || 1}
-            />
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-indigo-100 text-sm mb-1">Overall Accuracy</p>
+                <p className="text-5xl font-bold">{progress?.accuracy_percent || 0}%</p>
+                <p className="text-indigo-200 text-sm mt-2">
+                  {progress?.total_correct_answers || 0} / {progress?.total_questions_answered || 0} correct
+                </p>
+              </div>
+              <div className="w-20 h-20 rounded-full bg-white/20 flex items-center justify-center">
+                <TrendingUp className="w-10 h-10 text-white" />
+              </div>
+            </div>
           </motion.div>
         )}
 
         {/* Stats Grid */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           <StatsCard
-            icon={Zap}
-            label="Total XP"
-            value={progress?.total_xp?.toLocaleString() || '0'}
+            icon={Trophy}
+            label="Quizzes Done"
+            value={progress?.quizzes_completed || 0}
             color="indigo"
             delay={0.1}
           />
@@ -164,9 +169,9 @@ export default function StudentDashboard() {
             delay={0.15}
           />
           <StatsCard
-            icon={Trophy}
-            label="Badges"
-            value={progress?.badges?.length || 0}
+            icon={Target}
+            label="Questions"
+            value={progress?.total_questions_answered || 0}
             color="amber"
             delay={0.2}
           />
@@ -287,12 +292,6 @@ export default function StudentDashboard() {
 
           {/* Right Column */}
           <div className="space-y-6">
-            {/* Daily Goal */}
-            <DailyGoal
-              currentXP={progress?.today_xp || 0}
-              goalXP={progress?.daily_xp_goal || 50}
-            />
-
             {/* Upcoming Assignments */}
             <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
               <div className="flex items-center justify-between mb-4">

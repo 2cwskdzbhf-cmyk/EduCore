@@ -255,10 +255,6 @@ export default function TopicPage() {
                                   <Clock className="w-3.5 h-3.5" />
                                   {lesson.duration_minutes || 5} min
                                 </span>
-                                <span className="flex items-center gap-1">
-                                  <Zap className="w-3.5 h-3.5" />
-                                  +{lesson.xp_reward || 10} XP
-                                </span>
                               </div>
                             </div>
                             <ChevronRight className="w-5 h-5 text-slate-400" />

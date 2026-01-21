@@ -109,15 +109,15 @@ export default function TeacherDashboard() {
     const studentEmails = classObj.student_emails || [];
     const progressData = allProgress.filter(p => studentEmails.includes(p.student_email));
     
-    if (progressData.length === 0) return { avg: 0, top: null, struggling: null };
+    if (progressData.length === 0) return { avgAccuracy: 0, top: null, struggling: null };
 
-    const avgXp = progressData.reduce((sum, p) => sum + (p.total_xp || 0), 0) / progressData.length;
-    const sortedByXp = [...progressData].sort((a, b) => (b.total_xp || 0) - (a.total_xp || 0));
+    const avgAccuracy = progressData.reduce((sum, p) => sum + (p.accuracy_percent || 0), 0) / progressData.length;
+    const sortedByAccuracy = [...progressData].sort((a, b) => (b.accuracy_percent || 0) - (a.accuracy_percent || 0));
     
     return {
-      avg: Math.round(avgXp),
-      top: sortedByXp[0],
-      struggling: sortedByXp[sortedByXp.length - 1]
+      avgAccuracy: Math.round(avgAccuracy * 10) / 10,
+      top: sortedByAccuracy[0],
+      struggling: sortedByAccuracy[sortedByAccuracy.length - 1]
     };
   };
 
@@ -332,7 +332,7 @@ export default function TeacherDashboard() {
                         </div>
 
                         <div className="flex items-center justify-between text-sm">
-                          <span className="text-slate-500">Avg XP: {stats.avg}</span>
+                          <span className="text-slate-500">Avg Accuracy: {stats.avgAccuracy}%</span>
                           <ChevronRight className="w-4 h-4 text-slate-400" />
                         </div>
                       </Card>
