@@ -2141,13 +2141,13 @@ Is 17 prime?
 Find prime factors of 60
 
 **Solution:**
-```
+
         60
        /  \\
       6   10
      / \\  / \\
     2  3 2  5
-```
+
 **60 = 2 × 2 × 3 × 5 = 2² × 3 × 5**
 
 ### Example 3: Using prime factors
