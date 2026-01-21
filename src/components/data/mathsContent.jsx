@@ -4659,10 +4659,11 @@ export async function importMathsContent() {
       const topic = await base44.entities.Topic.create({
         ...topicFields,
         subject_id: subjectId,
-        prerequisite_topic_ids: prerequisite_refs 
-          ? prerequisite_refs.map(r => topicIdMap[r]).filter(Boolean) 
-          
-      });
+prerequisite_topic_ids: prerequisite_refs
+  ? prerequisite_refs.map(r => topicIdMap[r]).filter(Boolean)
+  : []
+});
+
       
       topicIdMap[ref] = topic.id;
       console.log(`Topic created: ${topicData.name} (${topic.id})`);
