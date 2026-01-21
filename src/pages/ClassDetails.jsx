@@ -124,11 +124,11 @@ export default function ClassDetails() {
     );
   }
 
-  const avgXp = allProgress.length > 0 
-    ? Math.round(allProgress.reduce((sum, p) => sum + (p.total_xp || 0), 0) / allProgress.length)
+  const avgAccuracy = allProgress.length > 0 
+    ? Math.round(allProgress.reduce((sum, p) => sum + (p.accuracy_percent || 0), 0) / allProgress.length * 10) / 10
     : 0;
 
-  const sortedStudents = [...allProgress].sort((a, b) => (b.total_xp || 0) - (a.total_xp || 0));
+  const sortedStudents = [...allProgress].sort((a, b) => (b.accuracy_percent || 0) - (a.accuracy_percent || 0));
   const commonWeakAreas = getCommonWeakAreas();
 
   return (
@@ -178,10 +178,10 @@ export default function ClassDetails() {
             </div>
             <div className="bg-slate-50 rounded-xl p-4">
               <div className="flex items-center gap-2 text-slate-500 mb-1">
-                <Zap className="w-4 h-4" />
-                <span className="text-sm">Avg XP</span>
+                <Trophy className="w-4 h-4" />
+                <span className="text-sm">Avg Accuracy</span>
               </div>
-              <p className="text-2xl font-bold text-slate-800">{avgXp}</p>
+              <p className="text-2xl font-bold text-slate-800">{avgAccuracy}%</p>
             </div>
             <div className="bg-emerald-50 rounded-xl p-4">
               <div className="flex items-center gap-2 text-emerald-600 mb-1">
@@ -212,44 +212,46 @@ export default function ClassDetails() {
             {classObj.student_emails?.length > 0 ? (
               <div className="bg-white rounded-2xl border border-slate-100 divide-y divide-slate-100">
                 {sortedStudents.map((progress, idx) => (
-                  <motion.div
+                  <Link 
                     key={progress.id}
-                    className="p-4 flex items-center gap-4"
-                    initial={{ opacity: 0, x: -10 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: idx * 0.05 }}
+                    to={createPageUrl(`StudentStats?email=${progress.student_email}&classId=${classId}`)}
                   >
-                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-white ${
-                      idx === 0 ? 'bg-amber-500' :
-                      idx === 1 ? 'bg-slate-400' :
-                      idx === 2 ? 'bg-orange-400' :
-                      'bg-slate-300'
-                    }`}>
-                      {idx < 3 ? (
-                        <Trophy className="w-5 h-5" />
-                      ) : (
-                        idx + 1
-                      )}
-                    </div>
-                    <div className="flex-1">
-                      <h4 className="font-medium text-slate-800">
-                        {getStudentName(progress.student_email)}
-                      </h4>
-                      <div className="flex items-center gap-4 mt-1">
-                        <span className="text-sm text-slate-500">Level {progress.level || 1}</span>
-                        <span className="text-sm text-slate-500">{progress.total_xp || 0} XP</span>
-                        {progress.current_streak > 0 && (
-                          <span className="text-sm text-orange-500">🔥 {progress.current_streak} day streak</span>
+                    <motion.div
+                      className="p-4 flex items-center gap-4 hover:bg-slate-50 cursor-pointer transition-colors"
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: idx * 0.05 }}
+                    >
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-white ${
+                        idx === 0 ? 'bg-amber-500' :
+                        idx === 1 ? 'bg-slate-400' :
+                        idx === 2 ? 'bg-orange-400' :
+                        'bg-slate-300'
+                      }`}>
+                        {idx < 3 ? (
+                          <Trophy className="w-5 h-5" />
+                        ) : (
+                          idx + 1
                         )}
                       </div>
-                    </div>
-                    <div className="text-right">
-                      <div className="flex items-center gap-1 text-sm text-emerald-600">
-                        <Award className="w-4 h-4" />
-                        {progress.badges?.length || 0} badges
+                      <div className="flex-1">
+                        <h4 className="font-medium text-slate-800">
+                          {getStudentName(progress.student_email)}
+                        </h4>
+                        <div className="flex items-center gap-4 mt-1">
+                          <span className="text-sm text-slate-500">{progress.quizzes_completed || 0} quizzes</span>
+                          <span className="text-sm text-slate-500">{progress.total_questions_answered || 0} answered</span>
+                          {progress.current_streak > 0 && (
+                            <span className="text-sm text-orange-500">🔥 {progress.current_streak} days</span>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  </motion.div>
+                      <div className="text-right">
+                        <p className="text-2xl font-bold text-slate-800">{progress.accuracy_percent || 0}%</p>
+                        <p className="text-xs text-slate-500">Accuracy</p>
+                      </div>
+                    </motion.div>
+                  </Link>
                 ))}
               </div>
             ) : (
