@@ -23,7 +23,7 @@ Deno.serve(async (req) => {
     });
 
     // Determine if we need vision model (if file_urls provided)
-    const hasImages = file_urls && file_urls.length > 0;
+    const hasImages = file_urls && Array.isArray(file_urls) && file_urls.length > 0;
     const model = hasImages ? 'gpt-4o' : 'gpt-4o-mini';
 
     // Build messages array
