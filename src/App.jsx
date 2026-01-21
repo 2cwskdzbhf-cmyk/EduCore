@@ -1,3 +1,23 @@
+// src/App.jsx
+import React, { useEffect } from "react";                 // React + useEffect hook
+import mathsContent from "@/components/data/mathsContent"; // Import your maths data
+
+function App() {
+  // Runs once when the app loads to register all maths content
+  useEffect(() => {
+    mathsContent.importMathsContent();
+  }, []);
+
+  return (
+    <div>
+      {/* your existing app JSX goes here */}
+      <h1>Welcome to My Maths App</h1>
+    </div>
+  );
+}
+
+export default App;
+
 import { Toaster } from "@/components/ui/toaster"
 import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClientInstance } from '@/lib/query-client'
