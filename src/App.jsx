@@ -1,27 +1,31 @@
 // src/App.jsx
 import React, { useEffect } from "react";
-import mathsContent from "@/components/data/mathsContent";
-import AuthProvider from "./AuthProvider"; // keep your existing imports
-// add any other imports your app already has
+import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
+import PageNotFound from './lib/PageNotFound';
+import { AuthProvider, useAuth } from '@/lib/AuthContext'; // KEEP THIS
+import mathsContent from "@/components/data/mathsContent"; // ADD THIS LINE
+import UserNotRegisteredError from '@/components/UserNotRegisteredError';
+
+// any other existing imports
+const { Pages, Layout, mainPage } = pagesConfig;
 
 function App() {
-  // Run once when app loads to register maths content
+  // Add this inside your App function
   useEffect(() => {
     mathsContent.importMathsContent();
   }, []);
 
   return (
     <AuthProvider>
-      {/* Your existing JSX goes here */}
-      <div>
-        <h1>Welcome to My Maths App</h1>
-        {/* Replace or keep your actual app components here */}
-      </div>
+      <Router>
+        {/* Your existing JSX / Routes here */}
+      </Router>
     </AuthProvider>
   );
 }
 
 export default App;
+
 
 import { Toaster } from "@/components/ui/toaster"
 import { QueryClientProvider } from '@tanstack/react-query'
