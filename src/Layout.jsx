@@ -16,6 +16,7 @@ import {
   Shield
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 
 /*
 ================================================================================
@@ -54,6 +55,7 @@ export default function Layout({ children, currentPageName }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [sidebarExpanded, setSidebarExpanded] = useState(false);
 
   // ============================================================================
   // STEP 1: Define page access rules
@@ -224,8 +226,8 @@ export default function Layout({ children, currentPageName }) {
   
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900/20 to-slate-900 flex items-center justify-center">
+        <div className="w-12 h-12 border-4 border-purple-500 border-t-transparent rounded-full animate-spin shadow-lg shadow-purple-500/50" />
       </div>
     );
   }
@@ -242,75 +244,112 @@ export default function Layout({ children, currentPageName }) {
   // ============================================================================
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900/20 to-slate-900">
       {/* Desktop Sidebar */}
-      <aside className="hidden lg:flex fixed left-0 top-0 bottom-0 w-64 bg-white border-r border-slate-100 flex-col z-50">
+      <aside 
+        className={cn(
+          "hidden lg:flex fixed left-0 top-0 bottom-0 bg-slate-950/50 backdrop-blur-xl border-r border-white/10 flex-col z-50 transition-all duration-300 ease-out",
+          sidebarExpanded ? "w-64" : "w-20"
+        )}
+        onMouseEnter={() => setSidebarExpanded(true)}
+        onMouseLeave={() => setSidebarExpanded(false)}
+      >
         {/* Logo */}
-        <div className="p-6 border-b border-slate-100">
-          <Link to={createPageUrl('Landing')} className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
+        <div className="p-6 border-b border-white/10">
+          <Link to={createPageUrl('Landing')} className="flex items-center gap-3 overflow-hidden">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center flex-shrink-0 shadow-lg shadow-purple-500/50">
               <GraduationCap className="w-6 h-6 text-white" />
             </div>
-            <span className="text-xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+            <motion.span 
+              className="text-xl font-bold bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent whitespace-nowrap"
+              initial={{ opacity: 0, width: 0 }}
+              animate={{ 
+                opacity: sidebarExpanded ? 1 : 0,
+                width: sidebarExpanded ? 'auto' : 0
+              }}
+              transition={{ duration: 0.3 }}
+            >
               EduCore
-            </span>
+            </motion.span>
           </Link>
         </div>
 
         {/* Navigation */}
         <nav className="flex-1 p-4">
-          <div className="space-y-1">
+          <div className="space-y-2">
             {navItems.map(item => (
               <Link
                 key={item.page + item.name}
                 to={createPageUrl(item.page)}
-                className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
+                className={cn(
+                  "flex items-center gap-4 px-4 py-3 rounded-xl transition-all duration-300",
                   currentPageName === item.page
-                    ? 'bg-indigo-50 text-indigo-600'
-                    : 'text-slate-600 hover:bg-slate-50'
-                }`}
+                    ? 'bg-gradient-to-r from-purple-500 to-blue-500 text-white shadow-lg shadow-purple-500/50'
+                    : 'text-slate-400 hover:bg-white/5 hover:text-white'
+                )}
               >
-                <item.icon className="w-5 h-5" />
-                <span className="font-medium">{item.name}</span>
+                <item.icon className="w-5 h-5 flex-shrink-0" />
+                <motion.span 
+                  className="font-medium whitespace-nowrap"
+                  initial={{ opacity: 0, width: 0 }}
+                  animate={{ 
+                    opacity: sidebarExpanded ? 1 : 0,
+                    width: sidebarExpanded ? 'auto' : 0
+                  }}
+                  transition={{ duration: 0.3 }}
+                >
+                  {item.name}
+                </motion.span>
               </Link>
             ))}
           </div>
         </nav>
 
         {/* User info and logout */}
-        <div className="p-4 border-t border-slate-100">
-          <div className="flex items-center gap-3 mb-3">
-            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center text-white font-bold">
+        <div className="p-4 border-t border-white/10">
+          <div className="flex items-center gap-3 mb-3 overflow-hidden">
+            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center text-white font-bold flex-shrink-0 shadow-lg shadow-purple-500/50">
               {user.full_name?.charAt(0) || user.email?.charAt(0) || '?'}
             </div>
-            <div className="flex-1 min-w-0">
-              <p className="font-medium text-slate-800 truncate">{user.full_name || 'User'}</p>
-              <p className="text-xs text-slate-500 truncate capitalize">{user.user_type || user.role || 'User'}</p>
-            </div>
+            <motion.div 
+              className="flex-1 min-w-0"
+              initial={{ opacity: 0, width: 0 }}
+              animate={{ 
+                opacity: sidebarExpanded ? 1 : 0,
+                width: sidebarExpanded ? 'auto' : 0
+              }}
+              transition={{ duration: 0.3 }}
+            >
+              <p className="font-medium text-white truncate text-sm">{user.full_name || 'User'}</p>
+              <p className="text-xs text-slate-400 truncate capitalize">{user.user_type || user.role || 'User'}</p>
+            </motion.div>
           </div>
           <Button 
             variant="ghost" 
-            className="w-full justify-start text-slate-500 hover:text-red-600"
+            className={cn(
+              "w-full text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-all duration-300",
+              sidebarExpanded ? "justify-start" : "justify-center"
+            )}
             onClick={handleLogout}
           >
-            <LogOut className="w-4 h-4 mr-2" />
-            Sign Out
+            <LogOut className="w-4 h-4" />
+            {sidebarExpanded && <span className="ml-2">Sign Out</span>}
           </Button>
         </div>
       </aside>
 
       {/* Mobile Header */}
-      <header className="lg:hidden fixed top-0 left-0 right-0 bg-white border-b border-slate-100 z-50">
+      <header className="lg:hidden fixed top-0 left-0 right-0 bg-slate-950/80 backdrop-blur-xl border-b border-white/10 z-50">
         <div className="flex items-center justify-between px-4 py-3">
           <Link to={createPageUrl('Landing')} className="flex items-center gap-2">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center shadow-lg shadow-purple-500/50">
               <GraduationCap className="w-5 h-5 text-white" />
             </div>
-            <span className="text-lg font-bold text-slate-800">EduCore</span>
+            <span className="text-lg font-bold bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">EduCore</span>
           </Link>
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="p-2 rounded-lg hover:bg-slate-100"
+            className="p-2 rounded-lg hover:bg-white/10 text-white"
           >
             {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
           </button>
@@ -328,25 +367,26 @@ export default function Layout({ children, currentPageName }) {
             onClick={() => setMobileMenuOpen(false)}
           >
             <motion.div
-              className="absolute right-0 top-0 bottom-0 w-72 bg-white"
+              className="absolute right-0 top-0 bottom-0 w-72 bg-slate-950/95 backdrop-blur-xl border-l border-white/10"
               initial={{ x: '100%' }}
               animate={{ x: 0 }}
               exit={{ x: '100%' }}
-              transition={{ type: 'tween' }}
+              transition={{ type: 'tween', duration: 0.3 }}
               onClick={e => e.stopPropagation()}
             >
               <div className="p-4 pt-20">
-                <nav className="space-y-1">
+                <nav className="space-y-2">
                   {navItems.map(item => (
                     <Link
                       key={item.page + item.name}
                       to={createPageUrl(item.page)}
                       onClick={() => setMobileMenuOpen(false)}
-                      className={`flex items-center gap-3 px-4 py-3 rounded-xl ${
+                      className={cn(
+                        "flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300",
                         currentPageName === item.page
-                          ? 'bg-indigo-50 text-indigo-600'
-                          : 'text-slate-600'
-                      }`}
+                          ? 'bg-gradient-to-r from-purple-500 to-blue-500 text-white shadow-lg shadow-purple-500/50'
+                          : 'text-slate-400 hover:bg-white/5 hover:text-white'
+                      )}
                     >
                       <item.icon className="w-5 h-5" />
                       <span className="font-medium">{item.name}</span>
@@ -354,19 +394,19 @@ export default function Layout({ children, currentPageName }) {
                   ))}
                 </nav>
 
-                <div className="mt-8 pt-6 border-t border-slate-100">
+                <div className="mt-8 pt-6 border-t border-white/10">
                   <div className="flex items-center gap-3 mb-4 px-4">
-                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center text-white font-bold">
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center text-white font-bold shadow-lg shadow-purple-500/50">
                       {user.full_name?.charAt(0) || '?'}
                     </div>
                     <div>
-                      <p className="font-medium text-slate-800">{user.full_name}</p>
-                      <p className="text-xs text-slate-500 capitalize">{user.user_type || 'User'}</p>
+                      <p className="font-medium text-white">{user.full_name}</p>
+                      <p className="text-xs text-slate-400 capitalize">{user.user_type || 'User'}</p>
                     </div>
                   </div>
                   <Button 
                     variant="ghost" 
-                    className="w-full justify-start text-red-500"
+                    className="w-full justify-start text-red-400 hover:text-red-300 hover:bg-red-500/10"
                     onClick={handleLogout}
                   >
                     <LogOut className="w-4 h-4 mr-2" />
@@ -380,7 +420,10 @@ export default function Layout({ children, currentPageName }) {
       </AnimatePresence>
 
       {/* Main Content */}
-      <main className="lg:ml-64 pt-16 lg:pt-0">
+      <main className={cn(
+        "pt-16 lg:pt-0 transition-all duration-300",
+        sidebarExpanded ? "lg:ml-64" : "lg:ml-20"
+      )}>
         {children}
       </main>
     </div>
