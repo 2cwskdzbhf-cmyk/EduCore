@@ -2,6 +2,7 @@ import AITutor from './pages/AITutor';
 import AdminPanel from './pages/AdminPanel';
 import ClassDetails from './pages/ClassDetails';
 import CreateAssignment from './pages/CreateAssignment';
+import ImportMathsContent from './pages/ImportMathsContent';
 import JoinClass from './pages/JoinClass';
 import Landing from './pages/Landing';
 import Lesson from './pages/Lesson';
@@ -11,7 +12,6 @@ import StudentDashboard from './pages/StudentDashboard';
 import Subject from './pages/Subject';
 import TeacherDashboard from './pages/TeacherDashboard';
 import Topic from './pages/Topic';
-import ImportMathsContent from './pages/ImportMathsContent';
 import __Layout from './Layout.jsx';
 
 
@@ -20,6 +20,7 @@ export const PAGES = {
     "AdminPanel": AdminPanel,
     "ClassDetails": ClassDetails,
     "CreateAssignment": CreateAssignment,
+    "ImportMathsContent": ImportMathsContent,
     "JoinClass": JoinClass,
     "Landing": Landing,
     "Lesson": Lesson,
@@ -29,7 +30,6 @@ export const PAGES = {
     "Subject": Subject,
     "TeacherDashboard": TeacherDashboard,
     "Topic": Topic,
-    "ImportMathsContent": ImportMathsContent,
 }
 
 export const pagesConfig = {

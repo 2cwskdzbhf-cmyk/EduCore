@@ -138,6 +138,18 @@ export default function QuizPage() {
   const currentQuestion = questions[currentQuestionIndex];
   const totalQuestions = questions.length;
 
+  // If no quiz or no questions, show error state
+  if (!quiz || totalQuestions === 0) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
+        <div className="text-center">
+          <p className="text-slate-600 mb-4">This quiz has no questions yet.</p>
+          <Button onClick={() => navigate(-1)}>Go Back</Button>
+        </div>
+      </div>
+    );
+  }
+
   const handleAnswer = (answer) => {
     const timeSpent = Math.round((Date.now() - questionStartTime) / 1000);
     setAnswers({
