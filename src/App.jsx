@@ -1,18 +1,23 @@
 // src/App.jsx
-import React, { useEffect } from "react";                 // React + useEffect hook
-import mathsContent from "@/components/data/mathsContent"; // Import your maths data
+import React, { useEffect } from "react";
+import mathsContent from "@/components/data/mathsContent";
+import AuthProvider from "./AuthProvider"; // keep your existing imports
+// add any other imports your app already has
 
 function App() {
-  // Runs once when the app loads to register all maths content
+  // Run once when app loads to register maths content
   useEffect(() => {
     mathsContent.importMathsContent();
   }, []);
 
   return (
-    <div>
-      {/* your existing app JSX goes here */}
-      <h1>Welcome to My Maths App</h1>
-    </div>
+    <AuthProvider>
+      {/* Your existing JSX goes here */}
+      <div>
+        <h1>Welcome to My Maths App</h1>
+        {/* Replace or keep your actual app components here */}
+      </div>
+    </AuthProvider>
   );
 }
 
