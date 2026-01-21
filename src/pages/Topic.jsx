@@ -65,7 +65,22 @@ export default function TopicPage() {
     queryKey: ['quizzes', topicId],
     queryFn: async () => {
       if (!topicId) return [];
-      return base44.entities.Quiz.filter({ topic_id: topicId });
+      const quizzesData = await base44.entities.Quiz.filter({ topic_id: topicId });
+      
+      // Fetch questions for each quiz to get accurate count
+      const quizzesWithQuestions = await Promise.all(
+        quizzesData.map(async (quiz) => {
+          if (quiz.question_ids && quiz.question_ids.length > 0) {
+            const questions = await base44.entities.Question.filter({ 
+              id: { $in: quiz.question_ids } 
+            });
+            return { ...quiz, questions };
+          }
+          return { ...quiz, questions: [] };
+        })
+      );
+      
+      return quizzesWithQuestions;
     },
     enabled: !!topicId
   });
