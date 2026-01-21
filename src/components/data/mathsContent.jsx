@@ -4689,8 +4689,10 @@ export async function importMathsContent() {
       }
     }
 
-    // 3) Create Lessons
+    // 3) Create Lessons (and remember IDs so quizzes can link to them)
     console.log("Creating lessons...");
+    const lessonIdMap = {};
+
     for (const [ref, lessonData] of Object.entries(mathsLessons)) {
       const topicId = topicIdMap[ref];
       if (!topicId) {
@@ -4700,46 +4702,55 @@ export async function importMathsContent() {
 
       const { ref: _ignored, ...lessonFields } = lessonData;
 
-      await base44.entities.Lesson.create({
+      const createdLesson = await base44.entities.Lesson.create({
         ...lessonFields,
         topic_id: topicId
       });
 
-      console.log(`Lesson created: ${lessonData.title}`);
+      lessonIdMap[ref] = createdLesson.id;
+      console.log(`Lesson created: ${lessonData.title} (${createdLesson.id})`);
     }
 
-    // 4) Create Quizzes + Questions and link them
+    // 4) Create Quizzes + Questions
+    //
+    // IMPORTANT: In your Base44 schema, quizzes are linked to questions via lesson_id.
+    // Your Quiz table has a lesson_id column (you said it's empty), and Question table also has lesson_id.
+    // So we set quiz.lesson_id and question.lesson_id to the SAME lesson for that topic.
     console.log("Creating quizzes and questions...");
     for (const quizData of mathsQuizzes) {
       const topicId = topicIdMap[quizData.ref];
+      const lessonId = lessonIdMap[quizData.ref];
+
       if (!topicId) {
         console.warn(`No topic found for quiz ref: ${quizData.ref}`);
+        continue;
+      }
+      if (!lessonId) {
+        console.warn(`No lesson found for quiz ref: ${quizData.ref} (quiz will be skipped)`);
         continue;
       }
 
       const { ref: _ref, questions = [], ...quizFields } = quizData;
 
+      // Create quiz linked to BOTH topic and lesson
       const quiz = await base44.entities.Quiz.create({
         ...quizFields,
-        topic_id: topicId
+        topic_id: topicId,
+        lesson_id: lessonId
       });
 
-      console.log(`Quiz created: ${quizData.title} (${quiz.id})`);
+      console.log(`Quiz created: ${quizFields.title} (${quiz.id}) linked to lesson ${lessonId}`);
 
-      const questionIds = [];
+      // Create questions linked to the SAME lesson_id (this is what your quiz UI expects)
       for (const q of questions) {
-        const createdQuestion = await base44.entities.Question.create({
+        await base44.entities.Question.create({
           ...q,
           topic_id: topicId,
-          quiz_id: quiz.id
+          lesson_id: lessonId
         });
-        questionIds.push(createdQuestion.id);
       }
 
-      // Many UIs expect quizzes to reference question IDs
-      await base44.entities.Quiz.update(quiz.id, { question_ids: questionIds });
-
-      console.log(`${questionIds.length} questions created for quiz ${quiz.id}`);
+      console.log(`${questions.length} questions created for quiz ${quiz.id}`);
     }
 
     console.log("✅ Maths content import complete!");
