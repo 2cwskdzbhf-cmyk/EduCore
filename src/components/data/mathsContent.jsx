@@ -4741,13 +4741,25 @@ export async function importMathsContent() {
 
       console.log(`Quiz created: ${quizFields.title} (${quiz.id}) linked to lesson ${lessonId}`);
 
-      // Create questions linked to the SAME lesson_id (this is what your quiz UI expects)
+      // Create questions linked to this quiz + lesson (covers both possible UI linking methods)
+      const createdQuestionIds = [];
       for (const q of questions) {
-        await base44.entities.Question.create({
+        const created = await base44.entities.Question.create({
           ...q,
           topic_id: topicId,
-          lesson_id: lessonId
+          lesson_id: lessonId,
+          quiz_id: quiz.id
         });
+        if (created?.id) createdQuestionIds.push(created.id);
+      }
+
+      // Some Base44 templates expect Quiz.question_ids. Try to set it if the field exists.
+      if (createdQuestionIds.length) {
+        try {
+          await base44.entities.Quiz.update(quiz.id, { question_ids: createdQuestionIds });
+        } catch (e) {
+          console.log("Quiz.question_ids update skipped (field may not exist).");
+        }
       }
 
       console.log(`${questions.length} questions created for quiz ${quiz.id}`);
