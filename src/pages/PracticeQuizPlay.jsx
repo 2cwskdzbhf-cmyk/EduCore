@@ -43,26 +43,33 @@ export default function PracticeQuizPlay() {
       const userData = await base44.auth.me();
       setUser(userData);
       
-      // Fetch questions
-      // Check if lesson is read (gating)
+      // Fetch questions - NO GATING
+      let allQuestions = [];
+      
       if (lessonId) {
-        const readProgress = await base44.entities.LessonReadProgress.filter({
-          student_email: userData.email,
-          lesson_id: lessonId
+        allQuestions = await base44.entities.QuestionBankItem.filter({ 
+          lesson_id: lessonId, 
+          is_active: true 
         });
         
-        if (readProgress.length === 0 || !readProgress[0].read_confirmed_at) {
-          // Redirect to lesson page with lock message
-          navigate(createPageUrl(`Lesson?id=${lessonId}`));
-          return;
+        // If fewer than requested, optionally fill from topic
+        if (allQuestions.length < count && topicId) {
+          const topicQuestions = await base44.entities.QuestionBankItem.filter({
+            topic_id: topicId,
+            is_active: true
+          });
+          const additionalNeeded = count - allQuestions.length;
+          const additional = topicQuestions
+            .filter(q => !allQuestions.some(aq => aq.id === q.id))
+            .slice(0, additionalNeeded);
+          allQuestions = [...allQuestions, ...additional];
         }
+      } else if (topicId) {
+        allQuestions = await base44.entities.QuestionBankItem.filter({ 
+          topic_id: topicId, 
+          is_active: true 
+        });
       }
-
-      const filter = lessonId 
-        ? { lesson_id: lessonId, is_active: true }
-        : { topic_id: topicId, is_active: true };
-      
-      let allQuestions = await base44.entities.QuestionBankItem.filter(filter);
       
       // Shuffle and limit
       allQuestions = allQuestions.sort(() => Math.random() - 0.5).slice(0, count);
@@ -85,8 +92,22 @@ export default function PracticeQuizPlay() {
     if (!userAnswer.trim() || !questions[currentIndex]) return;
     
     const question = questions[currentIndex];
+    const cleanAnswer = userAnswer.trim();
+    
+    // Validate input first
+    if (cleanAnswer.includes('/')) {
+      const parts = cleanAnswer.split('/');
+      if (parts.length === 2) {
+        const den = parseFloat(parts[1]);
+        if (den === 0 || isNaN(den)) {
+          setFeedback('invalid');
+          return;
+        }
+      }
+    }
+    
     const isCorrect = AnswerChecker.checkAnswer(
-      userAnswer,
+      cleanAnswer,
       question.correct_answer,
       question.allowed_forms
     );
@@ -105,7 +126,7 @@ export default function PracticeQuizPlay() {
         lesson_id: lessonId,
         topic_id: topicId || question.topic_id,
         question_id: question.id,
-        submitted_answer: userAnswer,
+        submitted_answer: cleanAnswer,
         is_correct: true,
         attempts_count: attempts + 1,
         time_to_answer_ms: timeTaken,
@@ -203,10 +224,14 @@ export default function PracticeQuizPlay() {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900/20 to-slate-900 p-6 flex items-center justify-center">
         <GlassCard className="p-8 text-center max-w-md">
-          <h2 className="text-2xl font-bold text-white mb-4">No Questions Available</h2>
-          <p className="text-slate-400 mb-6">No questions available yet. Ask your teacher to generate questions.</p>
-          <Button onClick={() => navigate(-1)} className="bg-gradient-to-r from-purple-500 to-blue-500">
-            Go Back
+          <XCircle className="w-16 h-16 text-red-400 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-white mb-2">No Questions Available</h2>
+          <p className="text-slate-400 mb-6">No practice questions exist yet. Ask your teacher to generate questions for this lesson.</p>
+          <Button 
+            onClick={() => lessonId ? navigate(createPageUrl(`Lesson?id=${lessonId}`)) : navigate(-1)} 
+            className="bg-gradient-to-r from-purple-500 to-blue-500"
+          >
+            {lessonId ? 'Back to Lesson' : 'Go Back'}
           </Button>
         </GlassCard>
       </div>
@@ -273,9 +298,11 @@ export default function PracticeQuizPlay() {
                   }}
                   placeholder="Type your answer..."
                   disabled={feedback === 'correct' || showAnswer}
-                  className={`text-2xl h-16 text-center bg-white/5 border-white/20 text-white placeholder:text-slate-500 ${
-                    feedback === 'incorrect' ? 'animate-shake border-red-500' : ''
-                  } ${feedback === 'correct' ? 'border-emerald-500' : ''}`}
+                  className={`text-2xl h-16 text-center bg-white/5 border-white/20 text-white placeholder:text-slate-500 transition-all ${
+                    feedback === 'incorrect' ? 'animate-shake border-red-500 shadow-lg shadow-red-500/50' : ''
+                  } ${feedback === 'correct' ? 'border-emerald-500 shadow-lg shadow-emerald-500/50' : ''} ${
+                    feedback === 'invalid' ? 'border-amber-500' : ''
+                  }`}
                 />
               </div>
 
@@ -306,6 +333,16 @@ export default function PracticeQuizPlay() {
                   >
                     <XCircle className="w-6 h-6 text-red-400" />
                     <p className="font-bold text-red-400">Try again</p>
+                  </motion.div>
+                )}
+
+                {feedback === 'invalid' && (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.8 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="mb-6 p-4 rounded-xl bg-amber-500/20 border border-amber-500/30"
+                  >
+                    <p className="text-sm text-amber-400">Invalid input. Try using a fraction like 3/4 or a decimal like 0.75</p>
                   </motion.div>
                 )}
 
@@ -347,7 +384,7 @@ export default function PracticeQuizPlay() {
                   </>
                 )}
 
-                {(feedback === 'incorrect' && !showAnswer) && (
+                {((feedback === 'incorrect' || feedback === 'invalid') && !showAnswer) && (
                   <Button
                     onClick={() => {
                       setFeedback(null);
