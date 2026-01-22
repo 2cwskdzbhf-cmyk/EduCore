@@ -125,14 +125,14 @@ export default function TopicPage() {
     return progress?.completed_lessons?.includes(lessonId);
   };
 
-  // Deduplicate lessons by ID
-  const uniqueLessons = lessons.reduce((acc, lesson) => {
-    const key = lesson.id || `${lesson.title}-${lesson.topic_id || topicId}`;
-    if (!acc.find(l => (l.id || `${l.title}-${l.topic_id || topicId}`) === key)) {
-      acc.push(lesson);
-    }
-    return acc;
-  }, []);
+  // Deduplicate lessons by stable ID
+  const seenIds = new Set();
+  const uniqueLessons = lessons.filter(lesson => {
+    const id = lesson.id || lesson.lesson_id || lesson._id || lesson.ref;
+    if (!id || seenIds.has(id)) return false;
+    seenIds.add(id);
+    return true;
+  });
 
   const completedLessonsCount = uniqueLessons.filter((l) => isLessonCompleted(l.id)).length;
   const overallProgress = uniqueLessons.length > 0 ? (completedLessonsCount / uniqueLessons.length) * 100 : 0;
