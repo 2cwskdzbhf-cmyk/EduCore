@@ -11,13 +11,11 @@ import GlassCard from '@/components/ui/GlassCard';
 import ReactMarkdown from 'react-markdown';
 import {
   ChevronLeft,
-  Clock,
   CheckCircle2,
   ArrowRight,
   MessageSquare,
   Trophy,
-  Lock,
-  Timer
+  Loader2
 } from 'lucide-react';
 
 export default function LessonPage() {
@@ -47,7 +45,7 @@ export default function LessonPage() {
     fetchUser();
   }, []);
 
-  // Track scroll and time
+  // Track scroll only (no time requirement)
   useEffect(() => {
     if (!lessonId || !user) return;
 
@@ -58,27 +56,20 @@ export default function LessonPage() {
       const scrollHeight = element.scrollHeight - window.innerHeight;
       const percent = Math.min(100, Math.max(0, (scrollTop / scrollHeight) * 100));
       setScrollPercent(percent);
+      
+      // Auto-mark as read at 60% scroll
+      if (percent >= 60 && !readProgress?.read_confirmed_at) {
+        markAsReadMutation.mutate();
+      }
     };
-
-    const timer = setInterval(() => {
-      const elapsed = Date.now() - startTimeRef.current;
-      setTimeSpent(elapsed);
-    }, 1000);
 
     window.addEventListener('scroll', handleScroll);
     handleScroll();
 
     return () => {
       window.removeEventListener('scroll', handleScroll);
-      clearInterval(timer);
     };
-  }, [lessonId, user]);
-
-  // Check if can mark as read
-  useEffect(() => {
-    const canMark = scrollPercent >= 80 && timeSpent >= 60000;
-    setCanMarkAsRead(canMark);
-  }, [scrollPercent, timeSpent]);
+  }, [lessonId, user, readProgress?.read_confirmed_at]);
 
   // Initialize or update read progress
   useEffect(() => {
@@ -186,10 +177,19 @@ export default function LessonPage() {
       });
 
       if (progressList.length > 0) {
-        await base44.entities.LessonReadProgress.update(progressList[0].id, {
+        if (!progressList[0].read_confirmed_at) {
+          await base44.entities.LessonReadProgress.update(progressList[0].id, {
+            read_confirmed_at: new Date().toISOString(),
+            percent_scrolled: Math.max(scrollPercent, 60)
+          });
+        }
+      } else {
+        await base44.entities.LessonReadProgress.create({
+          student_email: user.email,
+          lesson_id: lessonId,
+          first_opened_at: new Date().toISOString(),
           read_confirmed_at: new Date().toISOString(),
-          percent_scrolled: 100,
-          time_spent_ms: timeSpent
+          percent_scrolled: Math.max(scrollPercent, 60)
         });
       }
     },
@@ -227,7 +227,16 @@ export default function LessonPage() {
   const nextLesson = currentLessonIndex >= 0 ? allLessons[currentLessonIndex + 1] : null;
   const isCompleted = progress?.completed_lessons?.includes(lessonId);
   const isLessonRead = !!readProgress?.read_confirmed_at;
-  const isPracticeUnlocked = isLessonRead;
+  const hasQuestions = practiceQuestions.length > 0;
+
+  const handleStartQuiz = async () => {
+    // Mark as read if not already
+    if (!isLessonRead) {
+      await markAsReadMutation.mutateAsync();
+    }
+    // Navigate to quiz
+    navigate(createPageUrl(`PracticeQuizPlay?lessonId=${lessonId}&count=15`));
+  };
 
   const handleComplete = async () => {
     await completeLessonMutation.mutateAsync();
@@ -289,26 +298,16 @@ export default function LessonPage() {
                 <span className="text-white font-bold">{Math.round(scrollPercent)}%</span>
               </div>
               <Progress value={scrollPercent} className="h-2" />
-              <div className="flex items-center justify-between text-xs text-slate-500">
-                <div className="flex items-center gap-1">
-                  <Timer className="w-3 h-3" />
-                  <span>{Math.floor(timeSpent / 1000)}s</span>
-                </div>
-                {canMarkAsRead && (
-                  <Button
-                    size="sm"
-                    onClick={() => markAsReadMutation.mutate()}
-                    className="bg-gradient-to-r from-purple-500 to-blue-500 h-7 text-xs"
-                  >
-                    Mark as Read
-                  </Button>
-                )}
-              </div>
-              {!canMarkAsRead && (
-                <p className="text-xs text-slate-500">
-                  {scrollPercent < 80 ? 'Scroll to 80%' : 'Read for 60s'} to unlock practice
-                </p>
-              )}
+              <Button
+                size="sm"
+                onClick={() => markAsReadMutation.mutate()}
+                className="w-full bg-gradient-to-r from-purple-500 to-blue-500 h-8 text-xs mt-2"
+              >
+                Mark as Read
+              </Button>
+              <p className="text-xs text-slate-500 text-center">
+                Or scroll to 60% to auto-mark
+              </p>
             </div>
           </GlassCard>
         </motion.div>
@@ -402,33 +401,6 @@ export default function LessonPage() {
           </GlassCard>
 
           <div className="space-y-4">
-            {/* Practice Quiz Button */}
-            {practiceQuestions.length > 0 && (
-              <div className="relative">
-                <Button
-                  onClick={() => {
-                    if (isPracticeUnlocked) {
-                      navigate(createPageUrl(`PracticeQuizPlay?lessonId=${lessonId}&count=15`));
-                    }
-                  }}
-                  disabled={!isPracticeUnlocked}
-                  className={`w-full h-12 ${
-                    isPracticeUnlocked
-                      ? 'bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600'
-                      : 'bg-white/5 text-slate-500 cursor-not-allowed'
-                  }`}
-                >
-                  {!isPracticeUnlocked && <Lock className="w-5 h-5 mr-2" />}
-                  <Trophy className="w-5 h-5 mr-2" />
-                  {isPracticeUnlocked ? 'Start Practice Quiz' : 'Practice Quiz (Locked)'}
-                </Button>
-                {!isPracticeUnlocked && (
-                  <p className="text-xs text-slate-500 mt-2 text-center">
-                    Read the lesson to unlock practice
-                  </p>
-                )}
-              </div>
-            )}
 
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
               <Link to={createPageUrl(`AITutor?topic=${lesson.topic_id}`)}>
@@ -471,8 +443,30 @@ export default function LessonPage() {
               )}
             </div>
           </div>
-        </motion.div>
-      </div>
-    </div>
-  );
-}
+          </motion.div>
+          </div>
+
+          {/* Fixed Bottom-Left Start Quiz Button */}
+          {hasQuestions && (
+          <motion.div
+          className="fixed bottom-6 left-6 z-50"
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          >
+          <Button
+            onClick={handleStartQuiz}
+            disabled={markAsReadMutation.isPending}
+            className="bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 shadow-2xl shadow-purple-500/50 h-14 px-8 text-lg font-semibold transition-all hover:scale-105"
+          >
+            {markAsReadMutation.isPending ? (
+              <Loader2 className="w-5 h-5 animate-spin mr-2" />
+            ) : (
+              <Trophy className="w-5 h-5 mr-2" />
+            )}
+            Start Quiz
+          </Button>
+          </motion.div>
+          )}
+          </div>
+          );
+          }

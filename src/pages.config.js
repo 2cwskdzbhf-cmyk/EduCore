@@ -16,11 +16,11 @@ import StudentClassDetail from './pages/StudentClassDetail';
 import StudentDashboard from './pages/StudentDashboard';
 import StudentStats from './pages/StudentStats';
 import Subject from './pages/Subject';
+import TeacherClassDetail from './pages/TeacherClassDetail';
 import TeacherDashboard from './pages/TeacherDashboard';
 import TeacherQuestionBuilder from './pages/TeacherQuestionBuilder';
 import TeacherQuestionGenerator from './pages/TeacherQuestionGenerator';
 import Topic from './pages/Topic';
-import TeacherClassDetail from './pages/TeacherClassDetail';
 import __Layout from './Layout.jsx';
 
 
@@ -43,11 +43,11 @@ export const PAGES = {
     "StudentDashboard": StudentDashboard,
     "StudentStats": StudentStats,
     "Subject": Subject,
+    "TeacherClassDetail": TeacherClassDetail,
     "TeacherDashboard": TeacherDashboard,
     "TeacherQuestionBuilder": TeacherQuestionBuilder,
     "TeacherQuestionGenerator": TeacherQuestionGenerator,
     "Topic": Topic,
-    "TeacherClassDetail": TeacherClassDetail,
 }
 
 export const pagesConfig = {
