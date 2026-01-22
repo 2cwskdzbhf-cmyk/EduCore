@@ -13,6 +13,7 @@ import StudentStats from './pages/StudentStats';
 import Subject from './pages/Subject';
 import TeacherDashboard from './pages/TeacherDashboard';
 import Topic from './pages/Topic';
+import CreateQuiz from './pages/CreateQuiz';
 import __Layout from './Layout.jsx';
 
 
@@ -32,6 +33,7 @@ export const PAGES = {
     "Subject": Subject,
     "TeacherDashboard": TeacherDashboard,
     "Topic": Topic,
+    "CreateQuiz": CreateQuiz,
 }
 
 export const pagesConfig = {
