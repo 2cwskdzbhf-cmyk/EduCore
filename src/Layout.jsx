@@ -28,7 +28,7 @@ export default function Layout({ children, currentPageName }) {
   const publicPages = ['Landing'];
   const authOnlyPages = ['Onboarding'];
   const studentPages = ['StudentDashboard', 'Subject', 'Topic', 'Lesson', 'Quiz', 'AITutor', 'JoinClass'];
-  const teacherPages = ['TeacherDashboard', 'ClassDetails', 'CreateAssignment', 'CreateQuiz', 'QuizLibrary', 'StartLiveQuiz'];
+  const teacherPages = ['TeacherDashboard', 'ClassDetails', 'CreateAssignment', 'QuizLibrary', 'CreateQuiz', 'StartLiveQuiz'];
   const adminPages = ['AdminPanel'];
 
   useEffect(() => {
@@ -152,7 +152,6 @@ export default function Layout({ children, currentPageName }) {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900/20 to-slate-900">
-      {/* Desktop Sidebar */}
       <aside 
         className={cn(
           "hidden lg:flex fixed left-0 top-0 bottom-0 bg-slate-950/50 backdrop-blur-xl border-r border-white/10 flex-col z-50 transition-all duration-300 ease-out",
@@ -161,7 +160,6 @@ export default function Layout({ children, currentPageName }) {
         onMouseEnter={() => setSidebarExpanded(true)}
         onMouseLeave={() => setSidebarExpanded(false)}
       >
-        {/* Logo */}
         <div className="p-6 border-b border-white/10">
           <Link to={createPageUrl('Landing')} className="flex items-center gap-3 overflow-hidden">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center flex-shrink-0 shadow-lg shadow-purple-500/50">
@@ -181,7 +179,6 @@ export default function Layout({ children, currentPageName }) {
           </Link>
         </div>
 
-        {/* Navigation */}
         <nav className="flex-1 p-4">
           <div className="space-y-2">
             {navItems.map(item => (
@@ -212,7 +209,6 @@ export default function Layout({ children, currentPageName }) {
           </div>
         </nav>
 
-        {/* User info and logout */}
         <div className="p-4 border-t border-white/10">
           <div className="flex items-center gap-3 mb-3 overflow-hidden">
             <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center text-white font-bold flex-shrink-0 shadow-lg shadow-purple-500/50">
@@ -245,7 +241,6 @@ export default function Layout({ children, currentPageName }) {
         </div>
       </aside>
 
-      {/* Mobile Header */}
       <header className="lg:hidden fixed top-0 left-0 right-0 bg-slate-950/80 backdrop-blur-xl border-b border-white/10 z-50">
         <div className="flex items-center justify-between px-4 py-3">
           <Link to={createPageUrl('Landing')} className="flex items-center gap-2">
@@ -263,7 +258,6 @@ export default function Layout({ children, currentPageName }) {
         </div>
       </header>
 
-      {/* Mobile Menu */}
       <AnimatePresence>
         {mobileMenuOpen && (
           <motion.div
@@ -326,7 +320,6 @@ export default function Layout({ children, currentPageName }) {
         )}
       </AnimatePresence>
 
-      {/* Main Content */}
       <main className={cn(
         "pt-16 lg:pt-0 transition-all duration-300",
         sidebarExpanded ? "lg:ml-64" : "lg:ml-20"
