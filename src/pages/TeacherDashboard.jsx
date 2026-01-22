@@ -36,7 +36,8 @@ import {
   Award,
   Copy,
   Check,
-  Trophy
+  Trophy,
+  Sparkles
 } from 'lucide-react';
 import GlassCard from '@/components/ui/GlassCard';
 import { StatCard } from '@/components/ui/GlassCard';
@@ -210,6 +211,12 @@ export default function TeacherDashboard() {
             <Button variant="outline" className="border-white/10 text-slate-300 hover:bg-white/10 hover:text-white">
               <Trophy className="w-4 h-4 mr-2" />
               Quiz Library
+            </Button>
+          </Link>
+          <Link to={createPageUrl('TeacherQuestionGenerator')}>
+            <Button variant="outline" className="border-emerald-500/20 text-emerald-300 hover:bg-emerald-500/10 hover:text-emerald-200 border-2">
+              <Sparkles className="w-4 h-4 mr-2" />
+              AI Generator
             </Button>
           </Link>
         </div>
