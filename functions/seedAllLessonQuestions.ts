@@ -530,13 +530,23 @@ Deno.serve(async (req) => {
     }
 
     // Get all lessons
-    const allLessons = await base44.entities.Lesson.list(null, 1000);
-    if (!allLessons || allLessons.length === 0) {
-      return Response.json({ error: 'No lessons found' }, { status: 400 });
+    let allLessons = await base44.entities.Lesson.list();
+    if (!allLessons) allLessons = [];
+    
+    if (allLessons.length === 0) {
+      return Response.json({ 
+        success: true,
+        error: 'No lessons found',
+        totalLessons: 0,
+        totalQuestionsCreated: 0,
+        lessonStats: []
+      }, { status: 200 });
     }
 
     // Get all topics for mapping
-    const allTopics = await base44.entities.Topic.list(null, 1000);
+    let allTopics = await base44.entities.Topic.list();
+    if (!allTopics) allTopics = [];
+    
     const topicMap = {};
     allTopics.forEach(t => topicMap[t.id] = t);
 
