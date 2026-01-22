@@ -142,7 +142,9 @@ Deno.serve(async (req) => {
       ]
     };
 
-    // Process each lesson
+    // Collect all questions first (no DB writes yet)
+    const allQuestionsToCreate = [];
+
     for (let i = 0; i < allLessons.length; i++) {
       const lesson = allLessons[i];
       if (!lesson.topic_id) continue;
@@ -166,11 +168,10 @@ Deno.serve(async (req) => {
         templates = questionTemplates.fractions;
       }
 
-      // Create questions for this lesson (batch mode)
-      const questionsToCreate = [];
+      // Build question objects
       for (let j = 0; j < templates.length; j++) {
         const template = templates[j];
-        questionsToCreate.push({
+        allQuestionsToCreate.push({
           subject_id: topicMap[lesson.topic_id]?.subject_id || '',
           topic_id: lesson.topic_id,
           lesson_id: lesson.id,
@@ -190,20 +191,18 @@ Deno.serve(async (req) => {
         });
       }
 
-      // Batch create with delay to avoid rate limits
-      if (questionsToCreate.length > 0) {
-        await base44.entities.QuestionBankItem.bulkCreate(questionsToCreate);
-        // Wait 100ms between lessons to avoid rate limits
-        await new Promise(resolve => setTimeout(resolve, 100));
-      }
-
-      totalCreated += templates.length;
       lessonStats.push({
         lessonId: lesson.id,
         lessonName: lesson.title,
         topicName: topicMap[lesson.topic_id]?.name || '',
         questionCount: templates.length
       });
+    }
+
+    // Batch create all at once (single API call)
+    if (allQuestionsToCreate.length > 0) {
+      await base44.entities.QuestionBankItem.bulkCreate(allQuestionsToCreate);
+      totalCreated = allQuestionsToCreate.length;
     }
 
     return Response.json({
