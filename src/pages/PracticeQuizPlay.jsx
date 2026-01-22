@@ -223,16 +223,27 @@ export default function PracticeQuizPlay() {
   if (questions.length === 0) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900/20 to-slate-900 p-6 flex items-center justify-center">
-        <GlassCard className="p-8 text-center max-w-md">
-          <XCircle className="w-16 h-16 text-red-400 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-white mb-2">No Questions Available</h2>
-          <p className="text-slate-400 mb-6">No practice questions exist yet. Ask your teacher to generate questions for this lesson.</p>
-          <Button 
-            onClick={() => lessonId ? navigate(createPageUrl(`Lesson?id=${lessonId}`)) : navigate(-1)} 
-            className="bg-gradient-to-r from-purple-500 to-blue-500"
-          >
-            {lessonId ? 'Back to Lesson' : 'Go Back'}
-          </Button>
+        <GlassCard className="p-12 text-center max-w-lg">
+          <XCircle className="w-20 h-20 text-amber-400 mx-auto mb-6" />
+          <h2 className="text-3xl font-bold text-white mb-3">No Questions Yet</h2>
+          <p className="text-slate-300 mb-8 leading-relaxed">
+            This lesson doesn't have practice questions yet. Your teacher will add them soon, or you can go back and try another lesson.
+          </p>
+          <div className="flex flex-col sm:flex-row gap-3">
+            <Button 
+              onClick={() => lessonId ? navigate(createPageUrl(`Lesson?id=${lessonId}`)) : navigate(-1)} 
+              variant="outline"
+              className="flex-1 border-white/20 text-white hover:bg-white/10"
+            >
+              Back to Lesson
+            </Button>
+            <Button 
+              onClick={() => navigate(createPageUrl('StudentDashboard'))} 
+              className="flex-1 bg-gradient-to-r from-purple-500 to-blue-500"
+            >
+              Go to Dashboard
+            </Button>
+          </div>
         </GlassCard>
       </div>
     );
