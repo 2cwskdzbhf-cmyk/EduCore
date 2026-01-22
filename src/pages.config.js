@@ -9,10 +9,10 @@ import Lesson from './pages/Lesson';
 import Onboarding from './pages/Onboarding';
 import Quiz from './pages/Quiz';
 import StudentDashboard from './pages/StudentDashboard';
-import StudentStats from './pages/StudentStats';
 import Subject from './pages/Subject';
 import TeacherDashboard from './pages/TeacherDashboard';
 import Topic from './pages/Topic';
+import StudentStats from './pages/StudentStats';
 import __Layout from './Layout.jsx';
 
 
@@ -28,10 +28,10 @@ export const PAGES = {
     "Onboarding": Onboarding,
     "Quiz": Quiz,
     "StudentDashboard": StudentDashboard,
-    "StudentStats": StudentStats,
     "Subject": Subject,
     "TeacherDashboard": TeacherDashboard,
     "Topic": Topic,
+    "StudentStats": StudentStats,
 }
 
 export const pagesConfig = {

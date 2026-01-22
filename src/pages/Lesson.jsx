@@ -19,7 +19,6 @@ import {
   MessageSquare,
   Trophy
 } from 'lucide-react';
-import GlassCard from '@/components/ui/GlassCard';
 
 export default function LessonPage() {
   const navigate = useNavigate();
@@ -143,25 +142,24 @@ export default function LessonPage() {
 
   if (!lessonId || loadingLesson) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900/20 to-slate-900 p-6 flex items-center justify-center">
-        <div className="w-12 h-12 border-4 border-purple-500 border-t-transparent rounded-full animate-spin shadow-lg shadow-purple-500/50" />
+      <div className="min-h-screen bg-slate-50 p-6">
+        <div className="max-w-3xl mx-auto">
+          <Skeleton className="h-8 w-48 mb-4" />
+          <Skeleton className="h-64 w-full rounded-xl" />
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900/20 to-slate-900 p-6">
-      <div className="max-w-3xl mx-auto">
-        {/* Header */}
-        <motion.div
-          className="mb-6"
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-        >
-          <div className="flex items-center justify-between mb-4">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
+      {/* Header */}
+      <div className="bg-white border-b border-slate-100 sticky top-0 z-10">
+        <div className="max-w-3xl mx-auto px-6 py-4">
+          <div className="flex items-center justify-between">
             <Link 
               to={topic ? createPageUrl(`Topic?id=${topic.id}`) : createPageUrl('StudentDashboard')} 
-              className="inline-flex items-center gap-2 text-slate-400 hover:text-white transition-colors"
+              className="inline-flex items-center gap-2 text-slate-500 hover:text-slate-700 transition-colors"
             >
               <ChevronLeft className="w-5 h-5" />
               <span className="hidden sm:inline">Back to {topic?.name || 'Topic'}</span>
@@ -169,12 +167,12 @@ export default function LessonPage() {
             
             <div className="flex items-center gap-4">
               {allLessons.length > 1 && (
-                <span className="text-sm text-slate-400">
-                  {currentLessonIndex + 1} / {allLessons.length}
+                <span className="text-sm text-slate-500">
+                  Lesson {currentLessonIndex + 1} of {allLessons.length}
                 </span>
               )}
               {isCompleted && (
-                <span className="flex items-center gap-1 text-emerald-400 text-sm font-medium">
+                <span className="flex items-center gap-1 text-emerald-600 text-sm font-medium">
                   <CheckCircle2 className="w-4 h-4" />
                   Completed
                 </span>
@@ -185,51 +183,58 @@ export default function LessonPage() {
           {/* Progress */}
           <Progress 
             value={((currentLessonIndex + (isCompleted ? 1 : 0)) / allLessons.length) * 100} 
-            className="h-2" 
+            className="h-1 mt-4" 
           />
-        </motion.div>
+        </div>
+      </div>
+
+      {/* Content */}
+      <div className="max-w-3xl mx-auto px-6 py-8">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3 }}
         >
           {/* Lesson Header */}
-          <div className="mb-6">
-            <h1 className="text-3xl font-bold text-white mb-3">{lesson?.title}</h1>
-            <div className="flex items-center gap-4 text-sm text-slate-400">
+          <div className="mb-8">
+            <h1 className="text-3xl font-bold text-slate-900 mb-4">{lesson?.title}</h1>
+            <div className="flex items-center gap-4 text-sm text-slate-500">
               <span className="flex items-center gap-1">
                 <Clock className="w-4 h-4" />
-                {lesson?.duration_minutes || 5} min
+                {lesson?.duration_minutes || 5} min read
+              </span>
+              <span className="flex items-center gap-1">
+                <Zap className="w-4 h-4 text-amber-500" />
+                +{lesson?.xp_reward || 10} XP
               </span>
             </div>
           </div>
 
           {/* Lesson Content */}
-          <GlassCard className="p-8 mb-6">
-            <div className="prose prose-invert max-w-none">
+          <div className="bg-white rounded-2xl border border-slate-100 p-8 shadow-sm">
+            <div className="prose prose-slate max-w-none">
               <ReactMarkdown
                 components={{
-                  h1: ({ children }) => <h1 className="text-2xl font-bold text-white mt-8 mb-4">{children}</h1>,
-                  h2: ({ children }) => <h2 className="text-xl font-bold text-slate-200 mt-6 mb-3">{children}</h2>,
-                  h3: ({ children }) => <h3 className="text-lg font-semibold text-slate-200 mt-5 mb-2">{children}</h3>,
-                  p: ({ children }) => <p className="text-slate-300 leading-relaxed mb-4">{children}</p>,
-                  ul: ({ children }) => <ul className="list-disc pl-6 mb-4 space-y-2 text-slate-300">{children}</ul>,
-                  ol: ({ children }) => <ol className="list-decimal pl-6 mb-4 space-y-2 text-slate-300">{children}</ol>,
+                  h1: ({ children }) => <h1 className="text-2xl font-bold text-slate-900 mt-8 mb-4">{children}</h1>,
+                  h2: ({ children }) => <h2 className="text-xl font-bold text-slate-800 mt-6 mb-3">{children}</h2>,
+                  h3: ({ children }) => <h3 className="text-lg font-semibold text-slate-800 mt-5 mb-2">{children}</h3>,
+                  p: ({ children }) => <p className="text-slate-600 leading-relaxed mb-4">{children}</p>,
+                  ul: ({ children }) => <ul className="list-disc pl-6 mb-4 space-y-2 text-slate-600">{children}</ul>,
+                  ol: ({ children }) => <ol className="list-decimal pl-6 mb-4 space-y-2 text-slate-600">{children}</ol>,
                   li: ({ children }) => <li className="leading-relaxed">{children}</li>,
-                  code: ({ children }) => <code className="bg-purple-500/20 px-2 py-1 rounded text-purple-300 text-sm">{children}</code>,
-                  pre: ({ children }) => <pre className="bg-slate-950/50 text-slate-100 p-4 rounded-xl overflow-x-auto mb-4 border border-white/10">{children}</pre>,
-                  blockquote: ({ children }) => <blockquote className="border-l-4 border-purple-500 pl-4 italic text-slate-300 my-4">{children}</blockquote>,
+                  code: ({ children }) => <code className="bg-slate-100 px-2 py-1 rounded text-indigo-600 text-sm">{children}</code>,
+                  pre: ({ children }) => <pre className="bg-slate-900 text-slate-100 p-4 rounded-xl overflow-x-auto mb-4">{children}</pre>,
+                  blockquote: ({ children }) => <blockquote className="border-l-4 border-indigo-500 pl-4 italic text-slate-600 my-4">{children}</blockquote>,
                 }}
               >
                 {lesson?.content || 'No content available for this lesson.'}
               </ReactMarkdown>
             </div>
-          </GlassCard>
+          </div>
 
           {/* Action Buttons */}
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="mt-8 flex flex-col sm:flex-row items-center justify-between gap-4">
             <Link to={createPageUrl(`AITutor?topic=${lesson?.topic_id}`)}>
-              <Button variant="outline" className="w-full sm:w-auto border-white/10 text-slate-300 hover:bg-white/5 hover:text-white">
+              <Button variant="outline" className="w-full sm:w-auto">
                 <MessageSquare className="w-4 h-4 mr-2" />
                 Ask AI Tutor
               </Button>
@@ -238,7 +243,7 @@ export default function LessonPage() {
             <div className="flex items-center gap-3 w-full sm:w-auto">
               {quizzes.length > 0 ? (
                 <Button 
-                  className="flex-1 sm:flex-none bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 shadow-lg shadow-amber-500/30"
+                  className="flex-1 sm:flex-none bg-amber-500 hover:bg-amber-600"
                   onClick={handleComplete}
                   disabled={completeLessonMutation.isPending}
                 >
@@ -253,7 +258,7 @@ export default function LessonPage() {
                 </Button>
               ) : nextLesson ? (
                 <Button 
-                  className="flex-1 sm:flex-none bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 shadow-lg shadow-purple-500/30"
+                  className="flex-1 sm:flex-none bg-indigo-500 hover:bg-indigo-600"
                   onClick={handleComplete}
                   disabled={completeLessonMutation.isPending}
                 >
@@ -268,7 +273,7 @@ export default function LessonPage() {
                 </Button>
               ) : (
                 <Button 
-                  className="flex-1 sm:flex-none bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 shadow-lg shadow-emerald-500/30"
+                  className="flex-1 sm:flex-none bg-emerald-500 hover:bg-emerald-600"
                   onClick={handleComplete}
                   disabled={completeLessonMutation.isPending}
                 >

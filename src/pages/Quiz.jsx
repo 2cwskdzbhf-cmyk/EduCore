@@ -18,7 +18,6 @@ import {
   ArrowRight,
   Sparkles
 } from 'lucide-react';
-import GlassCard from '@/components/ui/GlassCard';
 
 export default function QuizPage() {
   const navigate = useNavigate();
@@ -130,8 +129,8 @@ export default function QuizPage() {
 
   if (!quizId || isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900/20 to-slate-900 flex items-center justify-center">
-        <div className="w-12 h-12 border-4 border-purple-500 border-t-transparent rounded-full animate-spin shadow-lg shadow-purple-500/50" />
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
@@ -143,10 +142,10 @@ export default function QuizPage() {
   // If no quiz or no questions, show error state
   if (!quiz || totalQuestions === 0) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900/20 to-slate-900 flex items-center justify-center p-6">
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
         <div className="text-center">
-          <p className="text-slate-400 mb-4">This quiz has no questions yet.</p>
-          <Button onClick={() => navigate(-1)} className="bg-gradient-to-r from-purple-500 to-blue-500">Go Back</Button>
+          <p className="text-slate-600 mb-4">This quiz has no questions yet.</p>
+          <Button onClick={() => navigate(-1)}>Go Back</Button>
         </div>
       </div>
     );
@@ -204,27 +203,22 @@ export default function QuizPage() {
     const passed = score >= (quiz.passing_score || 60);
 
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900/20 to-slate-900 flex items-center justify-center p-6">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50 flex items-center justify-center p-6">
         <motion.div
           className="w-full max-w-lg"
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.3 }}
         >
-          <GlassCard className={`p-8 text-center border-2 ${
+          <div className={`rounded-3xl p-8 text-center ${
             passed 
-              ? 'border-emerald-500/50 shadow-emerald-500/30' 
-              : 'border-amber-500/50 shadow-amber-500/30'
+              ? 'bg-gradient-to-br from-emerald-500 to-teal-600 text-white' 
+              : 'bg-gradient-to-br from-amber-500 to-orange-600 text-white'
           }`}>
             <motion.div
               initial={{ scale: 0 }}
               animate={{ scale: 1 }}
               transition={{ type: "spring", delay: 0.2 }}
-              className={`w-24 h-24 mx-auto mb-6 rounded-full flex items-center justify-center shadow-lg ${
-                passed 
-                  ? 'bg-gradient-to-br from-emerald-500 to-teal-500 shadow-emerald-500/50'
-                  : 'bg-gradient-to-br from-amber-500 to-orange-500 shadow-amber-500/50'
-              }`}
+              className="w-24 h-24 mx-auto mb-6 bg-white/20 rounded-full flex items-center justify-center"
             >
               {passed ? (
                 <Trophy className="w-12 h-12 text-white" />
@@ -233,33 +227,33 @@ export default function QuizPage() {
               )}
             </motion.div>
 
-            <h1 className="text-3xl font-bold mb-2 text-white">
+            <h1 className="text-3xl font-bold mb-2">
               {passed ? 'Great Job!' : 'Keep Practicing!'}
             </h1>
-            <p className="text-slate-300 mb-8">
+            <p className="text-white/80 mb-8">
               {passed ? "You've mastered this quiz!" : "You're getting there, keep going!"}
             </p>
 
-            <div className="grid grid-cols-2 gap-4 mb-6">
-              <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/10">
-                <p className="text-4xl font-bold text-white">{score}%</p>
-                <p className="text-sm text-slate-400">Accuracy</p>
+            <div className="grid grid-cols-2 gap-4 mb-8">
+              <div className="bg-white/20 rounded-xl p-4">
+                <p className="text-4xl font-bold">{score}%</p>
+                <p className="text-sm text-white/70">Accuracy</p>
               </div>
-              <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/10">
-                <p className="text-4xl font-bold text-white">{correctCount}/{totalQuestions}</p>
-                <p className="text-sm text-slate-400">Correct</p>
+              <div className="bg-white/20 rounded-xl p-4">
+                <p className="text-4xl font-bold">{correctCount}/{totalQuestions}</p>
+                <p className="text-sm text-white/70">Correct</p>
               </div>
             </div>
 
-            <div className="bg-gradient-to-r from-purple-500/20 to-blue-500/20 rounded-xl p-4 mb-8 border border-purple-500/30">
-              <p className="text-2xl font-bold text-white">{submitQuizMutation.data?.accuracy || 0}%</p>
-              <p className="text-sm text-slate-300">Your Overall Accuracy</p>
+            <div className="bg-white/20 rounded-xl p-4 mb-8">
+              <p className="text-2xl font-bold">{submitQuizMutation.data?.accuracy || 0}%</p>
+              <p className="text-sm text-white/70">Your Overall Accuracy</p>
             </div>
 
             <div className="space-y-3">
               {quiz.topic_id && (
                 <Button 
-                  className="w-full bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 h-12 shadow-lg shadow-purple-500/30"
+                  className="w-full bg-white text-slate-800 hover:bg-white/90 h-12"
                   onClick={() => navigate(createPageUrl(`Topic?id=${quiz.topic_id}`))}
                 >
                   Back to Topic
@@ -268,41 +262,39 @@ export default function QuizPage() {
               )}
               <Button 
                 variant="ghost" 
-                className="w-full text-slate-300 hover:bg-white/10 hover:text-white h-12"
+                className="w-full text-white hover:bg-white/20 h-12"
                 onClick={() => navigate(createPageUrl('StudentDashboard'))}
               >
                 Go to Dashboard
               </Button>
             </div>
-          </GlassCard>
+          </div>
 
           {/* Review Answers */}
-          <GlassCard className="mt-6 p-6">
-            <h3 className="font-semibold text-white mb-4">Review Answers</h3>
+          <div className="mt-6 bg-white rounded-2xl border border-slate-100 p-6">
+            <h3 className="font-semibold text-slate-800 mb-4">Review Answers</h3>
             <div className="space-y-3">
               {questions.map((q, idx) => {
                 const answer = answers[q.id];
                 return (
-                  <div key={q.id} className={`p-4 rounded-xl border ${
-                    answer?.is_correct 
-                      ? 'bg-emerald-500/10 border-emerald-500/30' 
-                      : 'bg-red-500/10 border-red-500/30'
+                  <div key={q.id} className={`p-4 rounded-xl ${
+                    answer?.is_correct ? 'bg-emerald-50 border border-emerald-200' : 'bg-red-50 border border-red-200'
                   }`}>
                     <div className="flex items-start gap-3">
                       {answer?.is_correct ? (
-                        <CheckCircle2 className="w-5 h-5 text-emerald-400 flex-shrink-0 mt-0.5" />
+                        <CheckCircle2 className="w-5 h-5 text-emerald-500 flex-shrink-0 mt-0.5" />
                       ) : (
-                        <XCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
+                        <XCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
                       )}
                       <div>
-                        <p className="font-medium text-white text-sm">{q.question}</p>
+                        <p className="font-medium text-slate-800 text-sm">{q.question}</p>
                         {!answer?.is_correct && (
-                          <p className="text-sm text-emerald-400 mt-1">
+                          <p className="text-sm text-emerald-600 mt-1">
                             Correct: {q.correct_answer}
                           </p>
                         )}
                         {q.explanation && (
-                          <p className="text-xs text-slate-400 mt-2">{q.explanation}</p>
+                          <p className="text-xs text-slate-500 mt-2">{q.explanation}</p>
                         )}
                       </div>
                     </div>
@@ -310,37 +302,37 @@ export default function QuizPage() {
                 );
               })}
             </div>
-          </GlassCard>
+          </div>
         </motion.div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900/20 to-slate-900 p-6">
-      <div className="max-w-3xl mx-auto">
-        {/* Header */}
-        <motion.div
-          className="mb-6"
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-        >
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-indigo-50/30">
+      {/* Header */}
+      <div className="bg-white border-b border-slate-100 sticky top-0 z-10">
+        <div className="max-w-3xl mx-auto px-6 py-4">
           <div className="flex items-center justify-between mb-4">
             <button 
               onClick={() => navigate(-1)}
-              className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors"
+              className="flex items-center gap-2 text-slate-500 hover:text-slate-700"
             >
               <ChevronLeft className="w-5 h-5" />
               Exit Quiz
             </button>
             <div className="flex items-center gap-4">
-              <span className="text-sm font-medium text-slate-400">
+              <span className="text-sm font-medium text-slate-600">
                 {currentQuestionIndex + 1} / {totalQuestions}
               </span>
             </div>
           </div>
           <Progress value={((currentQuestionIndex + 1) / totalQuestions) * 100} className="h-2" />
-        </motion.div>
+        </div>
+      </div>
+
+      {/* Question */}
+      <div className="max-w-3xl mx-auto px-6 py-12">
         <AnimatePresence mode="wait">
           <motion.div
             key={currentQuestionIndex}
@@ -349,16 +341,16 @@ export default function QuizPage() {
             exit={{ opacity: 0, x: -20 }}
             transition={{ duration: 0.3 }}
           >
-            <GlassCard className="p-8">
-              <span className={`inline-block px-3 py-1 rounded-full text-sm font-medium mb-6 ${
+            <div className="bg-white rounded-2xl border border-slate-100 p-8 shadow-sm">
+              <span className={`inline-block px-3 py-1 rounded-full text-sm font-medium mb-4 ${
                 currentQuestion?.type === 'multiple_choice' 
-                  ? 'bg-purple-500/20 text-purple-300' 
-                  : 'bg-blue-500/20 text-blue-300'
+                  ? 'bg-indigo-100 text-indigo-700' 
+                  : 'bg-purple-100 text-purple-700'
               }`}>
                 {currentQuestion?.type === 'multiple_choice' ? 'Multiple Choice' : 'Short Answer'}
               </span>
 
-              <h2 className="text-2xl font-bold text-white mb-8">
+              <h2 className="text-2xl font-bold text-slate-900 mb-8">
                 {currentQuestion?.question}
               </h2>
 
@@ -368,21 +360,21 @@ export default function QuizPage() {
                     <button
                       key={idx}
                       onClick={() => handleAnswer(option)}
-                      className={`w-full p-4 rounded-xl border-2 text-left transition-all duration-300 ${
+                      className={`w-full p-4 rounded-xl border-2 text-left transition-all ${
                         answers[currentQuestion.id]?.answer === option
-                          ? 'border-purple-500 bg-purple-500/20 shadow-lg shadow-purple-500/30'
-                          : 'border-white/10 hover:border-white/20 hover:bg-white/5'
+                          ? 'border-indigo-500 bg-indigo-50'
+                          : 'border-slate-200 hover:border-slate-300'
                       }`}
                     >
                       <div className="flex items-center gap-4">
-                        <div className={`w-8 h-8 rounded-full flex items-center justify-center font-medium transition-all duration-300 ${
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center font-medium ${
                           answers[currentQuestion.id]?.answer === option
-                            ? 'bg-gradient-to-br from-purple-500 to-blue-500 text-white shadow-lg shadow-purple-500/50'
-                            : 'bg-white/10 text-slate-400'
+                            ? 'bg-indigo-500 text-white'
+                            : 'bg-slate-100 text-slate-600'
                         }`}>
                           {String.fromCharCode(65 + idx)}
                         </div>
-                        <span className="text-white">{option}</span>
+                        <span className="text-slate-700">{option}</span>
                       </div>
                     </button>
                   ))}
@@ -392,7 +384,7 @@ export default function QuizPage() {
                   placeholder="Type your answer..."
                   value={answers[currentQuestion.id]?.answer || ''}
                   onChange={(e) => handleAnswer(e.target.value)}
-                  className="h-14 text-lg bg-white/5 border-white/10 text-white placeholder:text-slate-500"
+                  className="h-14 text-lg"
                 />
               )}
 
@@ -400,7 +392,7 @@ export default function QuizPage() {
                 <Button
                   onClick={handleNext}
                   disabled={!answers[currentQuestion?.id]}
-                  className="bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 h-12 px-8 shadow-lg shadow-purple-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="bg-indigo-500 hover:bg-indigo-600 h-12 px-8"
                 >
                   {currentQuestionIndex === totalQuestions - 1 ? (
                     <>
@@ -415,7 +407,7 @@ export default function QuizPage() {
                   )}
                 </Button>
               </div>
-            </GlassCard>
+            </div>
           </motion.div>
         </AnimatePresence>
       </div>
