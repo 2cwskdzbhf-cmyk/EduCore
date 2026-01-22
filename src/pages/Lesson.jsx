@@ -45,6 +45,19 @@ export default function LessonPage() {
     fetchUser();
   }, []);
 
+  const { data: readProgress } = useQuery({
+    queryKey: ['lessonReadProgress', lessonId, user?.email],
+    queryFn: async () => {
+      if (!lessonId || !user?.email) return null;
+      const progressList = await base44.entities.LessonReadProgress.filter({
+        student_email: user.email,
+        lesson_id: lessonId
+      });
+      return progressList[0] || null;
+    },
+    enabled: !!lessonId && !!user?.email
+  });
+
   // Track scroll only (no time requirement)
   useEffect(() => {
     if (!lessonId || !user) return;
@@ -58,7 +71,7 @@ export default function LessonPage() {
       setScrollPercent(percent);
       
       // Auto-mark as read at 60% scroll
-      if (percent >= 60 && !readProgress?.read_confirmed_at) {
+      if (percent >= 60 && readProgress && !readProgress.read_confirmed_at) {
         markAsReadMutation.mutate();
       }
     };
@@ -69,7 +82,7 @@ export default function LessonPage() {
     return () => {
       window.removeEventListener('scroll', handleScroll);
     };
-  }, [lessonId, user, readProgress?.read_confirmed_at]);
+  }, [lessonId, user, readProgress]);
 
   // Initialize read progress on mount
   useEffect(() => {
@@ -132,19 +145,6 @@ export default function LessonPage() {
       return progressList?.[0] || null;
     },
     enabled: !!user?.email
-  });
-
-  const { data: readProgress } = useQuery({
-    queryKey: ['lessonReadProgress', lessonId, user?.email],
-    queryFn: async () => {
-      if (!lessonId || !user?.email) return null;
-      const progressList = await base44.entities.LessonReadProgress.filter({
-        student_email: user.email,
-        lesson_id: lessonId
-      });
-      return progressList[0] || null;
-    },
-    enabled: !!lessonId && !!user?.email
   });
 
   const { data: practiceQuestions = [] } = useQuery({
