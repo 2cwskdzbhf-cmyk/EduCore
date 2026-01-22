@@ -44,6 +44,20 @@ export default function PracticeQuizPlay() {
       setUser(userData);
       
       // Fetch questions
+      // Check if lesson is read (gating)
+      if (lessonId) {
+        const readProgress = await base44.entities.LessonReadProgress.filter({
+          student_email: userData.email,
+          lesson_id: lessonId
+        });
+        
+        if (readProgress.length === 0 || !readProgress[0].read_confirmed_at) {
+          // Redirect to lesson page with lock message
+          navigate(createPageUrl(`Lesson?id=${lessonId}`));
+          return;
+        }
+      }
+
       const filter = lessonId 
         ? { lesson_id: lessonId, is_active: true }
         : { topic_id: topicId, is_active: true };
