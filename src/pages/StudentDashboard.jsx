@@ -25,10 +25,7 @@ export default function StudentDashboard() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
-  const [joinLiveQuizOpen, setJoinLiveQuizOpen] = useState(false);
   const [joinClassOpen, setJoinClassOpen] = useState(false);
-  const [joinCode, setJoinCode] = useState('');
-  const [nickname, setNickname] = useState('');
   const [classJoinCode, setClassJoinCode] = useState('');
 
   useEffect(() => {
@@ -120,9 +117,11 @@ export default function StudentDashboard() {
     }
   };
 
-  const handleJoinLiveQuiz = () => {
-    if (joinCode && nickname) {
-      navigate(createPageUrl(`LiveQuizPlay?code=${joinCode}&nickname=${encodeURIComponent(nickname)}`));
+  const handleJoinLiveQuiz = async (sessionId) => {
+    try {
+      navigate(createPageUrl(`LiveQuizStudent?sessionId=${sessionId}`));
+    } catch (error) {
+      alert('Failed to join live quiz');
     }
   };
 
@@ -140,24 +139,47 @@ export default function StudentDashboard() {
           <p className="text-slate-400">Continue your learning journey</p>
         </motion.div>
 
+        {activeLiveSessions.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-8"
+          >
+            <GlassCard className="p-6 border-2 border-amber-500/30">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center animate-pulse">
+                  <Zap className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-white">Live Quiz Available!</h3>
+                  <p className="text-sm text-slate-400">Join now to compete with your classmates</p>
+                </div>
+              </div>
+              <div className="space-y-2">
+                {activeLiveSessions.map(session => {
+                  const sessionClass = enrolledClasses.find(c => c.id === session.class_id);
+                  return (
+                    <Button
+                      key={session.id}
+                      onClick={() => handleJoinLiveQuiz(session.id)}
+                      className="w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600"
+                    >
+                      <Zap className="w-4 h-4 mr-2" />
+                      Join {sessionClass?.name} Live Quiz
+                    </Button>
+                  );
+                })}
+              </div>
+            </GlassCard>
+          </motion.div>
+        )}
+
         <motion.div
-          className="grid md:grid-cols-2 gap-4 mb-8"
+          className="grid md:grid-cols-1 gap-4 mb-8"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
         >
-          <GlassCard className="p-6 cursor-pointer hover:scale-[1.02]" onClick={() => setJoinLiveQuizOpen(true)}>
-            <div className="flex items-center gap-4">
-              <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-red-500 to-pink-500 flex items-center justify-center shadow-lg shadow-red-500/30">
-                <Radio className="w-7 h-7 text-white" />
-              </div>
-              <div>
-                <h3 className="text-lg font-bold text-white">Join Live Quiz</h3>
-                <p className="text-sm text-slate-400">Enter a code to play</p>
-              </div>
-            </div>
-          </GlassCard>
-
           <GlassCard className="p-6 cursor-pointer hover:scale-[1.02]" onClick={() => setJoinClassOpen(true)}>
             <div className="flex items-center gap-4">
               <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center shadow-lg shadow-blue-500/30">
@@ -165,7 +187,7 @@ export default function StudentDashboard() {
               </div>
               <div>
                 <h3 className="text-lg font-bold text-white">Join Class</h3>
-                <p className="text-sm text-slate-400">Enter a class code</p>
+                <p className="text-sm text-slate-400">Enter a class code to join</p>
               </div>
             </div>
           </GlassCard>
@@ -280,41 +302,6 @@ export default function StudentDashboard() {
             </div>
           </div>
         </div>
-
-        <Dialog open={joinLiveQuizOpen} onOpenChange={setJoinLiveQuizOpen}>
-          <DialogContent className="bg-slate-950/95 backdrop-blur-xl border-white/10">
-            <DialogHeader>
-              <DialogTitle className="text-white">Join Live Quiz</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div>
-                <Label className="text-slate-300">Join Code</Label>
-                <Input
-                  value={joinCode}
-                  onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
-                  placeholder="Enter code"
-                  className="bg-white/5 border-white/10 text-white"
-                />
-              </div>
-              <div>
-                <Label className="text-slate-300">Nickname</Label>
-                <Input
-                  value={nickname}
-                  onChange={(e) => setNickname(e.target.value)}
-                  placeholder="Your display name"
-                  className="bg-white/5 border-white/10 text-white"
-                />
-              </div>
-              <Button
-                onClick={handleJoinLiveQuiz}
-                className="w-full bg-gradient-to-r from-red-500 to-pink-500"
-                disabled={!joinCode || !nickname}
-              >
-                Join Quiz
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
 
         <Dialog open={joinClassOpen} onOpenChange={setJoinClassOpen}>
           <DialogContent className="bg-slate-950/95 backdrop-blur-xl border-white/10">
