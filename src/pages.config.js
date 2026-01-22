@@ -18,6 +18,8 @@ import Subject from './pages/Subject';
 import TeacherDashboard from './pages/TeacherDashboard';
 import Topic from './pages/Topic';
 import PracticeQuizPlay from './pages/PracticeQuizPlay';
+import PracticeQuizResults from './pages/PracticeQuizResults';
+import TeacherQuestionBuilder from './pages/TeacherQuestionBuilder';
 import __Layout from './Layout.jsx';
 
 
@@ -42,6 +44,8 @@ export const PAGES = {
     "TeacherDashboard": TeacherDashboard,
     "Topic": Topic,
     "PracticeQuizPlay": PracticeQuizPlay,
+    "PracticeQuizResults": PracticeQuizResults,
+    "TeacherQuestionBuilder": TeacherQuestionBuilder,
 }
 
 export const pagesConfig = {
