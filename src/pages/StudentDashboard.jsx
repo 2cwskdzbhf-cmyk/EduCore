@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -21,10 +21,24 @@ import {
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 
-import { StatCard } from '@/components/ui/GlassCard';
-import GlassCard from '@/components/ui/GlassCard';
+import StatCard from '@/components/dashboard/StatsCard';
+
+
+function GlassCard({ className = '', children, ...props }) {
+  return (
+    <div
+      className={
+        `rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl shadow-lg shadow-black/20 transition-all duration-300 ${className}`
+      }
+      {...props}
+    >
+      {children}
+    </div>
+  );
+}
 
 export default function StudentDashboard() {
+  const navigate = useNavigate();
   const [user, setUser] = useState(null);
   const [liveQuizCode, setLiveQuizCode] = useState('');
 
