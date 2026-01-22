@@ -37,6 +37,8 @@ import {
   Copy,
   Check
 } from 'lucide-react';
+import GlassCard from '@/components/ui/GlassCard';
+import { StatCard } from '@/components/ui/GlassCard';
 
 export default function TeacherDashboard() {
   const queryClient = useQueryClient();
@@ -128,30 +130,30 @@ export default function TeacherDashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-indigo-50/30 p-6">
-      <div className="max-w-7xl mx-auto">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900/20 to-slate-900 p-6">
+      <div className="max-w-6xl mx-auto">
         {/* Header */}
         <motion.div
-          className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8"
+          className="mb-12"
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
         >
-          <div>
-            <h1 className="text-3xl font-bold text-slate-900">
-              Teacher Dashboard
-            </h1>
-            <p className="text-slate-500 mt-1">
-              Welcome back{user?.full_name ? `, ${user.full_name}` : ''}
-            </p>
-          </div>
-          <div className="flex gap-3">
-            <Dialog open={newClassOpen} onOpenChange={setNewClassOpen}>
-              <DialogTrigger asChild>
-                <Button className="bg-indigo-500 hover:bg-indigo-600">
-                  <Plus className="w-4 h-4 mr-2" />
-                  New Class
-                </Button>
-              </DialogTrigger>
+          <h1 className="text-4xl font-bold text-white mb-2">
+            Teacher Dashboard
+          </h1>
+          <p className="text-slate-400">
+            Welcome back{user?.full_name ? `, ${user.full_name}` : ''}
+          </p>
+        </motion.div>
+
+        <div className="flex justify-end gap-3 mb-8">
+          <Dialog open={newClassOpen} onOpenChange={setNewClassOpen}>
+            <DialogTrigger asChild>
+              <Button className="bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 shadow-lg shadow-purple-500/30">
+                <Plus className="w-4 h-4 mr-2" />
+                New Class
+              </Button>
+            </DialogTrigger>
               <DialogContent>
                 <DialogHeader>
                   <DialogTitle>Create New Class</DialogTitle>
@@ -190,101 +192,55 @@ export default function TeacherDashboard() {
                   </Button>
                 </div>
               </DialogContent>
-            </Dialog>
-            <Link to={createPageUrl('CreateAssignment')}>
-              <Button variant="outline">
-                <ClipboardList className="w-4 h-4 mr-2" />
-                New Assignment
-              </Button>
-            </Link>
-          </div>
-        </motion.div>
+          </Dialog>
+          <Link to={createPageUrl('CreateAssignment')}>
+            <Button variant="outline" className="border-white/10 text-slate-300 hover:bg-white/10 hover:text-white">
+              <ClipboardList className="w-4 h-4 mr-2" />
+              New Assignment
+            </Button>
+          </Link>
+        </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          <motion.div
-            className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-          >
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-500 to-indigo-600 flex items-center justify-center shadow-lg">
-                <Users className="w-6 h-6 text-white" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-slate-800">{getTotalStudents()}</p>
-                <p className="text-sm text-slate-500">Total Students</p>
-              </div>
-            </div>
-          </motion.div>
-
-          <motion.div
-            className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.15 }}
-          >
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center shadow-lg">
-                <BookOpen className="w-6 h-6 text-white" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-slate-800">{classes.length}</p>
-                <p className="text-sm text-slate-500">Classes</p>
-              </div>
-            </div>
-          </motion.div>
-
-          <motion.div
-            className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-          >
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-500 to-amber-600 flex items-center justify-center shadow-lg">
-                <ClipboardList className="w-6 h-6 text-white" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-slate-800">{assignments.length}</p>
-                <p className="text-sm text-slate-500">Assignments</p>
-              </div>
-            </div>
-          </motion.div>
-
-          <motion.div
-            className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.25 }}
-          >
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center shadow-lg">
-                <BarChart3 className="w-6 h-6 text-white" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-slate-800">
-                  {assignments.filter(a => new Date(a.due_date) > new Date()).length}
-                </p>
-                <p className="text-sm text-slate-500">Active Assignments</p>
-              </div>
-            </div>
-          </motion.div>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
+          <StatCard
+            icon={Users}
+            label="Total Students"
+            value={getTotalStudents()}
+            delay={0}
+          />
+          <StatCard
+            icon={BookOpen}
+            label="Classes"
+            value={classes.length}
+            delay={0.1}
+          />
+          <StatCard
+            icon={ClipboardList}
+            label="Assignments"
+            value={assignments.length}
+            delay={0.2}
+          />
+          <StatCard
+            icon={BarChart3}
+            label="Active"
+            value={assignments.filter(a => new Date(a.due_date) > new Date()).length}
+            delay={0.3}
+          />
         </div>
 
         {/* Classes */}
         <div className="mb-8">
-          <h2 className="text-xl font-bold text-slate-900 mb-4">Your Classes</h2>
+          <h2 className="text-2xl font-bold text-white mb-6">Your Classes</h2>
           
           {loadingClasses ? (
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid md:grid-cols-2 gap-6">
               {[1, 2, 3].map(i => (
-                <Skeleton key={i} className="h-48 rounded-2xl" />
+                <Skeleton key={i} className="h-40 rounded-2xl bg-white/5" />
               ))}
             </div>
           ) : classes.length > 0 ? (
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid md:grid-cols-2 gap-6">
               {classes.map((classObj, idx) => {
                 const subject = subjects.find(s => s.id === classObj.subject_id);
                 const stats = getClassStudentProgress(classObj);
@@ -294,35 +250,35 @@ export default function TeacherDashboard() {
                     key={classObj.id}
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: idx * 0.1 }}
+                    transition={{ delay: idx * 0.1, duration: 0.3 }}
                   >
                     <Link to={createPageUrl(`ClassDetails?id=${classObj.id}`)}>
-                      <Card className="p-6 hover:shadow-md transition-shadow cursor-pointer">
+                      <GlassCard className="p-6 hover:scale-[1.02]">
                         <div className="flex items-start justify-between mb-4">
                           <div>
-                            <h3 className="font-semibold text-slate-800">{classObj.name}</h3>
-                            <p className="text-sm text-slate-500">{subject?.name || 'No subject'}</p>
+                            <h3 className="font-semibold text-white">{classObj.name}</h3>
+                            <p className="text-sm text-slate-400">{subject?.name || 'No subject'}</p>
                           </div>
-                          <div className="flex items-center gap-1 text-sm text-slate-500">
+                          <div className="flex items-center gap-1 text-sm text-slate-400">
                             <Users className="w-4 h-4" />
                             {classObj.student_emails?.length || 0}
                           </div>
                         </div>
 
-                        <div className="bg-slate-50 rounded-lg p-3 mb-4">
+                        <div className="bg-white/5 rounded-lg p-3 mb-4 border border-white/10">
                           <div className="flex items-center justify-between text-sm">
-                            <span className="text-slate-500">Join Code:</span>
+                            <span className="text-slate-400">Join Code:</span>
                             <div className="flex items-center gap-2">
-                              <span className="font-mono font-bold text-slate-700">{classObj.join_code}</span>
+                              <span className="font-mono font-bold text-white">{classObj.join_code}</span>
                               <button
                                 onClick={(e) => {
                                   e.preventDefault();
                                   copyJoinCode(classObj.join_code);
                                 }}
-                                className="p-1 hover:bg-slate-200 rounded"
+                                className="p-1 hover:bg-white/10 rounded transition-colors"
                               >
                                 {copiedCode === classObj.join_code ? (
-                                  <Check className="w-4 h-4 text-emerald-500" />
+                                  <Check className="w-4 h-4 text-emerald-400" />
                                 ) : (
                                   <Copy className="w-4 h-4 text-slate-400" />
                                 )}
@@ -332,39 +288,39 @@ export default function TeacherDashboard() {
                         </div>
 
                         <div className="flex items-center justify-between text-sm">
-                          <span className="text-slate-500">Avg Accuracy: {stats.avgAccuracy}%</span>
-                          <ChevronRight className="w-4 h-4 text-slate-400" />
+                          <span className="text-slate-400">Avg Accuracy: {stats.avgAccuracy}%</span>
+                          <ChevronRight className="w-4 h-4 text-slate-500" />
                         </div>
-                      </Card>
+                      </GlassCard>
                     </Link>
                   </motion.div>
                 );
               })}
             </div>
           ) : (
-            <Card className="p-8 text-center">
-              <Users className="w-12 h-12 text-slate-300 mx-auto mb-4" />
-              <h3 className="font-semibold text-slate-700 mb-2">No classes yet</h3>
-              <p className="text-slate-500 text-sm mb-4">Create your first class to start adding students</p>
-              <Button onClick={() => setNewClassOpen(true)}>
+            <GlassCard className="p-8 text-center">
+              <Users className="w-12 h-12 text-slate-400 mx-auto mb-4" />
+              <h3 className="font-semibold text-white mb-2">No classes yet</h3>
+              <p className="text-slate-400 text-sm mb-4">Create your first class to start adding students</p>
+              <Button onClick={() => setNewClassOpen(true)} className="bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 shadow-lg shadow-purple-500/30">
                 <Plus className="w-4 h-4 mr-2" />
                 Create Class
               </Button>
-            </Card>
+            </GlassCard>
           )}
         </div>
 
         {/* Recent Assignments */}
         <div>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-bold text-slate-900">Recent Assignments</h2>
-            <Link to={createPageUrl('CreateAssignment')} className="text-indigo-600 text-sm font-medium hover:underline">
-              View all
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-2xl font-bold text-white">Recent Assignments</h2>
+            <Link to={createPageUrl('CreateAssignment')} className="text-purple-400 text-sm font-medium hover:text-purple-300 transition-colors">
+              View all →
             </Link>
           </div>
 
           {assignments.length > 0 ? (
-            <div className="bg-white rounded-2xl border border-slate-100 divide-y divide-slate-100">
+            <GlassCard className="divide-y divide-white/10">
               {assignments.slice(0, 5).map(assignment => {
                 const classObj = classes.find(c => c.id === assignment.class_id);
                 const isPastDue = new Date(assignment.due_date) < new Date();
@@ -372,16 +328,16 @@ export default function TeacherDashboard() {
                 return (
                   <div key={assignment.id} className="p-4 flex items-center justify-between">
                     <div className="flex items-center gap-4">
-                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-                        isPastDue ? 'bg-slate-100' : 'bg-indigo-100'
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-lg ${
+                        isPastDue 
+                          ? 'bg-slate-600 shadow-slate-600/30' 
+                          : 'bg-gradient-to-br from-purple-500 to-blue-500 shadow-purple-500/30'
                       }`}>
-                        <ClipboardList className={`w-5 h-5 ${
-                          isPastDue ? 'text-slate-500' : 'text-indigo-600'
-                        }`} />
+                        <ClipboardList className="w-5 h-5 text-white" />
                       </div>
                       <div>
-                        <h4 className="font-medium text-slate-800">{assignment.title}</h4>
-                        <p className="text-sm text-slate-500">
+                        <h4 className="font-medium text-white">{assignment.title}</h4>
+                        <p className="text-sm text-slate-400">
                           {classObj?.name} • Due {new Date(assignment.due_date).toLocaleDateString()}
                         </p>
                       </div>
@@ -389,33 +345,28 @@ export default function TeacherDashboard() {
                     <div className="flex items-center gap-3">
                       <span className={`text-xs px-2 py-1 rounded-full ${
                         assignment.type === 'quiz' 
-                          ? 'bg-amber-100 text-amber-700' 
-                          : 'bg-purple-100 text-purple-700'
+                          ? 'bg-amber-500/20 text-amber-400' 
+                          : 'bg-purple-500/20 text-purple-400'
                       }`}>
                         {assignment.type}
                       </span>
-                      {!assignment.ai_help_enabled && (
-                        <span className="text-xs px-2 py-1 rounded-full bg-red-100 text-red-700">
-                          No AI
-                        </span>
-                      )}
                     </div>
                   </div>
                 );
               })}
-            </div>
+            </GlassCard>
           ) : (
-            <Card className="p-8 text-center">
-              <ClipboardList className="w-12 h-12 text-slate-300 mx-auto mb-4" />
-              <h3 className="font-semibold text-slate-700 mb-2">No assignments yet</h3>
-              <p className="text-slate-500 text-sm mb-4">Create assignments for your students</p>
+            <GlassCard className="p-8 text-center">
+              <ClipboardList className="w-12 h-12 text-slate-400 mx-auto mb-4" />
+              <h3 className="font-semibold text-white mb-2">No assignments yet</h3>
+              <p className="text-slate-400 text-sm mb-4">Create assignments for your students</p>
               <Link to={createPageUrl('CreateAssignment')}>
-                <Button>
+                <Button className="bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 shadow-lg shadow-purple-500/30">
                   <Plus className="w-4 h-4 mr-2" />
                   Create Assignment
                 </Button>
               </Link>
-            </Card>
+            </GlassCard>
           )}
         </div>
       </div>

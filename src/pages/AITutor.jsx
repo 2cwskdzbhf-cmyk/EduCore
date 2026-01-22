@@ -811,7 +811,7 @@ Create 10-15 short questions. For multiple choice questions provide 4 options wi
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-purple-50/30 flex flex-col">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900/20 to-slate-900 flex flex-col">
       {/* Modals */}
       {showFlashcards && revisionState.generatedFlashcards && (
         <FlashcardModal
@@ -839,19 +839,19 @@ Create 10-15 short questions. For multiple choice questions provide 4 options wi
       )}
 
       {/* Header */}
-      <div className="bg-white border-b border-slate-100 px-6 py-4">
+      <div className="bg-slate-950/50 backdrop-blur-xl border-b border-white/10 px-6 py-4">
         <div className="max-w-4xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <Link to={createPageUrl('StudentDashboard')} className="text-slate-500 hover:text-slate-700">
+            <Link to={createPageUrl('StudentDashboard')} className="text-slate-400 hover:text-white transition-colors">
               <ChevronLeft className="w-5 h-5" />
             </Link>
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center shadow-lg shadow-purple-500/50">
                 <Bot className="w-5 h-5 text-white" />
               </div>
               <div>
-                <h1 className="font-semibold text-slate-800">AI Tutor</h1>
-                <p className="text-xs text-slate-500">
+                <h1 className="font-semibold text-white">AI Tutor</h1>
+                <p className="text-xs text-slate-400">
                   {revisionState.subject 
                     ? `Revising ${revisionState.subject}` 
                     : topic 
@@ -863,13 +863,13 @@ Create 10-15 short questions. For multiple choice questions provide 4 options wi
           </div>
 
           {/* Mode Toggle */}
-          <div className="flex items-center gap-2 bg-slate-100 rounded-lg p-1">
+          <div className="flex items-center gap-2 bg-white/5 rounded-lg p-1 border border-white/10">
             <button
               onClick={() => { setMode('chat'); resetRevision(); }}
-              className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
+              className={`px-4 py-2 rounded-md text-sm font-medium transition-all duration-300 ${
                 mode === 'chat' 
-                  ? 'bg-white text-slate-800 shadow-sm' 
-                  : 'text-slate-500 hover:text-slate-700'
+                  ? 'bg-gradient-to-r from-purple-500 to-blue-500 text-white shadow-lg shadow-purple-500/50' 
+                  : 'text-slate-400 hover:text-white'
               }`}
             >
               <MessageSquare className="w-4 h-4 inline mr-2" />
@@ -877,10 +877,10 @@ Create 10-15 short questions. For multiple choice questions provide 4 options wi
             </button>
             <button
               onClick={() => { setMode('revision'); if (revisionState.step === 'idle') startRevisionBot(); }}
-              className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
+              className={`px-4 py-2 rounded-md text-sm font-medium transition-all duration-300 ${
                 mode === 'revision' 
-                  ? 'bg-white text-slate-800 shadow-sm' 
-                  : 'text-slate-500 hover:text-slate-700'
+                  ? 'bg-gradient-to-r from-purple-500 to-blue-500 text-white shadow-lg shadow-purple-500/50' 
+                  : 'text-slate-400 hover:text-white'
               }`}
             >
               <Sparkles className="w-4 h-4 inline mr-2" />
@@ -898,15 +898,16 @@ Create 10-15 short questions. For multiple choice questions provide 4 options wi
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3 }}
                 className="text-center py-12"
               >
-                <div className="w-20 h-20 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center">
+                <div className="w-20 h-20 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center shadow-lg shadow-purple-500/50">
                   <Bot className="w-10 h-10 text-white" />
                 </div>
-                <h2 className="text-2xl font-bold text-slate-800 mb-2">
+                <h2 className="text-2xl font-bold text-white mb-2">
                   {mode === 'revision' ? "Let's Revise!" : "Hi! I'm your AI Tutor"}
                 </h2>
-                <p className="text-slate-500 mb-8 max-w-md mx-auto">
+                <p className="text-slate-400 mb-8 max-w-md mx-auto">
                   {mode === 'revision' 
                     ? "Tell me what you'd like to revise and I'll create a personalized mini-lesson for you."
                     : "Ask me anything about your subjects. I'll explain concepts step by step and help you practice."}
@@ -915,15 +916,15 @@ Create 10-15 short questions. For multiple choice questions provide 4 options wi
                 {mode === 'revision' && (
                   <div className="max-w-md mx-auto mb-8">
                     <Input
-                      placeholder="What would you like to revise? (e.g., fractions, algebra)"
+                      placeholder="What would you like to revise?"
                       value={revisionTopic}
                       onChange={(e) => setRevisionTopic(e.target.value)}
-                      className="h-12"
+                      className="h-12 bg-white/5 border-white/10 text-white placeholder:text-slate-500"
                     />
                     <Button
                       onClick={handleSend}
                       disabled={!revisionTopic.trim() || sendMessageMutation.isPending}
-                      className="mt-3 w-full bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700"
+                      className="mt-3 w-full bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 shadow-lg shadow-purple-500/30"
                     >
                       Start Revision Session
                       <Sparkles className="w-4 h-4 ml-2" />
@@ -944,7 +945,7 @@ Create 10-15 short questions. For multiple choice questions provide 4 options wi
                         onClick={() => {
                           setMessage(prompt);
                         }}
-                        className="px-4 py-2 bg-white rounded-full border border-slate-200 text-sm text-slate-600 hover:border-indigo-300 hover:text-indigo-600 transition-colors"
+                        className="px-4 py-2 bg-white/5 backdrop-blur-sm rounded-full border border-white/10 text-sm text-slate-300 hover:bg-white/10 hover:text-white transition-all duration-300"
                       >
                         {prompt}
                       </button>
@@ -957,7 +958,7 @@ Create 10-15 short questions. For multiple choice questions provide 4 options wi
                   <div className="mt-6">
                     <Button
                       onClick={startRevisionBot}
-                      className="bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700"
+                      className="bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 shadow-lg shadow-purple-500/30"
                     >
                       <Sparkles className="w-4 h-4 mr-2" />
                       Start Revision Session
@@ -975,10 +976,10 @@ Create 10-15 short questions. For multiple choice questions provide 4 options wi
                       animate={{ opacity: 1, y: 0 }}
                       className={`flex gap-4 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}
                     >
-                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 shadow-lg ${
                         msg.role === 'user' 
-                          ? 'bg-indigo-500' 
-                          : 'bg-gradient-to-br from-purple-500 to-indigo-600'
+                          ? 'bg-gradient-to-br from-blue-500 to-cyan-500 shadow-blue-500/50' 
+                          : 'bg-gradient-to-br from-purple-500 to-blue-500 shadow-purple-500/50'
                       }`}>
                         {msg.role === 'user' ? (
                           <User className="w-5 h-5 text-white" />
@@ -987,23 +988,23 @@ Create 10-15 short questions. For multiple choice questions provide 4 options wi
                         )}
                       </div>
                       <div className={`flex-1 max-w-[80%] ${msg.role === 'user' ? 'text-right' : ''}`}>
-                        <div className={`inline-block rounded-2xl px-5 py-3 ${
+                        <div className={`inline-block rounded-2xl px-5 py-3 backdrop-blur-xl transition-all duration-300 ${
                           msg.role === 'user' 
-                            ? 'bg-indigo-500 text-white' 
-                            : 'bg-white border border-slate-100 shadow-sm'
+                            ? 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white shadow-lg shadow-blue-500/30' 
+                            : 'bg-white/5 border border-white/10 shadow-lg'
                         }`}>
                           {msg.role === 'user' ? (
-                            <p>{msg.content}</p>
+                            <p className="text-white">{msg.content}</p>
                           ) : (
-                            <div className="prose prose-sm prose-slate max-w-none">
+                            <div className="prose prose-sm prose-invert max-w-none">
                               <ReactMarkdown
                                 components={{
-                                  p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
-                                  ul: ({ children }) => <ul className="list-disc pl-4 mb-2">{children}</ul>,
-                                  ol: ({ children }) => <ol className="list-decimal pl-4 mb-2">{children}</ol>,
+                                  p: ({ children }) => <p className="mb-2 last:mb-0 text-slate-200">{children}</p>,
+                                  ul: ({ children }) => <ul className="list-disc pl-4 mb-2 text-slate-200">{children}</ul>,
+                                  ol: ({ children }) => <ol className="list-decimal pl-4 mb-2 text-slate-200">{children}</ol>,
                                   li: ({ children }) => <li className="mb-1">{children}</li>,
-                                  strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
-                                  code: ({ children }) => <code className="bg-slate-100 px-1 rounded text-indigo-600">{children}</code>,
+                                  strong: ({ children }) => <strong className="font-semibold text-white">{children}</strong>,
+                                  code: ({ children }) => <code className="bg-purple-500/20 px-1 rounded text-purple-300">{children}</code>,
                                 }}
                               >
                                 {msg.content}
@@ -1022,14 +1023,14 @@ Create 10-15 short questions. For multiple choice questions provide 4 options wi
                     animate={{ opacity: 1 }}
                     className="flex gap-4"
                   >
-                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center shadow-lg shadow-purple-500/50">
                       <Bot className="w-5 h-5 text-white" />
                     </div>
-                    <div className="bg-white border border-slate-100 rounded-2xl px-5 py-4 shadow-sm">
+                    <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl px-5 py-4">
                       <div className="flex gap-1">
-                        <div className="w-2 h-2 bg-slate-300 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                        <div className="w-2 h-2 bg-slate-300 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                        <div className="w-2 h-2 bg-slate-300 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                        <div className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                        <div className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                        <div className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
                       </div>
                     </div>
                   </motion.div>
@@ -1042,7 +1043,7 @@ Create 10-15 short questions. For multiple choice questions provide 4 options wi
                         key={subj}
                         variant="outline"
                         onClick={() => selectSubject(subj)}
-                        className="hover:bg-indigo-50 hover:border-indigo-300"
+                        className="border-white/10 text-slate-300 hover:bg-white/10 hover:text-white hover:border-purple-500/50 transition-all duration-300"
                       >
                         {subj}
                       </Button>
@@ -1067,7 +1068,7 @@ Create 10-15 short questions. For multiple choice questions provide 4 options wi
                       variant="outline"
                       onClick={generateFlashcards}
                       disabled={isTyping}
-                      className="hover:bg-yellow-50 hover:border-yellow-300"
+                      className="border-white/10 text-slate-300 hover:bg-amber-500/20 hover:border-amber-500/50 hover:text-amber-300"
                     >
                       <Layers className="w-4 h-4 mr-2" />
                       Flashcards
@@ -1076,7 +1077,7 @@ Create 10-15 short questions. For multiple choice questions provide 4 options wi
                       variant="outline"
                       onClick={generateQuiz}
                       disabled={isTyping}
-                      className="hover:bg-blue-50 hover:border-blue-300"
+                      className="border-white/10 text-slate-300 hover:bg-blue-500/20 hover:border-blue-500/50 hover:text-blue-300"
                     >
                       <HelpCircle className="w-4 h-4 mr-2" />
                       Quiz
@@ -1085,7 +1086,7 @@ Create 10-15 short questions. For multiple choice questions provide 4 options wi
                       variant="outline"
                       onClick={generateGameQuestions}
                       disabled={isTyping}
-                      className="hover:bg-green-50 hover:border-green-300"
+                      className="border-white/10 text-slate-300 hover:bg-emerald-500/20 hover:border-emerald-500/50 hover:text-emerald-300"
                     >
                       <Gamepad2 className="w-4 h-4 mr-2" />
                       Game
@@ -1093,7 +1094,7 @@ Create 10-15 short questions. For multiple choice questions provide 4 options wi
                     <Button
                       variant="ghost"
                       onClick={() => { resetRevision(); startRevisionBot(); }}
-                      className="text-slate-500"
+                      className="text-slate-400 hover:text-white hover:bg-white/5"
                     >
                       <RefreshCw className="w-4 h-4 mr-2" />
                       New Content
@@ -1154,7 +1155,7 @@ Create 10-15 short questions. For multiple choice questions provide 4 options wi
 
       {/* Input */}
       {mode === 'chat' && (
-        <div className="bg-white border-t border-slate-100 px-6 py-4">
+        <div className="bg-slate-950/50 backdrop-blur-xl border-t border-white/10 px-6 py-4">
           <div className="max-w-4xl mx-auto">
             <div className="flex gap-3">
               <Input
@@ -1162,13 +1163,13 @@ Create 10-15 short questions. For multiple choice questions provide 4 options wi
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSend()}
-                className="h-12"
+                className="h-12 bg-white/5 border-white/10 text-white placeholder:text-slate-500"
                 disabled={isTyping}
               />
               <Button
                 onClick={handleSend}
                 disabled={!message.trim() || isTyping}
-                className="h-12 w-12 bg-indigo-500 hover:bg-indigo-600 p-0"
+                className="h-12 w-12 bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 p-0 shadow-lg shadow-purple-500/30"
               >
                 {isTyping ? (
                   <Loader2 className="w-5 h-5 animate-spin" />
