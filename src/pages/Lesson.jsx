@@ -17,9 +17,6 @@ import {
   Trophy
 } from 'lucide-react';
 
-/**
- * Local, dependency-free Progress bar (prevents crashes if ui/progress is broken)
- */
 function ProgressBar({ value = 0, className = '' }) {
   const safe = Number.isFinite(value) ? Math.max(0, Math.min(100, value)) : 0;
   return (
@@ -37,7 +34,6 @@ export default function LessonPage() {
   const queryClient = useQueryClient();
   const [user, setUser] = useState(null);
 
-  // Robust lesson id parsing (query-string based, as your app uses Lesson?id=...)
   const lessonId = useMemo(() => {
     const params = new URLSearchParams(window.location.search);
     return params.get('id');
@@ -49,7 +45,6 @@ export default function LessonPage() {
         const userData = await base44.auth.me();
         setUser(userData);
       } catch (e) {
-        // Not fatal for viewing a lesson
         console.warn('Failed to fetch user:', e);
       }
     };
@@ -115,13 +110,11 @@ export default function LessonPage() {
       const newTotalXp = (progress.total_xp || 0) + xpEarned;
       const newTodayXp = (progress.today_xp || 0) + xpEarned;
 
-      // Calculate new level
       let newLevel = progress.level || 1;
       while (newTotalXp >= newLevel * 100) {
         newLevel++;
       }
 
-      // Update topic mastery
       const topicMastery = { ...(progress.topic_mastery || {}) };
       const topicLessons = allLessons.length || 1;
       const completedTopicLessons =
@@ -160,7 +153,6 @@ export default function LessonPage() {
     }
   };
 
-  // Loading skeleton (keeps page from going “blank”)
   if (!lessonId || loadingLesson) {
     return (
       <div className="min-h-screen bg-slate-50 p-6">
@@ -172,14 +164,13 @@ export default function LessonPage() {
     );
   }
 
-  // Friendly not-found state (instead of blank)
   if (!lesson) {
     return (
       <div className="min-h-screen bg-slate-50 p-6">
         <div className="max-w-3xl mx-auto bg-white rounded-2xl border border-slate-100 p-8">
           <h1 className="text-2xl font-bold text-slate-900 mb-2">Lesson not found</h1>
           <p className="text-slate-600 mb-6">
-            This lesson link doesn’t have a valid id, or the lesson was deleted.
+            This lesson link doesn't have a valid id, or the lesson was deleted.
           </p>
           <Button onClick={() => navigate(createPageUrl('StudentDashboard'))}>
             Back to Dashboard
@@ -196,7 +187,6 @@ export default function LessonPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
-      {/* Header */}
       <div className="bg-white border-b border-slate-100 sticky top-0 z-10">
         <div className="max-w-3xl mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
@@ -223,15 +213,12 @@ export default function LessonPage() {
             </div>
           </div>
 
-          {/* Progress */}
           <ProgressBar value={progressValue} className="h-1 mt-4" />
         </div>
       </div>
 
-      {/* Content */}
       <div className="max-w-3xl mx-auto px-6 py-8">
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-          {/* Lesson Header */}
           <div className="mb-8">
             <h1 className="text-3xl font-bold text-slate-900 mb-4">{lesson.title}</h1>
             <div className="flex items-center gap-4 text-sm text-slate-500">
@@ -246,7 +233,6 @@ export default function LessonPage() {
             </div>
           </div>
 
-          {/* Lesson Content */}
           <div className="bg-white rounded-2xl border border-slate-100 p-8 shadow-sm">
             <div className="prose prose-slate max-w-none">
               <ReactMarkdown
@@ -292,7 +278,6 @@ export default function LessonPage() {
             </div>
           </div>
 
-          {/* Action Buttons */}
           <div className="mt-8 flex flex-col sm:flex-row items-center justify-between gap-4">
             <Link to={createPageUrl(`AITutor?topic=${lesson.topic_id}`)}>
               <Button variant="outline" className="w-full sm:w-auto">

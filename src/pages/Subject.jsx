@@ -9,7 +9,6 @@ import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
 import { 
   ChevronLeft, 
-  ChevronRight, 
   BookOpen, 
   Trophy,
   Lock,
@@ -105,7 +104,6 @@ export default function SubjectPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
-      {/* Header */}
       <div className={`bg-gradient-to-r ${bgColor} text-white`}>
         <div className="max-w-5xl mx-auto px-6 py-8">
           <Link to={createPageUrl('StudentDashboard')} className="inline-flex items-center gap-2 text-white/80 hover:text-white mb-6 transition-colors">
@@ -139,7 +137,6 @@ export default function SubjectPage() {
         </div>
       </div>
 
-      {/* Topics */}
       <div className="max-w-5xl mx-auto px-6 py-8">
         <h2 className="text-2xl font-bold text-slate-900 mb-6">Learning Path</h2>
 
@@ -151,7 +148,6 @@ export default function SubjectPage() {
           </div>
         ) : topics.length > 0 ? (
           <div className="relative">
-            {/* Connection Line */}
             <div className="absolute left-8 top-0 bottom-0 w-0.5 bg-slate-200" />
 
             <div className="space-y-4">
@@ -170,7 +166,6 @@ export default function SubjectPage() {
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: index * 0.1 }}
                   >
-                    {/* Node */}
                     <div className={`absolute left-6 top-6 w-5 h-5 rounded-full border-4 z-10 ${
                       isCompleted ? 'bg-emerald-500 border-emerald-200' :
                       isUnlocked ? 'bg-indigo-500 border-indigo-200' :

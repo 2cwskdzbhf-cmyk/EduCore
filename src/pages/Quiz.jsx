@@ -11,7 +11,6 @@ import {
   ChevronLeft, 
   ChevronRight, 
   Trophy,
-  Clock,
   Zap,
   CheckCircle2,
   XCircle,
@@ -68,17 +67,14 @@ export default function QuizPage() {
       const questionsAnswered = results.totalQuestions;
       const correctAnswers = results.correctCount;
 
-      // Calculate new overall accuracy
       const newTotalQuestions = (progress.total_questions_answered || 0) + questionsAnswered;
       const newTotalCorrect = (progress.total_correct_answers || 0) + correctAnswers;
       const newAccuracy = newTotalQuestions > 0 ? Math.round((newTotalCorrect / newTotalQuestions) * 100 * 10) / 10 : 0;
 
-      // Update topic mastery based on quiz score
       const topicMastery = { ...progress.topic_mastery };
       const currentMastery = topicMastery[quiz.topic_id] || 0;
       topicMastery[quiz.topic_id] = Math.max(currentMastery, results.score);
 
-      // Update weak/strong areas
       let weakAreas = [...(progress.weak_areas || [])];
       let strongAreas = [...(progress.strong_areas || [])];
 
@@ -94,7 +90,6 @@ export default function QuizPage() {
         strongAreas = strongAreas.filter(id => id !== quiz.topic_id);
       }
 
-      // Save quiz attempt
       await base44.entities.QuizAttempt.create({
         student_email: user.email,
         quiz_id: quizId,
@@ -108,7 +103,6 @@ export default function QuizPage() {
         completed_at: new Date().toISOString()
       });
 
-      // Update progress
       await base44.entities.StudentProgress.update(progress.id, {
         total_questions_answered: newTotalQuestions,
         total_correct_answers: newTotalCorrect,
@@ -139,7 +133,6 @@ export default function QuizPage() {
   const currentQuestion = questions[currentQuestionIndex];
   const totalQuestions = questions.length;
 
-  // If no quiz or no questions, show error state
   if (!quiz || totalQuestions === 0) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
@@ -270,11 +263,10 @@ export default function QuizPage() {
             </div>
           </div>
 
-          {/* Review Answers */}
           <div className="mt-6 bg-white rounded-2xl border border-slate-100 p-6">
             <h3 className="font-semibold text-slate-800 mb-4">Review Answers</h3>
             <div className="space-y-3">
-              {questions.map((q, idx) => {
+              {questions.map((q) => {
                 const answer = answers[q.id];
                 return (
                   <div key={q.id} className={`p-4 rounded-xl ${
@@ -310,7 +302,6 @@ export default function QuizPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-indigo-50/30">
-      {/* Header */}
       <div className="bg-white border-b border-slate-100 sticky top-0 z-10">
         <div className="max-w-3xl mx-auto px-6 py-4">
           <div className="flex items-center justify-between mb-4">
@@ -331,7 +322,6 @@ export default function QuizPage() {
         </div>
       </div>
 
-      {/* Question */}
       <div className="max-w-3xl mx-auto px-6 py-12">
         <AnimatePresence mode="wait">
           <motion.div
