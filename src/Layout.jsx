@@ -28,7 +28,7 @@ export default function Layout({ children, currentPageName }) {
   const publicPages = ['Landing'];
   const authOnlyPages = ['Onboarding'];
   const studentPages = ['StudentDashboard', 'Subject', 'Topic', 'Lesson', 'Quiz', 'AITutor', 'JoinClass'];
-  const teacherPages = ['TeacherDashboard', 'ClassDetails', 'CreateAssignment', 'QuizLibrary', 'CreateQuiz', 'StartLiveQuiz'];
+  const teacherPages = ['TeacherDashboard', 'ClassDetails', 'CreateAssignment', 'QuizLibrary', 'CreateQuiz', 'StartLiveQuiz', 'StudentStats'];
   const adminPages = ['AdminPanel'];
 
   useEffect(() => {
