@@ -18,38 +18,6 @@ import {
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
-/*
-================================================================================
-AUTHENTICATION & ROLE-BASED ACCESS CONTROL
-================================================================================
-
-This Layout handles three key responsibilities:
-
-1. AUTHENTICATION CHECK
-   - Checks if user is logged in via base44.auth.isAuthenticated()
-   - Unauthenticated users are redirected to Landing page
-   - Public pages (Landing) don't require authentication
-
-2. ONBOARDING CHECK  
-   - After login, checks if user has completed onboarding (has user_type set)
-   - Users without user_type are forced to Onboarding page
-   - This ensures every user has a role before accessing the app
-
-3. ROLE-BASED ROUTING
-   - Students can only access: StudentDashboard, Subject, Topic, Lesson, Quiz, AITutor, JoinClass
-   - Teachers can only access: TeacherDashboard, ClassDetails, CreateAssignment
-   - Admins can access: AdminPanel + all teacher pages
-   - Unauthorized access redirects to the user's appropriate dashboard
-
-Page access matrix:
-- Landing, Onboarding: PUBLIC (no auth required)
-- StudentDashboard, Subject, Topic, Lesson, Quiz, AITutor, JoinClass: STUDENT ONLY
-- TeacherDashboard, ClassDetails, CreateAssignment: TEACHER + ADMIN
-- AdminPanel: ADMIN ONLY
-
-================================================================================
-*/
-
 export default function Layout({ children, currentPageName }) {
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
@@ -57,109 +25,67 @@ export default function Layout({ children, currentPageName }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [sidebarExpanded, setSidebarExpanded] = useState(false);
 
-  // ============================================================================
-  // STEP 1: Define page access rules
-  // ============================================================================
-  
-  // Pages that don't require authentication at all
   const publicPages = ['Landing'];
-  
-  // Pages that require auth but no specific role (like onboarding)
   const authOnlyPages = ['Onboarding'];
-  
-  // Pages accessible only by students
   const studentPages = ['StudentDashboard', 'Subject', 'Topic', 'Lesson', 'Quiz', 'AITutor', 'JoinClass'];
-  
-  // Pages accessible by teachers (and admins)
-  const teacherPages = ['TeacherDashboard', 'ClassDetails', 'CreateAssignment'];
-  
-  // Pages accessible only by admins
+  const teacherPages = ['TeacherDashboard', 'ClassDetails', 'CreateAssignment', 'CreateQuiz', 'QuizLibrary', 'StartLiveQuiz'];
   const adminPages = ['AdminPanel'];
 
-  // ============================================================================
-  // STEP 2: Check authentication and user data on mount
-  // ============================================================================
-  
   useEffect(() => {
     const checkAuth = async () => {
-      // Skip auth check for public pages - they can be viewed by anyone
       if (publicPages.includes(currentPageName)) {
         setLoading(false);
         return;
       }
 
       try {
-        // Check if user is authenticated
         const isAuthenticated = await base44.auth.isAuthenticated();
         
         if (!isAuthenticated) {
-          // REDIRECT: Unauthenticated users go to Landing page
-          // They need to log in before accessing any protected content
           navigate(createPageUrl('Landing'));
           return;
         }
 
-        // User is authenticated - fetch their data
         const userData = await base44.auth.me();
         setUser(userData);
 
-        // ============================================================================
-        // STEP 3: Check if onboarding is complete
-        // ============================================================================
-        
-        // If user has no user_type, they haven't completed onboarding
-        // Force them to onboarding (unless they're already there)
         if (!userData.user_type && currentPageName !== 'Onboarding') {
           navigate(createPageUrl('Onboarding'));
           return;
         }
 
-        // ============================================================================
-        // STEP 4: Enforce role-based access control
-        // ============================================================================
-        
-        // Skip role check for onboarding page (user_type might not be set yet)
         if (currentPageName === 'Onboarding') {
           setLoading(false);
           return;
         }
 
-        const userRole = userData.user_type || userData.role; // user_type is our custom field, role is built-in
+        const userRole = userData.user_type || userData.role;
         const isAdmin = userRole === 'admin' || userData.role === 'admin';
         const isTeacher = userRole === 'teacher';
         const isStudent = userRole === 'student';
 
-        // Check if user is trying to access a page they're not allowed to
         let hasAccess = false;
         let redirectPage = null;
 
         if (studentPages.includes(currentPageName)) {
-          // Student pages - only students can access
           hasAccess = isStudent;
           if (!hasAccess) {
-            // Redirect teachers/admins to their dashboard
             redirectPage = isTeacher ? 'TeacherDashboard' : 'AdminPanel';
           }
         } else if (teacherPages.includes(currentPageName)) {
-          // Teacher pages - teachers and admins can access
           hasAccess = isTeacher || isAdmin;
           if (!hasAccess) {
-            // Redirect students to their dashboard
             redirectPage = 'StudentDashboard';
           }
         } else if (adminPages.includes(currentPageName)) {
-          // Admin pages - only admins can access
           hasAccess = isAdmin;
           if (!hasAccess) {
-            // Redirect to appropriate dashboard based on role
             redirectPage = isTeacher ? 'TeacherDashboard' : 'StudentDashboard';
           }
         } else {
-          // Unknown page - allow access (might be a new page)
           hasAccess = true;
         }
 
-        // REDIRECT: If user doesn't have access, send them to their dashboard
         if (!hasAccess && redirectPage) {
           navigate(createPageUrl(redirectPage));
           return;
@@ -167,7 +93,6 @@ export default function Layout({ children, currentPageName }) {
 
       } catch (e) {
         console.error('Auth check error:', e);
-        // On error, redirect to Landing for safety
         navigate(createPageUrl('Landing'));
         return;
       }
@@ -178,19 +103,10 @@ export default function Layout({ children, currentPageName }) {
     checkAuth();
   }, [currentPageName, navigate]);
 
-  // ============================================================================
-  // STEP 5: Render public pages without layout
-  // ============================================================================
-  
-  // Public pages and onboarding don't need the sidebar layout
   if (publicPages.includes(currentPageName) || currentPageName === 'Onboarding') {
     return children;
   }
 
-  // ============================================================================
-  // STEP 6: Define navigation items based on user role
-  // ============================================================================
-  
   const studentNav = [
     { name: 'Dashboard', icon: LayoutDashboard, page: 'StudentDashboard' },
     { name: 'Subjects', icon: BookOpen, page: 'Subject' },
@@ -220,10 +136,6 @@ export default function Layout({ children, currentPageName }) {
     base44.auth.logout(createPageUrl('Landing'));
   };
 
-  // ============================================================================
-  // STEP 7: Show loading state while checking auth
-  // ============================================================================
-  
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900/20 to-slate-900 flex items-center justify-center">
@@ -232,16 +144,11 @@ export default function Layout({ children, currentPageName }) {
     );
   }
 
-  // If no user at this point, don't render anything (redirect should happen)
   if (!user) {
     return null;
   }
 
   const navItems = getNavItems();
-
-  // ============================================================================
-  // STEP 8: Render the layout with sidebar navigation
-  // ============================================================================
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900/20 to-slate-900">
