@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 
 export default function TopicPage() {
+  const navigate = useNavigate();
   const [user, setUser] = useState(null);
   const urlParams = new URLSearchParams(window.location.search);
 
@@ -284,8 +285,29 @@ export default function TopicPage() {
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: index * 0.1, duration: 0.3 }}
                   >
-                    <Link to={quiz.lesson_id ? createPageUrl(`Lesson?id=${quiz.lesson_id}`) : createPageUrl(`PracticeQuizPlay?topicId=${topicId}&count=10`)}>
-                      <GlassCard className="p-5 hover:scale-[1.02]">
+                    <GlassCard className="p-5 hover:scale-[1.02] cursor-pointer" onClick={async () => {
+                      if (quiz.lesson_id) {
+                        // Check if practice is unlocked
+                        if (user?.email) {
+                          const readProgress = await base44.entities.LessonReadProgress.filter({
+                            student_email: user.email,
+                            lesson_id: quiz.lesson_id
+                          });
+                          
+                          if (readProgress.length > 0 && readProgress[0].read_confirmed_at) {
+                            // Unlocked - start practice
+                            navigate(createPageUrl(`PracticeQuizPlay?lessonId=${quiz.lesson_id}&count=15`));
+                          } else {
+                            // Locked - go to lesson
+                            navigate(createPageUrl(`Lesson?id=${quiz.lesson_id}`));
+                          }
+                        } else {
+                          navigate(createPageUrl(`Lesson?id=${quiz.lesson_id}`));
+                        }
+                      } else {
+                        navigate(createPageUrl(`PracticeQuizPlay?topicId=${topicId}&count=10`));
+                      }
+                    }}>
                         <div className="flex items-center gap-3 mb-3">
                           <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center shadow-lg shadow-purple-500/30">
                             <Trophy className="w-5 h-5 text-white" />
@@ -310,7 +332,6 @@ export default function TopicPage() {
                           <span className="text-xs text-slate-500">Practice</span>
                         </div>
                       </GlassCard>
-                    </Link>
                   </motion.div>
                 ))}
               </div>

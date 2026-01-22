@@ -204,7 +204,7 @@ export default function PracticeQuizPlay() {
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900/20 to-slate-900 p-6 flex items-center justify-center">
         <GlassCard className="p-8 text-center max-w-md">
           <h2 className="text-2xl font-bold text-white mb-4">No Questions Available</h2>
-          <p className="text-slate-400 mb-6">There are no practice questions for this lesson yet.</p>
+          <p className="text-slate-400 mb-6">No questions available yet. Ask your teacher to generate questions.</p>
           <Button onClick={() => navigate(-1)} className="bg-gradient-to-r from-purple-500 to-blue-500">
             Go Back
           </Button>
