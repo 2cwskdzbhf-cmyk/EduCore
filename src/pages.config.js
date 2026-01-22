@@ -8,7 +8,6 @@ import JoinClass from './pages/JoinClass';
 import Landing from './pages/Landing';
 import Lesson from './pages/Lesson';
 import Onboarding from './pages/Onboarding';
-import Quiz from './pages/Quiz';
 import QuizLibrary from './pages/QuizLibrary';
 import StartLiveQuiz from './pages/StartLiveQuiz';
 import StudentClassDetail from './pages/StudentClassDetail';
@@ -34,7 +33,6 @@ export const PAGES = {
     "Landing": Landing,
     "Lesson": Lesson,
     "Onboarding": Onboarding,
-    "Quiz": Quiz,
     "QuizLibrary": QuizLibrary,
     "StartLiveQuiz": StartLiveQuiz,
     "StudentClassDetail": StudentClassDetail,
