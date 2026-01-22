@@ -554,7 +554,7 @@ Deno.serve(async (req) => {
     const lessonStats = [];
 
     // Seed questions for each lesson
-    for (const lesson of allLessons) {
+    for (const lesson of (allLessons || [])) {
       if (!lesson.topic_id) continue;
 
       const topicName = topicMap[lesson.topic_id]?.name || '';
