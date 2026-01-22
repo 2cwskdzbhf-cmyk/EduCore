@@ -129,53 +129,64 @@ Rules:
       const content = data.choices[0].message.content;
       console.log('OpenAI response received, parsing...');
       
-      try {
-        const parsed = JSON.parse(content);
-        console.log('Parsed response:', JSON.stringify(parsed).substring(0, 200));
-        
-        const questionArray = parsed.questions || parsed.items || (Array.isArray(parsed) ? parsed : []);
-        
-        if (Array.isArray(questionArray)) {
-          // Validate each question
-          questions = questionArray.filter(q => {
-            if (!q.prompt || !q.correct_answer) {
-              console.log('Invalid question - missing prompt or answer:', q);
-              return false;
-            }
-            
-            // Basic fraction validation
-            if (q.correct_answer.includes('/')) {
-              const parts = q.correct_answer.split('/');
-              if (parts.length === 2) {
-                const den = parseInt(parts[1]);
-                if (den === 0 || isNaN(den)) {
-                  console.log('Invalid fraction - zero denominator:', q.correct_answer);
-                  return false;
+        try {
+          const parsed = JSON.parse(content);
+          console.log('Parsed response:', JSON.stringify(parsed).substring(0, 200));
+          
+          const questionArray = parsed.questions || parsed.items || (Array.isArray(parsed) ? parsed : []);
+          
+          if (Array.isArray(questionArray)) {
+            // Validate each question
+            questions = questionArray.filter(q => {
+              if (!q.prompt || !q.correct_answer) {
+                console.log('Invalid question - missing prompt or answer:', q);
+                return false;
+              }
+              
+              // Basic fraction validation
+              if (q.correct_answer.includes('/')) {
+                const parts = q.correct_answer.split('/');
+                if (parts.length === 2) {
+                  const den = parseInt(parts[1]);
+                  if (den === 0 || isNaN(den)) {
+                    console.log('Invalid fraction - zero denominator:', q.correct_answer);
+                    return false;
+                  }
                 }
               }
-            }
+              
+              return true;
+            }).slice(0, count);
             
-            return true;
-          }).slice(0, count);
-          
-          console.log(`Valid questions after filtering: ${questions.length}`);
-        } else {
-          console.error('Response not an array:', typeof questionArray);
+            console.log(`Valid questions after filtering: ${questions.length}`);
+            
+            if (questions.length > 0) {
+              break; // Success - exit retry loop
+            }
+          } else {
+            console.error('Response not an array:', typeof questionArray);
+          }
+        } catch (e) {
+          console.error('Parse error on attempt', attempt, ':', e.message);
+          lastError = { error: 'Failed to parse AI response. Try again.', code: 'parse_error' };
         }
-      } catch (e) {
-        console.error('Parse error on attempt', attempts, ':', e.message);
+      } catch (error) {
+        console.error('Request error on attempt', attempt, ':', error.message);
+        lastError = { error: error.message, code: 'request_error' };
       }
     }
 
     if (questions.length === 0) {
       console.error('No valid questions generated after 3 attempts');
+      const errorMsg = lastError?.error || 'Failed to generate valid questions after 3 attempts. Try again.';
       return Response.json({ 
-        error: 'Failed to generate valid questions after 3 attempts. The AI may have returned invalid data. Please try again with different parameters.',
-        attempts
+        error: errorMsg,
+        code: lastError?.code || 'generation_failed',
+        attempts: 3
       }, { status: 500 });
     }
 
-    console.log(`Successfully generated ${questions.length} questions`);
+    console.log(`✓ Successfully generated ${questions.length} questions in ONE API call`);
     return Response.json({ 
       success: true, 
       questions,

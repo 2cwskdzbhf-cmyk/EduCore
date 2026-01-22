@@ -70,6 +70,8 @@ Rules:
       return Response.json({ error: 'OPENAI_API_KEY not configured' }, { status: 500 });
     }
 
+    console.log('Making SINGLE OpenAI API call to generate ALL questions...');
+    
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -89,13 +91,26 @@ Rules:
 
     if (!response.ok) {
       const errorText = await response.text();
+      let errorJson = null;
+      try {
+        errorJson = JSON.parse(errorText);
+      } catch (e) {}
+      
       console.error(`OpenAI error (${response.status}):`, errorText);
       
       if (response.status === 401) {
         return Response.json({ error: 'Invalid OpenAI API key' }, { status: 500 });
       } else if (response.status === 429) {
-        console.error('Rate limit hit - instructing user to wait 60s');
-        return Response.json({ error: 'AI is busy. Please wait 60 seconds and try again.' }, { status: 429 });
+        const errorType = errorJson?.error?.type || 'rate_limit';
+        if (errorType === 'insufficient_quota') {
+          console.error('Insufficient quota error');
+          return Response.json({ error: 'No OpenAI quota available on this key. Add credits or use a different key.' }, { status: 429 });
+        }
+        console.error('Rate limit hit');
+        return Response.json({ error: 'Rate limit exceeded. The AI is busy right now.' }, { status: 429 });
+      } else if (response.status === 404) {
+        console.error('Model not found');
+        return Response.json({ error: 'AI model unavailable. Contact support.' }, { status: 500 });
       }
       
       return Response.json({ error: `OpenAI API error: ${response.status}` }, { status: 500 });
@@ -121,10 +136,10 @@ Rules:
 
     if (questions.length === 0) {
       console.error('No valid questions generated');
-      return Response.json({ error: 'No valid questions generated. Please try again.' }, { status: 500 });
+      return Response.json({ error: 'No valid questions generated. Try again.' }, { status: 500 });
     }
 
-    console.log(`Generated ${questions.length} valid questions`);
+    console.log(`✓ Successfully generated ${questions.length} questions in ONE API call`);
     return Response.json({ success: true, questions });
   } catch (error) {
     console.error('Error in generateLiveQuizQuestionsAI:', error);

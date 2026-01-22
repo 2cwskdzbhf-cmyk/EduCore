@@ -26,6 +26,14 @@ export default function TeacherQuestionGenerator() {
   const [regenerateFeedback, setRegenerateFeedback] = useState('');
   const [regeneratingIndex, setRegeneratingIndex] = useState(null);
   const [lastGenerateTime, setLastGenerateTime] = useState(0);
+  const [cooldownRemaining, setCooldownRemaining] = useState(0);
+
+  useEffect(() => {
+    if (cooldownRemaining > 0) {
+      const timer = setTimeout(() => setCooldownRemaining(cooldownRemaining - 1), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [cooldownRemaining]);
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -59,10 +67,12 @@ export default function TeacherQuestionGenerator() {
   const generateMutation = useMutation({
     mutationFn: async ({ lessonId, topicId, regenerateIndex, regenerateFeedback }) => {
       const now = Date.now();
-      if (now - lastGenerateTime < 10000) {
-        throw new Error('Please wait a moment before generating again (cooldown: 10s)');
+      if (now - lastGenerateTime < 30000) {
+        const remainingSec = Math.ceil((30000 - (now - lastGenerateTime)) / 1000);
+        throw new Error(`Please wait ${remainingSec}s before generating again`);
       }
       setLastGenerateTime(now);
+      setCooldownRemaining(30);
       
       const response = await base44.functions.invoke('generateQuestionsAI', {
         lessonId,
@@ -85,6 +95,9 @@ export default function TeacherQuestionGenerator() {
       } else {
         setGeneratedQuestions(data.questions || []);
       }
+    },
+    onError: () => {
+      setCooldownRemaining(0);
     }
   });
 
@@ -229,7 +242,7 @@ export default function TeacherQuestionGenerator() {
 
               <Button
                 onClick={handleGenerate}
-                disabled={!selectedTopic || generateMutation.isPending}
+                disabled={!selectedTopic || generateMutation.isPending || cooldownRemaining > 0}
                 className="w-full bg-gradient-to-r from-purple-500 to-blue-500"
               >
                 {generateMutation.isPending ? (
@@ -237,6 +250,8 @@ export default function TeacherQuestionGenerator() {
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                     Generating...
                   </>
+                ) : cooldownRemaining > 0 ? (
+                  <>Wait {cooldownRemaining}s...</>
                 ) : (
                   <>
                     <Sparkles className="w-4 h-4 mr-2" />
