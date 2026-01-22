@@ -4848,3 +4848,10 @@ export async function importMathsContent() {
     return { success: false, error: error?.message || String(error) };
   }
 }
+export default {
+  mathsSubject,
+  mathsTopics,
+  mathsLessons,
+  mathsQuizzes,
+  importMathsContent
+};
