@@ -4640,58 +4640,104 @@ export const mathsQuizzes = [
 // ============================================================================
 
 export async function importMathsContent() {
-  // ✅ Prevent duplicates (icons/topics) during dev reload / React StrictMode
+  // ✅ Prevent duplicate runs in the same browser session (dev reload / StrictMode)
   if (globalThis.__EDUCORE_MATHS_IMPORTED__) {
-    console.log("Maths content already imported — skipping.");
+    console.log("Maths content already imported (session) — skipping.");
     return { success: true, skipped: true };
   }
   globalThis.__EDUCORE_MATHS_IMPORTED__ = true;
 
   try {
-    console.log("Starting Maths content import...");
+    console.log("Starting Maths content import (idempotent)...");
 
-    // 1) Create Subject
-    console.log("Creating Maths subject...");
-    const subject = await base44.entities.Subject.create(mathsSubject);
+    // -------------------------------
+    // 0) Load existing data (so we can dedupe)
+    // -------------------------------
+    const [allSubjects, allTopics, allLessons, allQuizzes] = await Promise.all([
+      base44.entities.Subject.list(),
+      base44.entities.Topic.list(),
+      base44.entities.Lesson.list(),
+      base44.entities.Quiz.list()
+    ]);
+
+    // -------------------------------
+    // 1) Subject (reuse if already exists)
+    // -------------------------------
+    let subject =
+      allSubjects.find(s => s.name?.toLowerCase() === mathsSubject.name.toLowerCase()) ||
+      allSubjects.find(s => s.name?.toLowerCase() === "mathematics");
+
+    if (!subject) {
+      console.log("Creating Maths subject...");
+      subject = await base44.entities.Subject.create(mathsSubject);
+      console.log("Subject created:", subject.id);
+    } else {
+      console.log("Maths subject already exists — reusing:", subject.id);
+    }
+
     const subjectId = subject.id;
-    console.log("Subject created:", subjectId);
 
-    // 2) Create Topics (Pass 1: create topics first)
-    console.log("Creating topics (pass 1)...");
+    // -------------------------------
+    // 2) Topics (Pass 1: create/reuse topics)
+    // -------------------------------
+    console.log("Upserting topics...");
     const topicIdMap = {};
+
+    // Only topics for this subject
+    const existingSubjectTopics = allTopics.filter(t => t.subject_id === subjectId);
 
     for (const topicData of mathsTopics) {
       const { ref, prerequisite_refs, ...topicFields } = topicData;
 
-      const topic = await base44.entities.Topic.create({
-        ...topicFields,
-        subject_id: subjectId,
-        prerequisite_topic_ids: []
-      });
+      // Prefer matching by ref if your DB stores it; otherwise fall back to name
+      let existing =
+        existingSubjectTopics.find(t => t.ref === ref) ||
+        existingSubjectTopics.find(t => t.name?.toLowerCase() === topicFields.name.toLowerCase());
 
-      topicIdMap[ref] = topic.id;
-      console.log(`Topic created: ${topicData.name} (${topic.id})`);
+      if (!existing) {
+        const created = await base44.entities.Topic.create({
+          ...topicFields,
+          ref, // IMPORTANT: store ref for future dedupe
+          subject_id: subjectId,
+          prerequisite_topic_ids: []
+        });
+        existing = created;
+        existingSubjectTopics.push(created);
+        console.log(`Topic created: ${topicFields.name} (${created.id})`);
+      } else {
+        console.log(`Topic exists — reusing: ${existing.name} (${existing.id})`);
+      }
+
+      topicIdMap[ref] = existing.id;
     }
 
-    // 2b) Update Topics with prerequisites (Pass 2)
-    console.log("Updating topic prerequisites (pass 2)...");
+    // -------------------------------
+    // 2b) Topics (Pass 2: update prerequisites)
+    // -------------------------------
+    console.log("Updating topic prerequisites...");
     for (const topicData of mathsTopics) {
       const { ref, prerequisite_refs } = topicData;
       if (!prerequisite_refs?.length) continue;
 
       const topicId = topicIdMap[ref];
       const prerequisite_topic_ids = prerequisite_refs
-        .map((r) => topicIdMap[r])
+        .map(r => topicIdMap[r])
         .filter(Boolean);
 
-      if (prerequisite_topic_ids.length) {
+      if (topicId && prerequisite_topic_ids.length) {
         await base44.entities.Topic.update(topicId, { prerequisite_topic_ids });
       }
     }
 
-    // 3) Create Lessons (and remember IDs so quizzes can link to them)
-    console.log("Creating lessons...");
+    // -------------------------------
+    // 3) Lessons (create/reuse, store ref)
+    // -------------------------------
+    console.log("Upserting lessons...");
     const lessonIdMap = {};
+
+    // Only lessons for this subject's topics (cheap filter)
+    const subjectTopicIds = new Set(Object.values(topicIdMap));
+    const existingSubjectLessons = allLessons.filter(l => subjectTopicIds.has(l.topic_id));
 
     for (const [ref, lessonData] of Object.entries(mathsLessons)) {
       const topicId = topicIdMap[ref];
@@ -4700,23 +4746,40 @@ export async function importMathsContent() {
         continue;
       }
 
-      const { ref: _ignored, ...lessonFields } = lessonData;
+      // Prefer match by ref; fallback title+topic_id
+      let existing =
+        existingSubjectLessons.find(l => l.ref === ref) ||
+        existingSubjectLessons.find(
+          l => l.topic_id === topicId && l.title?.toLowerCase() === lessonData.title.toLowerCase()
+        );
 
-      const createdLesson = await base44.entities.Lesson.create({
-        ...lessonFields,
-        topic_id: topicId
-      });
+      if (!existing) {
+        const { ref: _ignored, ...lessonFields } = lessonData;
 
-      lessonIdMap[ref] = createdLesson.id;
-      console.log(`Lesson created: ${lessonData.title} (${createdLesson.id})`);
+        const createdLesson = await base44.entities.Lesson.create({
+          ...lessonFields,
+          ref,       // IMPORTANT: store ref
+          topic_id: topicId
+        });
+
+        existing = createdLesson;
+        existingSubjectLessons.push(createdLesson);
+        console.log(`Lesson created: ${lessonData.title} (${createdLesson.id})`);
+      } else {
+        console.log(`Lesson exists — reusing: ${existing.title} (${existing.id})`);
+      }
+
+      lessonIdMap[ref] = existing.id;
     }
 
-    // 4) Create Quizzes + Questions
-    //
-    // IMPORTANT: In your Base44 schema, quizzes are linked to questions via lesson_id.
-    // Your Quiz table has a lesson_id column (you said it's empty), and Question table also has lesson_id.
-    // So we set quiz.lesson_id and question.lesson_id to the SAME lesson for that topic.
-    console.log("Creating quizzes and questions...");
+    // -------------------------------
+    // 4) Quizzes + Questions (create/reuse)
+    // -------------------------------
+    console.log("Upserting quizzes and questions...");
+
+    // Only quizzes for this subject (topic_id in our topic set)
+    const existingSubjectQuizzes = allQuizzes.filter(q => subjectTopicIds.has(q.topic_id));
+
     for (const quizData of mathsQuizzes) {
       const topicId = topicIdMap[quizData.ref];
       const lessonId = lessonIdMap[quizData.ref];
@@ -4726,57 +4789,62 @@ export async function importMathsContent() {
         continue;
       }
       if (!lessonId) {
-        console.warn(`No lesson found for quiz ref: ${quizData.ref} (quiz will be skipped)`);
+        console.warn(`No lesson found for quiz ref: ${quizData.ref} (quiz skipped)`);
         continue;
       }
 
-      const { ref: _ref, questions = [], ...quizFields } = quizData;
+      const { ref, questions = [], ...quizFields } = quizData;
 
-      // Create quiz linked to BOTH topic and lesson
-      const quiz = await base44.entities.Quiz.create({
-        ...quizFields,
-        topic_id: topicId,
-        lesson_id: lessonId
-      });
+      // Prefer match by ref; fallback title+topic_id
+      let existing =
+        existingSubjectQuizzes.find(q => q.ref === ref) ||
+        existingSubjectQuizzes.find(
+          q => q.topic_id === topicId && q.title?.toLowerCase() === quizFields.title.toLowerCase()
+        );
 
-      console.log(`Quiz created: ${quizFields.title} (${quiz.id}) linked to lesson ${lessonId}`);
-
-      // Create questions linked to this quiz + lesson (covers both possible UI linking methods)
-      const createdQuestionIds = [];
-      for (const q of questions) {
-        const created = await base44.entities.Question.create({
-          ...q,
+      if (!existing) {
+        const quiz = await base44.entities.Quiz.create({
+          ...quizFields,
+          ref,       // IMPORTANT: store ref
           topic_id: topicId,
-          lesson_id: lessonId,
-          quiz_id: quiz.id
+          lesson_id: lessonId
         });
-        if (created?.id) createdQuestionIds.push(created.id);
-      }
 
-      // Some Base44 templates expect Quiz.question_ids. Try to set it if the field exists.
-      if (createdQuestionIds.length) {
-        try {
-          await base44.entities.Quiz.update(quiz.id, { question_ids: createdQuestionIds });
-        } catch (e) {
-          console.log("Quiz.question_ids update skipped (field may not exist).");
+        console.log(`Quiz created: ${quizFields.title} (${quiz.id}) linked to lesson ${lessonId}`);
+
+        // Create questions
+        const createdQuestionIds = [];
+        for (const q of questions) {
+          const created = await base44.entities.Question.create({
+            ...q,
+            topic_id: topicId,
+            lesson_id: lessonId,
+            quiz_id: quiz.id
+          });
+          if (created?.id) createdQuestionIds.push(created.id);
         }
-      }
 
-      console.log(`${questions.length} questions created for quiz ${quiz.id}`);
+        // Optional: set question_ids if your schema supports it
+        if (createdQuestionIds.length) {
+          try {
+            await base44.entities.Quiz.update(quiz.id, { question_ids: createdQuestionIds });
+          } catch {
+            // ignore if field doesn't exist
+          }
+        }
+      } else {
+        console.log(`Quiz exists — reusing: ${existing.title} (${existing.id})`);
+      }
     }
 
-    console.log("✅ Maths content import complete!");
-    return { success: true, subjectId, topicCount: Object.keys(topicIdMap).length };
+    console.log("✅ Maths content import complete (no DB duplicates).");
+    return {
+      success: true,
+      subjectId,
+      topicCount: Object.keys(topicIdMap).length
+    };
   } catch (error) {
     console.error("Error importing Maths content:", error);
     return { success: false, error: error?.message || String(error) };
   }
 }
-
-export default {
-  mathsSubject,
-  mathsTopics,
-  mathsLessons,
-  mathsQuizzes,
-  importMathsContent
-};
