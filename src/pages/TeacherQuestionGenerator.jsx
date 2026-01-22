@@ -58,6 +58,12 @@ export default function TeacherQuestionGenerator() {
 
   const generateMutation = useMutation({
     mutationFn: async ({ lessonId, topicId, regenerateIndex, regenerateFeedback }) => {
+      const now = Date.now();
+      if (now - lastGenerateTime < 10000) {
+        throw new Error('Please wait a moment before generating again (cooldown: 10s)');
+      }
+      setLastGenerateTime(now);
+      
       const response = await base44.functions.invoke('generateQuestionsAI', {
         lessonId,
         topicId,

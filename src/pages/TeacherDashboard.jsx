@@ -86,15 +86,40 @@ export default function TeacherDashboard() {
     queryFn: () => base44.entities.StudentProgress.list()
   });
 
+  const generateUniqueJoinCode = () => {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    let code = '';
+    for (let i = 0; i < 7; i++) {
+      code += chars[Math.floor(Math.random() * chars.length)];
+    }
+    return code;
+  };
+
   const createClassMutation = useMutation({
     mutationFn: async () => {
-      const joinCode = Math.random().toString(36).substring(2, 8).toUpperCase();
-      await base44.entities.Class.create({
+      if (!user?.email) return;
+      
+      let joinCode = generateUniqueJoinCode();
+      let isUnique = false;
+      let attempts = 0;
+      
+      while (!isUnique && attempts < 5) {
+        const existing = await base44.entities.Class.filter({ join_code: joinCode });
+        if (existing.length === 0) {
+          isUnique = true;
+        } else {
+          joinCode = generateUniqueJoinCode();
+          attempts++;
+        }
+      }
+      
+      return base44.entities.Class.create({
         name: newClassName,
         teacher_email: user.email,
         subject_id: selectedSubject,
+        join_code: joinCode,
         student_emails: [],
-        join_code: joinCode
+        is_active: true
       });
     },
     onSuccess: () => {
