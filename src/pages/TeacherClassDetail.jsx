@@ -357,25 +357,43 @@ export default function TeacherClassDetail() {
                     </div>
                   </div>
 
-                  <Button
-                    onClick={() => generatePracticeMutation.mutate({ regenerateIndex: null, regenerateFeedback: '' })}
-                    disabled={!selectedTopic || generatePracticeMutation.isPending || cooldownRemaining > 0}
-                    className="w-full bg-gradient-to-r from-purple-500 to-blue-500"
-                  >
-                    {generatePracticeMutation.isPending ? (
-                      <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Generating...
-                      </>
-                    ) : cooldownRemaining > 0 ? (
-                      <>Wait {cooldownRemaining}s...</>
-                    ) : (
-                      <>
-                        <Sparkles className="w-4 h-4 mr-2" />
-                        Generate Questions
-                      </>
-                    )}
-                  </Button>
+                  <div className="space-y-3">
+                    <Button
+                      onClick={() => generatePracticeMutation.mutate({ regenerateIndex: null, regenerateFeedback: '' })}
+                      disabled={!selectedTopic || generatePracticeMutation.isPending || cooldownRemaining > 0}
+                      className="w-full bg-gradient-to-r from-purple-500 to-blue-500"
+                    >
+                      {generatePracticeMutation.isPending ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Generating...
+                        </>
+                      ) : cooldownRemaining > 0 ? (
+                        <>Wait {cooldownRemaining}s...</>
+                      ) : (
+                        <>
+                          <Sparkles className="w-4 h-4 mr-2" />
+                          Generate Questions
+                        </>
+                      )}
+                    </Button>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Button
+                        onClick={() => navigate(createPageUrl(`CreateAssignment?classId=${classId}`))}
+                        variant="outline"
+                        className="border-white/20 text-white hover:bg-white/10"
+                      >
+                        Create Manually
+                      </Button>
+                      <Button
+                        onClick={() => navigate(createPageUrl(`QuizLibrary?classId=${classId}`))}
+                        variant="outline"
+                        className="border-white/20 text-white hover:bg-white/10"
+                      >
+                        Library
+                      </Button>
+                    </div>
+                  </div>
 
                   {generatePracticeMutation.isError && (
                     <div className="p-3 rounded-lg bg-red-500/20 border border-red-500/30 text-red-400 text-sm">
