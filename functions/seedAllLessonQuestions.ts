@@ -16,7 +16,7 @@ class QuestionGenerator {
     for (let i = 0; i < 15; i++) {
       const type = types[i % types.length];
       const difficulty = difficulties[i % difficulties.length];
-      const rand = this.seededRandom(seed + i);
+      const rand = QuestionGenerator.seededRandom(seed + i);
 
       let question = {};
 
@@ -125,7 +125,7 @@ class QuestionGenerator {
     for (let i = 0; i < 15; i++) {
       const type = types[i % types.length];
       const difficulty = difficulties[i % difficulties.length];
-      const rand = this.seededRandom(seed + i);
+      const rand = QuestionGenerator.seededRandom(seed + i);
 
       let question = {};
 
@@ -226,7 +226,7 @@ class QuestionGenerator {
     for (let i = 0; i < 15; i++) {
       const type = types[i % types.length];
       const difficulty = difficulties[i % difficulties.length];
-      const rand = this.seededRandom(seed + i);
+      const rand = QuestionGenerator.seededRandom(seed + i);
 
       let question = {};
 
@@ -314,7 +314,7 @@ class QuestionGenerator {
     for (let i = 0; i < 15; i++) {
       const type = types[i % types.length];
       const difficulty = difficulties[i % difficulties.length];
-      const rand = this.seededRandom(seed + i);
+      const rand = QuestionGenerator.seededRandom(seed + i);
 
       let question = {};
 
@@ -381,7 +381,7 @@ class QuestionGenerator {
     for (let i = 0; i < 15; i++) {
       const type = types[i % types.length];
       const difficulty = difficulties[i % difficulties.length];
-      const rand = this.seededRandom(seed + i);
+      const rand = QuestionGenerator.seededRandom(seed + i);
 
       let question = {};
 
@@ -449,7 +449,7 @@ class QuestionGenerator {
     for (let i = 0; i < 15; i++) {
       const type = types[i % types.length];
       const difficulty = difficulties[i % difficulties.length];
-      const rand = this.seededRandom(seed + i);
+      const rand = QuestionGenerator.seededRandom(seed + i);
 
       let question = {};
 
