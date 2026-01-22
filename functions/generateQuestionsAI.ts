@@ -22,7 +22,7 @@ Deno.serve(async (req) => {
 
     console.log(`Generating ${count} questions for ${lessonId ? 'lesson:' + lessonId : 'topic:' + topicId}`);
 
-    // Fetch context
+    // Fetch context (limit to reduce tokens)
     let lessonContext = '';
     let topicContext = '';
     let targetLessonId = lessonId;
@@ -32,7 +32,7 @@ Deno.serve(async (req) => {
       const lessons = await base44.asServiceRole.entities.Lesson.filter({ id: lessonId });
       if (lessons.length > 0) {
         const lesson = lessons[0];
-        lessonContext = lesson.content || lesson.title || '';
+        lessonContext = (lesson.content || lesson.title || '').substring(0, 500);
         targetTopicId = lesson.topic_id;
         
         const topics = await base44.asServiceRole.entities.Topic.filter({ id: targetTopicId });
@@ -47,36 +47,35 @@ Deno.serve(async (req) => {
       }
     }
 
-    const generatePrompt = (index = null) => {
-      const base = `You are a mathematics teacher creating practice questions.
+    const generatePrompt = () => {
+      const typesList = types.join(', ');
+      
+      return `Create ${count} math questions.
 Topic: ${topicContext}
-${lessonContext ? `Lesson content: ${lessonContext.substring(0, 500)}` : ''}
-
-Generate ${regenerateIndex !== null ? '1' : count} typed-answer maths questions suitable for students.
-Question types: ${types.join(', ')}
+${lessonContext ? `Context: ${lessonContext}` : ''}
+Types: ${typesList}
 Difficulty: ${difficulty}
-Allowed answer forms: ${allowedForms.join(', ')}
+${regenerateFeedback ? `Feedback: ${regenerateFeedback}` : ''}
 
-${regenerateFeedback ? `IMPORTANT FEEDBACK: ${regenerateFeedback}\n` : ''}
-
-Return ONLY valid JSON array (no markdown, no explanation):
-[{
-  "prompt": "Clear question text",
-  "correct_answer": "Answer in simplest form (e.g., 1/2, not 2/4)",
-  "allowed_forms": ["fraction", "decimal"],
-  "difficulty": "easy|medium|hard",
-  "explanation": "Step-by-step solution",
-  "type": "fraction|percentage|ratio|algebra|indices"
-}]
+Return valid JSON:
+{
+  "questions": [
+    {
+      "prompt": "Question text",
+      "correct_answer": "Simplified answer",
+      "allowed_forms": ${JSON.stringify(allowedForms)},
+      "difficulty": "${difficulty}",
+      "explanation": "Solution steps",
+      "type": "${types[0]}",
+      "hint": "Optional"
+    }
+  ]
+}
 
 Rules:
-- Use simple numbers (avoid large numbers)
-- Ensure all fractions are valid (denominator ≠ 0)
-- Answers must be mathematically correct
-- Use clear, unambiguous language
-- For fractions, always simplify the correct_answer`;
-
-      return base;
+- Simple numbers only
+- Fractions simplified, no zero denominators
+- Clear questions`;
     };
 
     const openaiKey = Deno.env.get('OPENAI_API_KEY');
@@ -87,12 +86,14 @@ Rules:
     
     console.log('OpenAI API key found, proceeding with generation...');
 
-    let attempts = 0;
-    let questions = [];
-
-    while (attempts < 3 && questions.length === 0) {
-      attempts++;
-      console.log(`Generation attempt ${attempts}/3...`);
+    console.log('Making SINGLE OpenAI API call to generate ALL questions...');
+    
+    const makeOpenAICall = async (attemptNum) => {
+      const backoffMs = attemptNum > 1 ? Math.pow(2, attemptNum - 1) * 1000 : 0;
+      if (backoffMs > 0) {
+        console.log(`Waiting ${backoffMs}ms before retry ${attemptNum}...`);
+        await new Promise(resolve => setTimeout(resolve, backoffMs));
+      }
       
       const response = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
@@ -111,24 +112,62 @@ Rules:
         })
       });
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error(`OpenAI API error (${response.status}):`, errorText);
-        
-        if (response.status === 401) {
-          return Response.json({ error: 'Invalid OpenAI API key. Please check your OPENAI_API_KEY in settings.' }, { status: 500 });
-        } else if (response.status === 429) {
-          console.error('Rate limit hit - instructing user to wait 60s');
-          return Response.json({ error: 'AI is busy. Please wait 60 seconds and try again.' }, { status: 429 });
-        }
-        
-        throw new Error(`OpenAI API error (${response.status}): ${errorText.substring(0, 200)}`);
-      }
+      return response;
+    };
 
-      const data = await response.json();
-      const content = data.choices[0].message.content;
-      console.log('OpenAI response received, parsing...');
+    let questions = [];
+    let lastError = null;
+    
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      console.log(`Generation attempt ${attempt}/3...`);
       
+      try {
+        const response = await makeOpenAICall(attempt);
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          let errorJson = null;
+          try {
+            errorJson = JSON.parse(errorText);
+          } catch (e) {}
+          
+          console.error(`OpenAI API error (${response.status}):`, errorText);
+          
+          if (response.status === 401) {
+            return Response.json({ 
+              error: 'Invalid OpenAI API key. Check settings.',
+              code: 'invalid_api_key'
+            }, { status: 500 });
+          } else if (response.status === 429) {
+            const errorType = errorJson?.error?.type || 'rate_limit';
+            if (errorType === 'insufficient_quota') {
+              console.error('Insufficient quota error');
+              return Response.json({ 
+                error: 'No OpenAI quota available on this key. Please add credits or use a different key.',
+                code: 'insufficient_quota'
+              }, { status: 429 });
+            }
+            console.error('Rate limit hit - attempt', attempt);
+            lastError = { error: 'Rate limit exceeded. The AI is busy right now.', code: 'rate_limit' };
+            if (attempt === 3) {
+              return Response.json(lastError, { status: 429 });
+            }
+            continue;
+          } else if (response.status === 404) {
+            console.error('Model not found error');
+            return Response.json({ 
+              error: 'AI model unavailable. Please contact support.',
+              code: 'model_not_found'
+            }, { status: 500 });
+          }
+          
+          throw new Error(`OpenAI API error (${response.status}): ${errorText.substring(0, 200)}`);
+        }
+
+        const data = await response.json();
+        const content = data.choices[0].message.content;
+        console.log('OpenAI response received, parsing...');
+
         try {
           const parsed = JSON.parse(content);
           console.log('Parsed response:', JSON.stringify(parsed).substring(0, 200));
