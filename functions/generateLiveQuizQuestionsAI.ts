@@ -25,7 +25,9 @@ Deno.serve(async (req) => {
     if (lessonId) {
       const lessons = await base44.asServiceRole.entities.Lesson.filter({ id: lessonId });
       if (lessons.length > 0) {
-        lessonContext = lessons[0].content || lessons[0].title || '';
+        const lesson = lessons[0];
+        // Limit to 500 chars to reduce tokens
+        lessonContext = (lesson.content || lesson.title || '').substring(0, 500);
       }
     }
     
@@ -36,36 +38,31 @@ Deno.serve(async (req) => {
       }
     }
 
-    const prompt = `You are a mathematics teacher creating ${count} live quiz questions for students.
+    const prompt = `Create ${count} live quiz questions.
 Topic: ${topicContext}
-${lessonContext ? `Lesson: ${lessonContext.substring(0, 800)}` : ''}
-
+${lessonContext ? `Context: ${lessonContext}` : ''}
 Difficulty: ${difficulty}
-${regenerateFeedback ? `TEACHER FEEDBACK: ${regenerateFeedback}\n` : ''}
+${regenerateFeedback ? `Feedback: ${regenerateFeedback}` : ''}
 
-Generate ${count} typed-answer or short-answer questions (NOT multiple choice).
-Return ONLY a valid JSON object with a "questions" array:
-
+Return valid JSON:
 {
   "questions": [
     {
-      "prompt": "Clear question text",
-      "correct_answer": "Answer in simplest form",
-      "allowed_forms": ["fraction", "decimal", "simplified"],
-      "difficulty": "easy|medium|hard",
-      "explanation": "Step-by-step solution",
-      "type": "fraction|percentage|ratio|algebra|indices",
-      "hint": "Optional hint"
+      "prompt": "Question",
+      "correct_answer": "Simplified answer",
+      "allowed_forms": ["fraction", "decimal"],
+      "difficulty": "${difficulty}",
+      "explanation": "Solution",
+      "type": "fraction",
+      "hint": "Optional"
     }
   ]
 }
 
-RULES:
-- Use simple numbers, avoid complex calculations
-- Ensure all answers are mathematically correct
-- For fractions: always simplify, no zero denominators
-- Clear, unambiguous questions
-- Provide helpful explanations`;
+Rules:
+- Simple numbers
+- Fractions simplified, no zero denominators
+- Clear questions`;
 
     const openaiKey = Deno.env.get('OPENAI_API_KEY');
     if (!openaiKey) {
@@ -97,7 +94,8 @@ RULES:
       if (response.status === 401) {
         return Response.json({ error: 'Invalid OpenAI API key' }, { status: 500 });
       } else if (response.status === 429) {
-        return Response.json({ error: 'Rate limit exceeded. Try again in a moment.' }, { status: 500 });
+        console.error('Rate limit hit - instructing user to wait 60s');
+        return Response.json({ error: 'AI is busy. Please wait 60 seconds and try again.' }, { status: 429 });
       }
       
       return Response.json({ error: `OpenAI API error: ${response.status}` }, { status: 500 });

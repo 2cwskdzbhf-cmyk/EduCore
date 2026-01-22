@@ -34,6 +34,14 @@ export default function TeacherClassDetail() {
   const [regeneratingIndex, setRegeneratingIndex] = useState(null);
   const [liveQuizTitle, setLiveQuizTitle] = useState('');
   const [generatedLiveQuestions, setGeneratedLiveQuestions] = useState([]);
+  const [copiedCode, setCopiedCode] = useState(false);
+  const [lastGenerateTime, setLastGenerateTime] = useState(0);
+
+  const copyJoinCode = (code) => {
+    navigator.clipboard.writeText(code);
+    setCopiedCode(true);
+    setTimeout(() => setCopiedCode(false), 2000);
+  };
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -91,6 +99,12 @@ export default function TeacherClassDetail() {
 
   const generatePracticeMutation = useMutation({
     mutationFn: async ({ regenerateIndex, regenerateFeedback }) => {
+      const now = Date.now();
+      if (now - lastGenerateTime < 10000) {
+        throw new Error('Please wait a moment before generating again (cooldown: 10s)');
+      }
+      setLastGenerateTime(now);
+      
       const response = await base44.functions.invoke('generateQuestionsAI', {
         lessonId: selectedLesson || null,
         topicId: selectedTopic,
@@ -140,6 +154,12 @@ export default function TeacherClassDetail() {
 
   const generateLiveMutation = useMutation({
     mutationFn: async () => {
+      const now = Date.now();
+      if (now - lastGenerateTime < 10000) {
+        throw new Error('Please wait a moment before generating again (cooldown: 10s)');
+      }
+      setLastGenerateTime(now);
+      
       const response = await base44.functions.invoke('generateLiveQuizQuestionsAI', {
         lessonId: selectedLesson || null,
         topicId: selectedTopic,
@@ -214,13 +234,37 @@ export default function TeacherClassDetail() {
 
           <div className="mb-8">
             <h1 className="text-3xl font-bold text-white mb-2">{classData.name}</h1>
-            <div className="flex items-center gap-4 text-sm text-slate-400">
+            <div className="flex flex-wrap items-center gap-4 text-sm text-slate-400 mb-3">
               <span className="flex items-center gap-1">
                 <Users className="w-4 h-4" />
                 {classData.student_emails?.length || 0} students
               </span>
               <span>{subject?.name}</span>
             </div>
+            
+            <GlassCard className="p-4 inline-block">
+              <div className="flex items-center gap-3">
+                <div>
+                  <p className="text-xs text-slate-500 mb-1">Class Join Code</p>
+                  <p className="text-2xl font-bold text-white font-mono tracking-wider">{classData.join_code}</p>
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => copyJoinCode(classData.join_code)}
+                  className="border-white/20 text-white hover:bg-white/10"
+                >
+                  {copiedCode ? (
+                    <>
+                      <CheckCircle2 className="w-4 h-4 mr-1" />
+                      Copied!
+                    </>
+                  ) : (
+                    'Copy Code'
+                  )}
+                </Button>
+              </div>
+            </GlassCard>
           </div>
 
           <Tabs defaultValue="practice" className="space-y-6">
@@ -315,7 +359,8 @@ export default function TeacherClassDetail() {
 
                   {generatePracticeMutation.isError && (
                     <div className="p-3 rounded-lg bg-red-500/20 border border-red-500/30 text-red-400 text-sm">
-                      Error: {generatePracticeMutation.error?.response?.data?.error || 'Failed to generate. Check console for details.'}
+                      <p className="font-semibold mb-1">Generation Failed</p>
+                      <p>{generatePracticeMutation.error?.response?.data?.error || generatePracticeMutation.error?.message || 'Failed to generate. Check console for details.'}</p>
                     </div>
                   )}
                 </div>
@@ -496,7 +541,8 @@ export default function TeacherClassDetail() {
 
                   {generateLiveMutation.isError && (
                     <div className="p-3 rounded-lg bg-red-500/20 border border-red-500/30 text-red-400 text-sm">
-                      {generateLiveMutation.error?.response?.data?.error || 'Generation failed'}
+                      <p className="font-semibold mb-1">Generation Failed</p>
+                      <p>{generateLiveMutation.error?.response?.data?.error || generateLiveMutation.error?.message || 'Generation failed'}</p>
                     </div>
                   )}
                 </div>

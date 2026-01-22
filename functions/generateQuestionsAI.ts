@@ -118,7 +118,8 @@ Rules:
         if (response.status === 401) {
           return Response.json({ error: 'Invalid OpenAI API key. Please check your OPENAI_API_KEY in settings.' }, { status: 500 });
         } else if (response.status === 429) {
-          return Response.json({ error: 'OpenAI rate limit exceeded. Please try again in a few moments.' }, { status: 500 });
+          console.error('Rate limit hit - instructing user to wait 60s');
+          return Response.json({ error: 'AI is busy. Please wait 60 seconds and try again.' }, { status: 429 });
         }
         
         throw new Error(`OpenAI API error (${response.status}): ${errorText.substring(0, 200)}`);

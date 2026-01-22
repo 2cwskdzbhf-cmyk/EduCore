@@ -25,6 +25,7 @@ export default function TeacherQuestionGenerator() {
   const [editingQuestion, setEditingQuestion] = useState(null);
   const [regenerateFeedback, setRegenerateFeedback] = useState('');
   const [regeneratingIndex, setRegeneratingIndex] = useState(null);
+  const [lastGenerateTime, setLastGenerateTime] = useState(0);
 
   useEffect(() => {
     const fetchUser = async () => {
