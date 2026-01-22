@@ -142,11 +142,11 @@ export default function TopicPage() {
 
   if (!topicIdFromUrl) {
     return (
-      <div className="min-h-screen bg-slate-50 p-6 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900/20 to-slate-900 p-6 flex items-center justify-center">
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-slate-800 mb-4">Topic not found</h1>
+          <h1 className="text-2xl font-bold text-white mb-4">Topic not found</h1>
           <Link to={createPageUrl('StudentDashboard')}>
-            <Button>Go to Dashboard</Button>
+            <Button className="bg-gradient-to-r from-purple-500 to-blue-500">Go to Dashboard</Button>
           </Link>
         </div>
       </div>
@@ -154,68 +154,68 @@ export default function TopicPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
-      {/* Header */}
-      <div className="bg-white border-b border-slate-100">
-        <div className="max-w-5xl mx-auto px-6 py-6">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900/20 to-slate-900 p-6">
+      <div className="max-w-5xl mx-auto">
+        {/* Header */}
+        <motion.div
+          className="mb-8"
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+        >
           <Link
             to={subject ? createPageUrl(`Subject?id=${subject.id}`) : createPageUrl('StudentDashboard')}
-            className="inline-flex items-center gap-2 text-slate-500 hover:text-slate-700 mb-4 transition-colors"
+            className="inline-flex items-center gap-2 text-slate-400 hover:text-white mb-6 transition-colors"
           >
             <ChevronLeft className="w-5 h-5" />
             Back to {subject?.name || 'Subject'}
           </Link>
 
           {loadingTopic ? (
-            <Skeleton className="h-10 w-64" />
+            <Skeleton className="h-10 w-64 bg-white/5" />
           ) : (
             <>
               <div className="flex items-center gap-3 mb-2">
-                <h1 className="text-3xl font-bold text-slate-900">{topic?.name}</h1>
+                <h1 className="text-3xl font-bold text-white">{topic?.name}</h1>
                 <span
                   className={`text-sm px-3 py-1 rounded-full ${
-                    topic?.difficulty_level === 'beginner'
-                      ? 'bg-green-100 text-green-700'
+                    topic?.difficulty_level === 'foundation'
+                      ? 'bg-green-500/20 text-green-400'
                       : topic?.difficulty_level === 'intermediate'
-                        ? 'bg-amber-100 text-amber-700'
-                        : 'bg-red-100 text-red-700'
+                        ? 'bg-amber-500/20 text-amber-400'
+                        : 'bg-red-500/20 text-red-400'
                   }`}
                 >
                   {topic?.difficulty_level}
                 </span>
               </div>
-              <p className="text-slate-500">{topic?.description}</p>
+              <p className="text-slate-400">{topic?.description}</p>
             </>
           )}
 
           {/* Progress Bar */}
-          <div className="mt-6 bg-slate-50 rounded-xl p-4">
+          <GlassCard className="mt-6 p-4">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-medium text-slate-600">Topic Progress</span>
-              <span className="text-sm font-bold text-slate-800">{Math.round(overallProgress)}%</span>
+              <span className="text-sm font-medium text-slate-400">Topic Progress</span>
+              <span className="text-sm font-bold text-white">{Math.round(overallProgress)}%</span>
             </div>
             <Progress value={overallProgress} className="h-3" />
             <p className="text-sm text-slate-500 mt-2">
               {completedLessonsCount} of {lessons.length} lessons completed
             </p>
-          </div>
-        </div>
-      </div>
-
-      {/* Content */}
-      <div className="max-w-5xl mx-auto px-6 py-8">
+          </GlassCard>
+        </motion.div>
         <div className="grid lg:grid-cols-3 gap-8">
           {/* Lessons List */}
           <div className="lg:col-span-2">
-            <h2 className="text-xl font-bold text-slate-900 mb-4 flex items-center gap-2">
-              <BookOpen className="w-5 h-5 text-indigo-500" />
+            <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
+              <BookOpen className="w-5 h-5 text-purple-400" />
               Lessons
             </h2>
 
             {loadingLessons ? (
-              <div className="space-y-4">
+              <div className="space-y-3">
                 {[1, 2, 3].map((i) => (
-                  <Skeleton key={i} className="h-24 rounded-xl" />
+                  <Skeleton key={i} className="h-24 rounded-xl bg-white/5" />
                 ))}
               </div>
             ) : lessons.length > 0 ? (
@@ -228,18 +228,18 @@ export default function TopicPage() {
                       key={lesson.id}
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: index * 0.05 }}
+                      transition={{ delay: index * 0.05, duration: 0.3 }}
                     >
                       <Link to={createPageUrl(`Lesson?id=${lesson.id}`)}>
-                        <div
-                          className={`bg-white rounded-xl border p-5 hover:shadow-md transition-all cursor-pointer ${
-                            completed ? 'border-emerald-200 bg-emerald-50/50' : 'border-slate-100'
-                          }`}
-                        >
+                        <GlassCard className={`p-5 hover:scale-[1.02] ${
+                          completed ? 'border-emerald-500/30 shadow-emerald-500/20' : ''
+                        }`}>
                           <div className="flex items-center gap-4">
                             <div
-                              className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-                                completed ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-500'
+                              className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-lg ${
+                                completed 
+                                  ? 'bg-emerald-500 text-white shadow-emerald-500/50' 
+                                  : 'bg-white/10 text-slate-400'
                               }`}
                             >
                               {completed ? (
@@ -249,35 +249,35 @@ export default function TopicPage() {
                               )}
                             </div>
                             <div className="flex-1">
-                              <h3 className="font-semibold text-slate-800">{lesson.title}</h3>
-                              <div className="flex items-center gap-3 mt-1 text-sm text-slate-500">
+                              <h3 className="font-semibold text-white">{lesson.title}</h3>
+                              <div className="flex items-center gap-3 mt-1 text-sm text-slate-400">
                                 <span className="flex items-center gap-1">
                                   <Clock className="w-3.5 h-3.5" />
                                   {lesson.duration_minutes || 5} min
                                 </span>
                               </div>
                             </div>
-                            <ChevronRight className="w-5 h-5 text-slate-400" />
+                            <ChevronRight className="w-5 h-5 text-slate-500" />
                           </div>
-                        </div>
+                        </GlassCard>
                       </Link>
                     </motion.div>
                   );
                 })}
               </div>
             ) : (
-              <div className="text-center py-12 bg-white rounded-xl border border-slate-100">
-                <FileText className="w-12 h-12 text-slate-300 mx-auto mb-4" />
-                <h3 className="font-semibold text-slate-700 mb-2">No lessons yet</h3>
-                <p className="text-slate-500 text-sm">Lessons will appear here once created.</p>
-              </div>
+              <GlassCard className="p-12 text-center">
+                <FileText className="w-12 h-12 text-slate-400 mx-auto mb-4" />
+                <h3 className="font-semibold text-white mb-2">No lessons yet</h3>
+                <p className="text-slate-400 text-sm">Lessons will appear here once created.</p>
+              </GlassCard>
             )}
           </div>
 
           {/* Sidebar - Quizzes */}
           <div>
-            <h2 className="text-xl font-bold text-slate-900 mb-4 flex items-center gap-2">
-              <Trophy className="w-5 h-5 text-amber-500" />
+            <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
+              <Trophy className="w-5 h-5 text-amber-400" />
               Quizzes
             </h2>
 
@@ -288,10 +288,10 @@ export default function TopicPage() {
                     key={quiz.id}
                     initial={{ opacity: 0, x: 20 }}
                     animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: index * 0.1 }}
+                    transition={{ delay: index * 0.1, duration: 0.3 }}
                   >
                     <Link to={createPageUrl(`Quiz?id=${quiz.id}`)}>
-                      <div className="bg-white rounded-xl border border-slate-100 p-5 hover:shadow-md transition-all cursor-pointer">
+                      <GlassCard className="p-5 hover:scale-[1.02]">
                         <div className="flex items-center gap-3 mb-3">
                           <div
                             className={`w-10 h-10 rounded-xl flex items-center justify-center ${
@@ -332,26 +332,27 @@ export default function TopicPage() {
                 ))}
               </div>
             ) : (
-              <div className="text-center py-8 bg-white rounded-xl border border-slate-100">
-                <Trophy className="w-10 h-10 text-slate-300 mx-auto mb-3" />
-                <p className="text-sm text-slate-500">No quizzes available yet</p>
-              </div>
+              <GlassCard className="p-8 text-center">
+                <Trophy className="w-10 h-10 text-slate-400 mx-auto mb-3" />
+                <p className="text-sm text-slate-400">No quizzes available yet</p>
+              </GlassCard>
             )}
 
             {/* AI Tutor Card */}
             <motion.div
-              className="mt-6 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-xl p-5 text-white"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.3 }}
             >
-              <h3 className="font-semibold mb-2">Stuck on something?</h3>
-              <p className="text-purple-100 text-sm mb-4">Ask the AI tutor for help with this topic.</p>
-              <Link to={createPageUrl(`AITutor?topic=${topicId}`)}>
-                <Button className="w-full bg-white text-indigo-600 hover:bg-indigo-50">
-                  Get Help
-                </Button>
-              </Link>
+              <GlassCard className="mt-6 p-6">
+                <h3 className="font-semibold mb-2 text-white">Need Help?</h3>
+                <p className="text-slate-400 text-sm mb-4">Ask the AI tutor for help with this topic.</p>
+                <Link to={createPageUrl(`AITutor?topic=${topicId}`)}>
+                  <Button className="w-full bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 shadow-lg shadow-purple-500/30">
+                    Get Help
+                  </Button>
+                </Link>
+              </GlassCard>
             </motion.div>
           </div>
         </div>
