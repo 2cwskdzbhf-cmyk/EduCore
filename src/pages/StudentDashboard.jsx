@@ -73,6 +73,21 @@ export default function StudentDashboard() {
     enabled: !!user?.email
   });
 
+  const { data: activeLiveSessions = [] } = useQuery({
+    queryKey: ['activeLiveSessions', enrolledClasses.map(c => c.id).join(',')],
+    queryFn: async () => {
+      if (enrolledClasses.length === 0) return [];
+      const classIds = enrolledClasses.map(c => c.id);
+      const sessions = await base44.entities.LiveQuizSession.filter({
+        class_id: { $in: classIds },
+        status: { $in: ['lobby', 'live'] }
+      });
+      return sessions;
+    },
+    enabled: enrolledClasses.length > 0,
+    refetchInterval: 5000
+  });
+
   const avgResponseTime = recentAttempts.length > 0
     ? Math.round(recentAttempts.reduce((sum, a) => sum + (a.time_taken_seconds || 0), 0) / recentAttempts.length * 1000)
     : null;

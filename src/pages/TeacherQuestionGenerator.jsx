@@ -233,7 +233,7 @@ export default function TeacherQuestionGenerator() {
                 ) : (
                   <>
                     <Sparkles className="w-4 h-4 mr-2" />
-                    Generate Questions
+                    Generate Practice Questions
                   </>
                 )}
               </Button>
@@ -242,9 +242,14 @@ export default function TeacherQuestionGenerator() {
 
           {generateMutation.isError && (
             <GlassCard className="p-4 mb-6 border-red-500/50">
-              <div className="flex items-center gap-2 text-red-400">
-                <AlertCircle className="w-5 h-5" />
-                <span>Failed to generate questions. Please try again.</span>
+              <div className="flex items-start gap-2 text-red-400">
+                <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-semibold">Generation failed</p>
+                  <p className="text-sm text-red-300 mt-1">
+                    {generateMutation.error?.response?.data?.error || 'Unknown error. Check console for details.'}
+                  </p>
+                </div>
               </div>
             </GlassCard>
           )}

@@ -148,7 +148,7 @@ export default function TeacherDashboard() {
           </p>
         </motion.div>
 
-        <div className="flex justify-end gap-3 mb-8">
+        <div className="flex justify-end mb-8">
           <Dialog open={newClassOpen} onOpenChange={setNewClassOpen}>
             <DialogTrigger asChild>
               <Button className="bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 shadow-lg shadow-purple-500/30">
@@ -195,34 +195,10 @@ export default function TeacherDashboard() {
                 </div>
               </DialogContent>
           </Dialog>
-          <Link to={createPageUrl('CreateAssignment')}>
-            <Button variant="outline" className="border-white/10 text-slate-300 hover:bg-white/10 hover:text-white">
-              <ClipboardList className="w-4 h-4 mr-2" />
-              New Assignment
-            </Button>
-          </Link>
-          <Link to={createPageUrl('CreateQuiz')}>
-            <Button variant="outline" className="border-white/10 text-slate-300 hover:bg-white/10 hover:text-white">
-              <Plus className="w-4 h-4 mr-2" />
-              Create Quiz
-            </Button>
-          </Link>
-          <Link to={createPageUrl('QuizLibrary')}>
-            <Button variant="outline" className="border-white/10 text-slate-300 hover:bg-white/10 hover:text-white">
-              <Trophy className="w-4 h-4 mr-2" />
-              Quiz Library
-            </Button>
-          </Link>
-          <Link to={createPageUrl('TeacherQuestionGenerator')}>
-            <Button variant="outline" className="border-emerald-500/20 text-emerald-300 hover:bg-emerald-500/10 hover:text-emerald-200 border-2">
-              <Sparkles className="w-4 h-4 mr-2" />
-              AI Generator
-            </Button>
-          </Link>
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
+        <div className="grid grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
           <StatCard
             icon={Users}
             label="Total Students"
@@ -241,17 +217,12 @@ export default function TeacherDashboard() {
             value={assignments.length}
             delay={0.2}
           />
-          <StatCard
-            icon={BarChart3}
-            label="Active"
-            value={assignments.filter(a => new Date(a.due_date) > new Date()).length}
-            delay={0.3}
-          />
         </div>
 
         {/* Classes */}
         <div className="mb-8">
           <h2 className="text-2xl font-bold text-white mb-6">Your Classes</h2>
+          <p className="text-slate-400 mb-6">Click a class to manage assignments, quizzes, and live sessions</p>
           
           {loadingClasses ? (
             <div className="grid md:grid-cols-2 gap-6">
@@ -272,7 +243,7 @@ export default function TeacherDashboard() {
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: idx * 0.1, duration: 0.3 }}
                   >
-                    <Link to={createPageUrl(`ClassDetails?id=${classObj.id}`)}>
+                    <Link to={createPageUrl(`TeacherClassDetail?id=${classObj.id}`)}>
                       <GlassCard className="p-6 hover:scale-[1.02]">
                         <div className="flex items-start justify-between mb-4">
                           <div>
@@ -282,28 +253,6 @@ export default function TeacherDashboard() {
                           <div className="flex items-center gap-1 text-sm text-slate-400">
                             <Users className="w-4 h-4" />
                             {classObj.student_emails?.length || 0}
-                          </div>
-                        </div>
-
-                        <div className="bg-white/5 rounded-lg p-3 mb-4 border border-white/10">
-                          <div className="flex items-center justify-between text-sm">
-                            <span className="text-slate-400">Join Code:</span>
-                            <div className="flex items-center gap-2">
-                              <span className="font-mono font-bold text-white">{classObj.join_code}</span>
-                              <button
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  copyJoinCode(classObj.join_code);
-                                }}
-                                className="p-1 hover:bg-white/10 rounded transition-colors"
-                              >
-                                {copiedCode === classObj.join_code ? (
-                                  <Check className="w-4 h-4 text-emerald-400" />
-                                ) : (
-                                  <Copy className="w-4 h-4 text-slate-400" />
-                                )}
-                              </button>
-                            </div>
                           </div>
                         </div>
 
@@ -330,65 +279,7 @@ export default function TeacherDashboard() {
           )}
         </div>
 
-        {/* Recent Assignments */}
-        <div>
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-bold text-white">Recent Assignments</h2>
-            <Link to={createPageUrl('CreateAssignment')} className="text-purple-400 text-sm font-medium hover:text-purple-300 transition-colors">
-              View all →
-            </Link>
-          </div>
 
-          {assignments.length > 0 ? (
-            <GlassCard className="divide-y divide-white/10">
-              {assignments.slice(0, 5).map(assignment => {
-                const classObj = classes.find(c => c.id === assignment.class_id);
-                const isPastDue = new Date(assignment.due_date) < new Date();
-
-                return (
-                  <div key={assignment.id} className="p-4 flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-lg ${
-                        isPastDue 
-                          ? 'bg-slate-600 shadow-slate-600/30' 
-                          : 'bg-gradient-to-br from-purple-500 to-blue-500 shadow-purple-500/30'
-                      }`}>
-                        <ClipboardList className="w-5 h-5 text-white" />
-                      </div>
-                      <div>
-                        <h4 className="font-medium text-white">{assignment.title}</h4>
-                        <p className="text-sm text-slate-400">
-                          {classObj?.name} • Due {new Date(assignment.due_date).toLocaleDateString()}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <span className={`text-xs px-2 py-1 rounded-full ${
-                        assignment.type === 'quiz' 
-                          ? 'bg-amber-500/20 text-amber-400' 
-                          : 'bg-purple-500/20 text-purple-400'
-                      }`}>
-                        {assignment.type}
-                      </span>
-                    </div>
-                  </div>
-                );
-              })}
-            </GlassCard>
-          ) : (
-            <GlassCard className="p-8 text-center">
-              <ClipboardList className="w-12 h-12 text-slate-400 mx-auto mb-4" />
-              <h3 className="font-semibold text-white mb-2">No assignments yet</h3>
-              <p className="text-slate-400 text-sm mb-4">Create assignments for your students</p>
-              <Link to={createPageUrl('CreateAssignment')}>
-                <Button className="bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 shadow-lg shadow-purple-500/30">
-                  <Plus className="w-4 h-4 mr-2" />
-                  Create Assignment
-                </Button>
-              </Link>
-            </GlassCard>
-          )}
-        </div>
       </div>
     </div>
   );
