@@ -23,7 +23,7 @@ class QuestionGenerator {
       if (type === 'simplify') {
         const nums = [[6, 8], [10, 15], [12, 18], [9, 12], [15, 25], [20, 30]];
         const [num, den] = nums[Math.floor(rand * nums.length)];
-        const gcd = this.gcd(num, den);
+        const gcd = QuestionGenerator.gcd(num, den);
         question = {
           prompt: `Simplify the fraction ${num}/${den}`,
           correct_answer: `${num / gcd}/${den / gcd}`,
@@ -60,7 +60,7 @@ class QuestionGenerator {
         const [c, d] = pairs2[Math.floor((rand + 0.5) * pairs2.length)];
         const numRes = a * c;
         const denRes = b * d;
-        const gcd = this.gcd(numRes, denRes);
+        const gcd = QuestionGenerator.gcd(numRes, denRes);
         question = {
           prompt: `Multiply: ${a}/${b} × ${c}/${d}`,
           correct_answer: `${numRes / gcd}/${denRes / gcd}`,
@@ -75,7 +75,7 @@ class QuestionGenerator {
         const [c, d] = pairs2[Math.floor((rand + 0.3) * pairs2.length)];
         const numRes = a * d;
         const denRes = b * c;
-        const gcd = this.gcd(numRes, denRes);
+        const gcd = QuestionGenerator.gcd(numRes, denRes);
         question = {
           prompt: `Divide: ${a}/${b} ÷ ${c}/${d}`,
           correct_answer: `${numRes / gcd}/${denRes / gcd}`,
@@ -255,7 +255,7 @@ class QuestionGenerator {
       } else if (type === 'percent_to_fraction') {
         const percents = [50, 25, 75, 20];
         const pct = percents[Math.floor(rand * percents.length)];
-        const gcd = this.gcd(pct, 100);
+        const gcd = QuestionGenerator.gcd(pct, 100);
         question = {
           prompt: `Convert ${pct}% to a fraction in lowest terms`,
           correct_answer: `${pct / gcd}/${100 / gcd}`,
@@ -321,7 +321,7 @@ class QuestionGenerator {
       if (type === 'simplify') {
         const ratios = [[6, 8], [10, 15], [4, 6], [12, 18]];
         const [a, b] = ratios[Math.floor(rand * ratios.length)];
-        const gcd = this.gcd(a, b);
+        const gcd = QuestionGenerator.gcd(a, b);
         question = {
           prompt: `Simplify the ratio ${a}:${b}`,
           correct_answer: `${a / gcd}:${b / gcd}`,
