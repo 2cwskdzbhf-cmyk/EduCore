@@ -559,25 +559,43 @@ export default function TeacherClassDetail() {
                     </div>
                   </div>
 
-                  <Button
-                    onClick={() => generateLiveMutation.mutate()}
-                    disabled={!selectedTopic || !liveQuizTitle || generateLiveMutation.isPending || cooldownRemaining > 0}
-                    className="w-full bg-gradient-to-r from-amber-500 to-orange-500"
-                  >
-                    {generateLiveMutation.isPending ? (
-                      <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Generating...
-                      </>
-                    ) : cooldownRemaining > 0 ? (
-                      <>Wait {cooldownRemaining}s...</>
-                    ) : (
-                      <>
-                        <Sparkles className="w-4 h-4 mr-2" />
-                        Generate Live Quiz Questions
-                      </>
-                    )}
-                  </Button>
+                  <div className="space-y-3">
+                    <Button
+                      onClick={() => generateLiveMutation.mutate()}
+                      disabled={!selectedTopic || !liveQuizTitle || generateLiveMutation.isPending || cooldownRemaining > 0}
+                      className="w-full bg-gradient-to-r from-amber-500 to-orange-500"
+                    >
+                      {generateLiveMutation.isPending ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Generating...
+                        </>
+                      ) : cooldownRemaining > 0 ? (
+                        <>Wait {cooldownRemaining}s...</>
+                      ) : (
+                        <>
+                          <Sparkles className="w-4 h-4 mr-2" />
+                          Generate Live Quiz Questions
+                        </>
+                      )}
+                    </Button>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Button
+                        onClick={() => navigate(createPageUrl(`CreateQuiz?classId=${classId}`))}
+                        variant="outline"
+                        className="border-white/20 text-white hover:bg-white/10"
+                      >
+                        Create Manually
+                      </Button>
+                      <Button
+                        onClick={() => navigate(createPageUrl(`QuizLibrary?classId=${classId}`))}
+                        variant="outline"
+                        className="border-white/20 text-white hover:bg-white/10"
+                      >
+                        Library
+                      </Button>
+                    </div>
+                  </div>
 
                   {generateLiveMutation.isError && (
                     <div className="p-3 rounded-lg bg-red-500/20 border border-red-500/30 text-red-400 text-sm">
