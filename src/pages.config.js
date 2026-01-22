@@ -6,15 +6,16 @@ import CreateQuiz from './pages/CreateQuiz';
 import ImportMathsContent from './pages/ImportMathsContent';
 import JoinClass from './pages/JoinClass';
 import Landing from './pages/Landing';
+import Lesson from './pages/Lesson';
 import Onboarding from './pages/Onboarding';
+import Quiz from './pages/Quiz';
 import QuizLibrary from './pages/QuizLibrary';
 import StartLiveQuiz from './pages/StartLiveQuiz';
 import StudentStats from './pages/StudentStats';
+import Subject from './pages/Subject';
 import TeacherDashboard from './pages/TeacherDashboard';
 import Topic from './pages/Topic';
-import Lesson from './pages/Lesson';
-import Subject from './pages/Subject';
-import Quiz from './pages/Quiz';
+import StudentDashboard from './pages/StudentDashboard';
 import __Layout from './Layout.jsx';
 
 
@@ -27,15 +28,16 @@ export const PAGES = {
     "ImportMathsContent": ImportMathsContent,
     "JoinClass": JoinClass,
     "Landing": Landing,
+    "Lesson": Lesson,
     "Onboarding": Onboarding,
+    "Quiz": Quiz,
     "QuizLibrary": QuizLibrary,
     "StartLiveQuiz": StartLiveQuiz,
     "StudentStats": StudentStats,
+    "Subject": Subject,
     "TeacherDashboard": TeacherDashboard,
     "Topic": Topic,
-    "Lesson": Lesson,
-    "Subject": Subject,
-    "Quiz": Quiz,
+    "StudentDashboard": StudentDashboard,
 }
 
 export const pagesConfig = {
