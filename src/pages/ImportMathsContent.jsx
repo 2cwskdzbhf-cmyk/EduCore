@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { importMathsContent } from '@/components/data/mathsContent';
+// Maths content import removed - use backend function instead
 import { Loader2, CheckCircle, AlertCircle, BookOpen, Upload } from 'lucide-react';
 import { motion } from 'framer-motion';
 
@@ -14,8 +14,10 @@ export default function ImportMathsContent() {
     setResult(null);
 
     try {
-      const importResult = await importMathsContent();
-      setResult(importResult);
+      setResult({ 
+        success: false, 
+        error: 'This import page is deprecated. Use the backend function "generateMathsQuestions" instead.' 
+      });
     } catch (error) {
       setResult({ 
         success: false, 
