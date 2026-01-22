@@ -251,24 +251,28 @@ export default function PracticeQuizPlay() {
           animate={{ opacity: 1, y: 0 }}
         >
           <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
-              <span className="text-lg font-bold text-white">
-                Question {currentIndex + 1} / {questions.length}
+            <div className="flex items-center gap-4">
+              <span className="text-xl font-bold text-white">
+                {currentIndex + 1} / {questions.length}
               </span>
               {streak > 0 && (
-                <div className="flex items-center gap-1 px-3 py-1 rounded-full bg-orange-500/20">
-                  <Flame className="w-4 h-4 text-orange-400" />
-                  <span className="text-sm font-bold text-orange-400">{streak}</span>
-                </div>
+                <motion.div
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  className="flex items-center gap-1 px-3 py-1.5 rounded-full bg-gradient-to-r from-orange-500/20 to-red-500/20 border border-orange-500/30"
+                >
+                  <Flame className="w-5 h-5 text-orange-400" />
+                  <span className="text-lg font-bold text-orange-400">{streak} streak</span>
+                </motion.div>
               )}
             </div>
           </div>
-          <div className="h-2 bg-white/10 rounded-full overflow-hidden">
+          <div className="h-2.5 bg-white/10 rounded-full overflow-hidden shadow-inner">
             <motion.div
-              className="h-full bg-gradient-to-r from-purple-500 to-blue-500"
+              className="h-full bg-gradient-to-r from-purple-500 to-blue-500 shadow-lg shadow-purple-500/50"
               initial={{ width: 0 }}
               animate={{ width: `${progress}%` }}
-              transition={{ duration: 0.3 }}
+              transition={{ duration: 0.5, ease: 'easeOut' }}
             />
           </div>
         </motion.div>
@@ -277,16 +281,18 @@ export default function PracticeQuizPlay() {
         <AnimatePresence mode="wait">
           <motion.div
             key={currentIndex}
-            initial={{ opacity: 0, x: 50 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -50 }}
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
             transition={{ duration: 0.3 }}
           >
-            <GlassCard className="p-8">
-              <h2 className="text-2xl font-bold text-white mb-8">{question.prompt}</h2>
+            <GlassCard className={`p-8 md:p-12 transition-all ${
+              feedback === 'correct' ? 'shadow-2xl shadow-emerald-500/30' : ''
+            }`}>
+              <h2 className="text-2xl md:text-3xl font-bold text-white mb-10 text-center">{question.prompt}</h2>
 
               {/* Answer Input */}
-              <div className="mb-6">
+              <div className="mb-8">
                 <Input
                   ref={inputRef}
                   value={userAnswer}
@@ -298,10 +304,10 @@ export default function PracticeQuizPlay() {
                   }}
                   placeholder="Type your answer..."
                   disabled={feedback === 'correct' || showAnswer}
-                  className={`text-2xl h-16 text-center bg-white/5 border-white/20 text-white placeholder:text-slate-500 transition-all ${
-                    feedback === 'incorrect' ? 'animate-shake border-red-500 shadow-lg shadow-red-500/50' : ''
-                  } ${feedback === 'correct' ? 'border-emerald-500 shadow-lg shadow-emerald-500/50' : ''} ${
-                    feedback === 'invalid' ? 'border-amber-500' : ''
+                  className={`text-3xl h-20 text-center bg-white/5 border-2 text-white placeholder:text-slate-500 transition-all ${
+                    feedback === 'incorrect' ? 'animate-shake border-red-500 shadow-lg shadow-red-500/50' : 'border-white/20'
+                  } ${feedback === 'correct' ? 'border-emerald-500 shadow-2xl shadow-emerald-500/50' : ''} ${
+                    feedback === 'invalid' ? 'border-amber-500 shadow-lg shadow-amber-500/50' : ''
                   }`}
                 />
               </div>
@@ -310,16 +316,22 @@ export default function PracticeQuizPlay() {
               <AnimatePresence>
                 {feedback === 'correct' && (
                   <motion.div
-                    initial={{ opacity: 0, scale: 0.8 }}
+                    initial={{ opacity: 0, scale: 0.5 }}
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0 }}
-                    className="mb-6 p-4 rounded-xl bg-emerald-500/20 border border-emerald-500/30 flex items-center gap-3"
+                    className="mb-8 p-6 rounded-xl bg-gradient-to-r from-emerald-500/30 to-teal-500/30 border-2 border-emerald-500/50 flex items-start gap-4"
                   >
-                    <CheckCircle2 className="w-6 h-6 text-emerald-400" />
+                    <motion.div
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1, rotate: [0, 360] }}
+                      transition={{ delay: 0.1, duration: 0.5 }}
+                    >
+                      <CheckCircle2 className="w-10 h-10 text-emerald-400" />
+                    </motion.div>
                     <div>
-                      <p className="font-bold text-emerald-400">Correct!</p>
+                      <p className="text-2xl font-bold text-emerald-400 mb-2">Correct!</p>
                       {question.explanation && (
-                        <p className="text-sm text-slate-300 mt-1">{question.explanation}</p>
+                        <p className="text-sm text-slate-200">{question.explanation}</p>
                       )}
                     </div>
                   </motion.div>
@@ -327,12 +339,12 @@ export default function PracticeQuizPlay() {
 
                 {feedback === 'incorrect' && !showAnswer && (
                   <motion.div
-                    initial={{ opacity: 0, scale: 0.8 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    className="mb-6 p-4 rounded-xl bg-red-500/20 border border-red-500/30 flex items-center gap-3"
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    className="mb-8 p-5 rounded-xl bg-red-500/20 border-2 border-red-500/50 flex items-center gap-3"
                   >
-                    <XCircle className="w-6 h-6 text-red-400" />
-                    <p className="font-bold text-red-400">Try again</p>
+                    <XCircle className="w-8 h-8 text-red-400" />
+                    <p className="text-xl font-bold text-red-400">Not quite - try again</p>
                   </motion.div>
                 )}
 
@@ -340,9 +352,9 @@ export default function PracticeQuizPlay() {
                   <motion.div
                     initial={{ opacity: 0, scale: 0.8 }}
                     animate={{ opacity: 1, scale: 1 }}
-                    className="mb-6 p-4 rounded-xl bg-amber-500/20 border border-amber-500/30"
+                    className="mb-8 p-5 rounded-xl bg-amber-500/20 border-2 border-amber-500/50"
                   >
-                    <p className="text-sm text-amber-400">Invalid input. Try using a fraction like 3/4 or a decimal like 0.75</p>
+                    <p className="text-amber-400 font-semibold">Try using a fraction like <span className="font-mono">3/4</span> or a decimal like <span className="font-mono">0.75</span></p>
                   </motion.div>
                 )}
 
@@ -350,12 +362,12 @@ export default function PracticeQuizPlay() {
                   <motion.div
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="mb-6 p-4 rounded-xl bg-blue-500/20 border border-blue-500/30"
+                    className="mb-8 p-6 rounded-xl bg-blue-500/20 border-2 border-blue-500/50"
                   >
-                    <p className="font-bold text-blue-400 mb-2">Answer:</p>
-                    <p className="text-2xl text-white mb-3">{question.correct_answer}</p>
+                    <p className="font-bold text-blue-400 mb-3 text-lg">Answer:</p>
+                    <p className="text-3xl font-bold text-white mb-4">{question.correct_answer}</p>
                     {question.explanation && (
-                      <p className="text-sm text-slate-300">{question.explanation}</p>
+                      <p className="text-sm text-slate-200 leading-relaxed">{question.explanation}</p>
                     )}
                   </motion.div>
                 )}
@@ -368,7 +380,7 @@ export default function PracticeQuizPlay() {
                     <Button
                       onClick={handleSubmit}
                       disabled={!userAnswer.trim()}
-                      className="flex-1 bg-gradient-to-r from-purple-500 to-blue-500 text-lg h-12"
+                      className="flex-1 bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 text-lg h-14 font-semibold shadow-lg shadow-purple-500/30 hover:shadow-xl hover:shadow-purple-500/50 transition-all"
                     >
                       Check Answer
                     </Button>
@@ -376,7 +388,7 @@ export default function PracticeQuizPlay() {
                       <Button
                         onClick={handleShowAnswer}
                         variant="outline"
-                        className="border-white/20 text-slate-300 hover:bg-white/5"
+                        className="border-white/20 text-slate-300 hover:bg-white/10 h-14"
                       >
                         Show Answer
                       </Button>
@@ -390,7 +402,7 @@ export default function PracticeQuizPlay() {
                       setFeedback(null);
                       setUserAnswer('');
                     }}
-                    className="flex-1 bg-gradient-to-r from-purple-500 to-blue-500 text-lg h-12"
+                    className="flex-1 bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 text-lg h-14 font-semibold shadow-lg shadow-purple-500/30"
                   >
                     Try Again
                   </Button>
@@ -399,7 +411,7 @@ export default function PracticeQuizPlay() {
                 {showAnswer && (
                   <Button
                     onClick={handleNext}
-                    className="flex-1 bg-gradient-to-r from-purple-500 to-blue-500 text-lg h-12"
+                    className="flex-1 bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 text-lg h-14 font-semibold shadow-lg shadow-purple-500/30"
                   >
                     Next Question
                     <ChevronRight className="w-5 h-5 ml-2" />

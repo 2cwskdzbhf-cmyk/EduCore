@@ -71,9 +71,9 @@ export default function LessonPage() {
     };
   }, [lessonId, user, readProgress?.read_confirmed_at]);
 
-  // Initialize or update read progress
+  // Initialize read progress on mount
   useEffect(() => {
-    const updateProgress = async () => {
+    const initProgress = async () => {
       if (!lessonId || !user?.email) return;
 
       const progressList = await base44.entities.LessonReadProgress.filter({
@@ -86,25 +86,14 @@ export default function LessonPage() {
           student_email: user.email,
           lesson_id: lessonId,
           first_opened_at: new Date().toISOString(),
-          percent_scrolled: scrollPercent,
-          time_spent_ms: timeSpent,
+          percent_scrolled: 0,
           last_seen_at: new Date().toISOString()
         });
-      } else {
-        const progress = progressList[0];
-        if (scrollPercent > (progress.percent_scrolled || 0) || timeSpent > (progress.time_spent_ms || 0)) {
-          await base44.entities.LessonReadProgress.update(progress.id, {
-            percent_scrolled: Math.max(scrollPercent, progress.percent_scrolled || 0),
-            time_spent_ms: Math.max(timeSpent, progress.time_spent_ms || 0),
-            last_seen_at: new Date().toISOString()
-          });
-        }
       }
     };
 
-    const interval = setInterval(updateProgress, 10000); // Update every 10s
-    return () => clearInterval(interval);
-  }, [lessonId, user, scrollPercent, timeSpent]);
+    initProgress();
+  }, [lessonId, user]);
 
   const { data: lesson, isLoading: loadingLesson } = useQuery({
     queryKey: ['lesson', lessonId],

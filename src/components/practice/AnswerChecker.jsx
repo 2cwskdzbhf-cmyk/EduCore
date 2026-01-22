@@ -14,40 +14,46 @@ export class AnswerChecker {
   static parseFraction(input) {
     if (!input || typeof input !== 'string') return null;
     
-    input = input.trim().replace(/\s+/g, '');
+    const trimmed = input.replace(/\s+/g, ' ').trim();
     
-    // Mixed number: "1 1/2" or "1_1/2"
-    const mixedMatch = input.match(/^(-?\d+)[_\s]+(\d+)\/(\d+)$/);
+    // Mixed number: "1 1/2" with spaces
+    const mixedMatch = trimmed.match(/^(-?\d+)\s+(\d+)\s*\/\s*(\d+)$/);
     if (mixedMatch) {
       const whole = parseInt(mixedMatch[1]);
       const num = parseInt(mixedMatch[2]);
       const den = parseInt(mixedMatch[3]);
-      if (den === 0) return null;
+      if (den === 0 || isNaN(den) || isNaN(num)) return null;
       const sign = whole < 0 ? -1 : 1;
       return {
-        numerator: Math.abs(whole) * den + num * sign,
+        numerator: Math.abs(whole) * den * sign + num * sign,
         denominator: den
       };
     }
     
-    // Regular fraction: "3/4" or "-3/4"
-    const fracMatch = input.match(/^(-?\d+)\/(\d+)$/);
+    // Regular fraction: "3/4" or "3 / 4"
+    const fracMatch = trimmed.match(/^(-?\d+)\s*\/\s*(\d+)$/);
     if (fracMatch) {
       const num = parseInt(fracMatch[1]);
       const den = parseInt(fracMatch[2]);
-      if (den === 0) return null;
+      if (den === 0 || isNaN(den) || isNaN(num)) return null;
       return { numerator: num, denominator: den };
     }
     
     // Decimal: "0.5" or "-0.5"
-    const decMatch = input.match(/^-?\d+\.?\d*$/);
+    const decMatch = trimmed.match(/^-?\d*\.?\d+$/);
     if (decMatch) {
-      const decimal = parseFloat(input);
+      const decimal = parseFloat(trimmed);
       if (isNaN(decimal)) return null;
-      // Convert to fraction (approximation)
-      const precision = 1000000;
+      
+      const decimalStr = trimmed.includes('.') ? trimmed.split('.')[1] : '';
+      const decimalPlaces = decimalStr.length;
+      if (decimalPlaces === 0) {
+        return { numerator: parseInt(trimmed), denominator: 1 };
+      }
+      
+      const precision = Math.pow(10, decimalPlaces);
       const num = Math.round(decimal * precision);
-      const gcd = this.gcd(num, precision);
+      const gcd = this.gcd(Math.abs(num), precision);
       return {
         numerator: num / gcd,
         denominator: precision / gcd
@@ -55,9 +61,11 @@ export class AnswerChecker {
     }
     
     // Integer: "3" or "-3"
-    const intMatch = input.match(/^-?\d+$/);
+    const intMatch = trimmed.match(/^-?\d+$/);
     if (intMatch) {
-      return { numerator: parseInt(input), denominator: 1 };
+      const val = parseInt(trimmed);
+      if (isNaN(val)) return null;
+      return { numerator: val, denominator: 1 };
     }
     
     return null;
