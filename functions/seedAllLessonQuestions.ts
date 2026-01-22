@@ -1,524 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
 
-// Deterministic question generators for maths topics
-class QuestionGenerator {
-  // Seeded random for reproducibility
-  static seededRandom(seed) {
-    const x = Math.sin(seed) * 10000;
-    return x - Math.floor(x);
-  }
-
-  static generateFractionsQuestions(lessonId, topicId, seed = 1) {
-    const questions = [];
-    const types = ['simplify', 'add', 'subtract', 'multiply', 'divide', 'compare', 'equivalent'];
-    const difficulties = ['easy', 'easy', 'medium', 'medium', 'hard'];
-
-    for (let i = 0; i < 15; i++) {
-      const type = types[i % types.length];
-      const difficulty = difficulties[i % difficulties.length];
-      const rand = QuestionGenerator.seededRandom(seed + i);
-
-      let question = {};
-
-      if (type === 'simplify') {
-        const nums = [[6, 8], [10, 15], [12, 18], [9, 12], [15, 25], [20, 30]];
-        const [num, den] = nums[Math.floor(rand * nums.length)];
-        const gcd = QuestionGenerator.gcd(num, den);
-        question = {
-          prompt: `Simplify the fraction ${num}/${den}`,
-          correct_answer: `${num / gcd}/${den / gcd}`,
-          allowed_forms: ['fraction'],
-          type: 'fraction',
-          explanation: `Divide both numerator and denominator by ${gcd}: ${num}/${den} = ${num / gcd}/${den / gcd}`
-        };
-      } else if (type === 'add') {
-        const pairs = [[1, 2], [1, 3], [2, 5], [3, 4]];
-        const [a, b] = pairs[Math.floor(rand * pairs.length)];
-        const num = a + b;
-        const den = a === b ? a : a * b;
-        question = {
-          prompt: `Add the fractions: 1/${a} + 1/${b}`,
-          correct_answer: `${num}/${den}`,
-          allowed_forms: ['fraction', 'decimal'],
-          type: 'fraction',
-          explanation: `Common denominator is ${den}. 1/${a} + 1/${b} = ${num}/${den}`
-        };
-      } else if (type === 'subtract') {
-        const pairs = [[3, 4], [5, 6], [7, 8], [2, 3]];
-        const [a, b] = pairs[Math.floor(rand * pairs.length)];
-        question = {
-          prompt: `Subtract: ${a}/${b} - 1/4`,
-          correct_answer: `${(a * 4 - b) / (b * 4)}`,
-          allowed_forms: ['fraction', 'decimal'],
-          type: 'fraction',
-          explanation: `Convert to common denominator: ${a}/${b} - 1/4 = ${a * 4}/${b * 4} - ${b}/${b * 4} = ${a * 4 - b}/${b * 4}`
-        };
-      } else if (type === 'multiply') {
-        const pairs = [[1, 2], [2, 3], [3, 5], [1, 4]];
-        const [a, b] = pairs[Math.floor(rand * pairs.length)];
-        const pairs2 = [[2, 3], [3, 4], [1, 2], [2, 5]];
-        const [c, d] = pairs2[Math.floor((rand + 0.5) * pairs2.length)];
-        const numRes = a * c;
-        const denRes = b * d;
-        const gcd = QuestionGenerator.gcd(numRes, denRes);
-        question = {
-          prompt: `Multiply: ${a}/${b} × ${c}/${d}`,
-          correct_answer: `${numRes / gcd}/${denRes / gcd}`,
-          allowed_forms: ['fraction'],
-          type: 'fraction',
-          explanation: `Multiply numerators and denominators: ${a}/${b} × ${c}/${d} = ${numRes}/${denRes} = ${numRes / gcd}/${denRes / gcd}`
-        };
-      } else if (type === 'divide') {
-        const pairs = [[1, 2], [2, 3], [3, 4]];
-        const [a, b] = pairs[Math.floor(rand * pairs.length)];
-        const pairs2 = [[1, 3], [2, 5], [1, 4]];
-        const [c, d] = pairs2[Math.floor((rand + 0.3) * pairs2.length)];
-        const numRes = a * d;
-        const denRes = b * c;
-        const gcd = QuestionGenerator.gcd(numRes, denRes);
-        question = {
-          prompt: `Divide: ${a}/${b} ÷ ${c}/${d}`,
-          correct_answer: `${numRes / gcd}/${denRes / gcd}`,
-          allowed_forms: ['fraction'],
-          type: 'fraction',
-          explanation: `Divide by multiplying by reciprocal: ${a}/${b} ÷ ${c}/${d} = ${a}/${b} × ${d}/${c} = ${numRes / gcd}/${denRes / gcd}`
-        };
-      } else if (type === 'compare') {
-        const fracs = [[1, 2], [2, 3], [3, 4], [1, 3]];
-        const [a, b] = fracs[Math.floor(rand * fracs.length)];
-        const [c, d] = fracs[Math.floor((rand + 0.2) * fracs.length)];
-        const aVal = a / b;
-        const cVal = c / d;
-        const greater = aVal > cVal ? `${a}/${b}` : `${c}/${d}`;
-        question = {
-          prompt: `Which is larger: ${a}/${b} or ${c}/${d}?`,
-          correct_answer: greater,
-          allowed_forms: ['fraction'],
-          type: 'fraction',
-          explanation: `${a}/${b} = ${aVal.toFixed(2)}, ${c}/${d} = ${cVal.toFixed(2)}. ${greater} is larger.`
-        };
-      } else if (type === 'equivalent') {
-        const base = [[1, 2], [2, 3], [3, 4]];
-        const [num, den] = base[Math.floor(rand * base.length)];
-        const mult = Math.floor(rand * 4) + 2;
-        question = {
-          prompt: `${num}/${den} = ?/${den * mult}`,
-          correct_answer: `${num * mult}`,
-          allowed_forms: ['integer'],
-          type: 'fraction',
-          explanation: `Multiply numerator by ${mult}: ${num}/${den} = ${num * mult}/${den * mult}`
-        };
-      }
-
-      question.difficulty = difficulty;
-      question.tags = ['fractions', type];
-      questions.push(question);
-    }
-    return questions;
-  }
-
-  static generateDecimalsQuestions(lessonId, topicId, seed = 2) {
-    const questions = [];
-    const types = ['round', 'add', 'subtract', 'multiply', 'divide', 'compare', 'place_value'];
-    const difficulties = ['easy', 'easy', 'medium', 'medium', 'hard'];
-
-    for (let i = 0; i < 15; i++) {
-      const type = types[i % types.length];
-      const difficulty = difficulties[i % difficulties.length];
-      const rand = QuestionGenerator.seededRandom(seed + i);
-
-      let question = {};
-
-      if (type === 'round') {
-        const values = [3.456, 7.832, 2.671, 9.145, 5.739];
-        const val = values[Math.floor(rand * values.length)];
-        const dp = Math.floor(rand * 2) + 1;
-        const rounded = parseFloat(val.toFixed(dp));
-        question = {
-          prompt: `Round ${val} to ${dp} decimal place${dp > 1 ? 's' : ''}`,
-          correct_answer: `${rounded}`,
-          allowed_forms: ['decimal'],
-          type: 'decimal',
-          explanation: `${val} rounded to ${dp} dp is ${rounded}`
-        };
-      } else if (type === 'add') {
-        const pairs = [[1.5, 2.3], [3.2, 1.8], [4.7, 2.1]];
-        const [a, b] = pairs[Math.floor(rand * pairs.length)];
-        const result = (a + b).toFixed(1);
-        question = {
-          prompt: `Add: ${a} + ${b}`,
-          correct_answer: `${result}`,
-          allowed_forms: ['decimal'],
-          type: 'decimal',
-          explanation: `${a} + ${b} = ${result}`
-        };
-      } else if (type === 'subtract') {
-        const pairs = [[5.7, 2.3], [8.4, 3.2], [6.9, 1.5]];
-        const [a, b] = pairs[Math.floor(rand * pairs.length)];
-        const result = (a - b).toFixed(1);
-        question = {
-          prompt: `Subtract: ${a} - ${b}`,
-          correct_answer: `${result}`,
-          allowed_forms: ['decimal'],
-          type: 'decimal',
-          explanation: `${a} - ${b} = ${result}`
-        };
-      } else if (type === 'multiply') {
-        const pairs = [[2.5, 4], [3.2, 2], [1.5, 6]];
-        const [a, b] = pairs[Math.floor(rand * pairs.length)];
-        const result = (a * b).toFixed(1);
-        question = {
-          prompt: `Multiply: ${a} × ${b}`,
-          correct_answer: `${result}`,
-          allowed_forms: ['decimal'],
-          type: 'decimal',
-          explanation: `${a} × ${b} = ${result}`
-        };
-      } else if (type === 'divide') {
-        const pairs = [[6.4, 2], [9.6, 3], [7.5, 2.5]];
-        const [a, b] = pairs[Math.floor(rand * pairs.length)];
-        const result = (a / b).toFixed(1);
-        question = {
-          prompt: `Divide: ${a} ÷ ${b}`,
-          correct_answer: `${result}`,
-          allowed_forms: ['decimal'],
-          type: 'decimal',
-          explanation: `${a} ÷ ${b} = ${result}`
-        };
-      } else if (type === 'compare') {
-        const values = [[0.5, 0.6], [0.75, 0.7], [0.33, 0.3]];
-        const [a, b] = values[Math.floor(rand * values.length)];
-        question = {
-          prompt: `Which is larger: ${a} or ${b}?`,
-          correct_answer: `${Math.max(a, b)}`,
-          allowed_forms: ['decimal'],
-          type: 'decimal',
-          explanation: `${a} = ${a}, ${b} = ${b}. ${Math.max(a, b)} is larger.`
-        };
-      } else if (type === 'place_value') {
-        const nums = [3.456, 7.821, 2.594];
-        const num = nums[Math.floor(rand * nums.length)];
-        const places = ['tenths', 'hundredths', 'thousandths'];
-        const placeIdx = Math.floor(rand * places.length);
-        const digits = num.toString().split('.')[1].split('');
-        const digit = digits[placeIdx];
-        question = {
-          prompt: `What digit is in the ${places[placeIdx]} place in ${num}?`,
-          correct_answer: `${digit}`,
-          allowed_forms: ['integer'],
-          type: 'decimal',
-          explanation: `In ${num}, the ${places[placeIdx]} digit is ${digit}`
-        };
-      }
-
-      question.difficulty = difficulty;
-      question.tags = ['decimals', type];
-      questions.push(question);
-    }
-    return questions;
-  }
-
-  static generatePercentagesQuestions(lessonId, topicId, seed = 3) {
-    const questions = [];
-    const types = ['percent_of', 'fraction_to_percent', 'percent_to_fraction', 'increase', 'decrease', 'compare'];
-    const difficulties = ['easy', 'easy', 'medium', 'medium', 'hard'];
-
-    for (let i = 0; i < 15; i++) {
-      const type = types[i % types.length];
-      const difficulty = difficulties[i % difficulties.length];
-      const rand = QuestionGenerator.seededRandom(seed + i);
-
-      let question = {};
-
-      if (type === 'percent_of') {
-        const values = [[25, 100], [50, 200], [10, 50], [20, 80]];
-        const [pct, total] = values[Math.floor(rand * values.length)];
-        const result = (pct / 100) * total;
-        question = {
-          prompt: `What is ${pct}% of ${total}?`,
-          correct_answer: `${result}`,
-          allowed_forms: ['integer', 'decimal'],
-          type: 'percentage',
-          explanation: `${pct}% of ${total} = ${pct}/100 × ${total} = ${result}`
-        };
-      } else if (type === 'fraction_to_percent') {
-        const fracs = [[1, 2], [1, 4], [3, 4], [1, 5]];
-        const [num, den] = fracs[Math.floor(rand * fracs.length)];
-        const pct = (num / den) * 100;
-        question = {
-          prompt: `Convert ${num}/${den} to a percentage`,
-          correct_answer: `${pct}`,
-          allowed_forms: ['integer', 'decimal'],
-          type: 'percentage',
-          explanation: `${num}/${den} = ${num / den} = ${pct}%`
-        };
-      } else if (type === 'percent_to_fraction') {
-        const percents = [50, 25, 75, 20];
-        const pct = percents[Math.floor(rand * percents.length)];
-        const gcd = QuestionGenerator.gcd(pct, 100);
-        question = {
-          prompt: `Convert ${pct}% to a fraction in lowest terms`,
-          correct_answer: `${pct / gcd}/${100 / gcd}`,
-          allowed_forms: ['fraction'],
-          type: 'percentage',
-          explanation: `${pct}% = ${pct}/100 = ${pct / gcd}/${100 / gcd}`
-        };
-      } else if (type === 'increase') {
-        const bases = [100, 80, 60, 50];
-        const base = bases[Math.floor(rand * bases.length)];
-        const pctInc = Math.floor(rand * 3) * 10 + 10; // 10, 20, or 30
-        const result = base + (base * pctInc / 100);
-        question = {
-          prompt: `Increase ${base} by ${pctInc}%`,
-          correct_answer: `${result}`,
-          allowed_forms: ['integer', 'decimal'],
-          type: 'percentage',
-          explanation: `${base} + (${base} × ${pctInc}%) = ${base} + ${base * pctInc / 100} = ${result}`
-        };
-      } else if (type === 'decrease') {
-        const bases = [100, 80, 60, 50];
-        const base = bases[Math.floor(rand * bases.length)];
-        const pctDec = Math.floor(rand * 3) * 10 + 10; // 10, 20, or 30
-        const result = base - (base * pctDec / 100);
-        question = {
-          prompt: `Decrease ${base} by ${pctDec}%`,
-          correct_answer: `${result}`,
-          allowed_forms: ['integer', 'decimal'],
-          type: 'percentage',
-          explanation: `${base} - (${base} × ${pctDec}%) = ${base} - ${base * pctDec / 100} = ${result}`
-        };
-      } else if (type === 'compare') {
-        const values = [[50, 45], [30, 25], [80, 75]];
-        const [a, b] = values[Math.floor(rand * values.length)];
-        question = {
-          prompt: `Which is larger: ${a}% or ${b}%?`,
-          correct_answer: `${Math.max(a, b)}%`,
-          allowed_forms: ['percentage'],
-          type: 'percentage',
-          explanation: `${Math.max(a, b)}% is larger than ${Math.min(a, b)}%`
-        };
-      }
-
-      question.difficulty = difficulty;
-      question.tags = ['percentages', type];
-      questions.push(question);
-    }
-    return questions;
-  }
-
-  static generateRatioQuestions(lessonId, topicId, seed = 4) {
-    const questions = [];
-    const types = ['simplify', 'scale', 'share', 'compare'];
-    const difficulties = ['easy', 'easy', 'medium', 'medium', 'hard'];
-
-    for (let i = 0; i < 15; i++) {
-      const type = types[i % types.length];
-      const difficulty = difficulties[i % difficulties.length];
-      const rand = QuestionGenerator.seededRandom(seed + i);
-
-      let question = {};
-
-      if (type === 'simplify') {
-        const ratios = [[6, 8], [10, 15], [4, 6], [12, 18]];
-        const [a, b] = ratios[Math.floor(rand * ratios.length)];
-        const gcd = QuestionGenerator.gcd(a, b);
-        question = {
-          prompt: `Simplify the ratio ${a}:${b}`,
-          correct_answer: `${a / gcd}:${b / gcd}`,
-          allowed_forms: ['ratio'],
-          type: 'ratio',
-          explanation: `Divide both by ${gcd}: ${a}:${b} = ${a / gcd}:${b / gcd}`
-        };
-      } else if (type === 'scale') {
-        const bases = [[2, 3], [3, 4], [1, 5]];
-        const [a, b] = bases[Math.floor(rand * bases.length)];
-        const scale = Math.floor(rand * 3) + 2;
-        question = {
-          prompt: `If the ratio is ${a}:${b}, what is it when scaled by ${scale}?`,
-          correct_answer: `${a * scale}:${b * scale}`,
-          allowed_forms: ['ratio'],
-          type: 'ratio',
-          explanation: `Multiply both parts by ${scale}: ${a}:${b} = ${a * scale}:${b * scale}`
-        };
-      } else if (type === 'share') {
-        const total = 100;
-        const ratios = [[1, 1], [2, 1], [3, 2]];
-        const [a, b] = ratios[Math.floor(rand * ratios.length)];
-        const sumParts = a + b;
-        const share1 = (a / sumParts) * total;
-        const share2 = (b / sumParts) * total;
-        question = {
-          prompt: `Share ${total} in the ratio ${a}:${b}. What is the first share?`,
-          correct_answer: `${share1}`,
-          allowed_forms: ['integer', 'decimal'],
-          type: 'ratio',
-          explanation: `First share = ${a}/${sumParts} × ${total} = ${share1}`
-        };
-      } else if (type === 'compare') {
-        const pairs = [['2:3', 3, 2], ['1:2', 4, 2], ['3:4', 6, 4]];
-        const [ratioStr, num1, num2] = pairs[Math.floor(rand * pairs.length)];
-        question = {
-          prompt: `Is the ratio ${num1}:${num2} equivalent to ${ratioStr}?`,
-          correct_answer: `Yes`,
-          allowed_forms: ['text'],
-          type: 'ratio',
-          explanation: `${num1}:${num2} simplified = ${ratioStr} ✓`
-        };
-      }
-
-      question.difficulty = difficulty;
-      question.tags = ['ratio', type];
-      questions.push(question);
-    }
-    return questions;
-  }
-
-  static generateAlgebraQuestions(lessonId, topicId, seed = 5) {
-    const questions = [];
-    const types = ['solve_linear', 'substitute', 'expand', 'simplify'];
-    const difficulties = ['easy', 'easy', 'medium', 'medium', 'hard'];
-
-    for (let i = 0; i < 15; i++) {
-      const type = types[i % types.length];
-      const difficulty = difficulties[i % difficulties.length];
-      const rand = QuestionGenerator.seededRandom(seed + i);
-
-      let question = {};
-
-      if (type === 'solve_linear') {
-        const values = [[2, 10], [3, 15], [5, 25], [4, 12]];
-        const [coeff, result] = values[Math.floor(rand * values.length)];
-        const xVal = result / coeff;
-        question = {
-          prompt: `Solve: ${coeff}x = ${result}`,
-          correct_answer: `${xVal}`,
-          allowed_forms: ['integer', 'fraction', 'decimal'],
-          type: 'algebra',
-          explanation: `x = ${result}/${coeff} = ${xVal}`
-        };
-      } else if (type === 'substitute') {
-        const xVals = [2, 3, 4, 5];
-        const x = xVals[Math.floor(rand * xVals.length)];
-        const a = Math.floor(rand * 3) + 1;
-        const b = Math.floor(rand * 5) + 1;
-        const result = a * x + b;
-        question = {
-          prompt: `If x = ${x}, find ${a}x + ${b}`,
-          correct_answer: `${result}`,
-          allowed_forms: ['integer'],
-          type: 'algebra',
-          explanation: `${a}(${x}) + ${b} = ${a * x} + ${b} = ${result}`
-        };
-      } else if (type === 'expand') {
-        const pairs = [[2, 5], [3, 4], [2, 3]];
-        const [coeff, x] = pairs[Math.floor(rand * pairs.length)];
-        const const1 = Math.floor(rand * 4) + 1;
-        const expanded = `${coeff}x + ${coeff * const1}`;
-        question = {
-          prompt: `Expand: ${coeff}(x + ${const1})`,
-          correct_answer: expanded,
-          allowed_forms: ['expression'],
-          type: 'algebra',
-          explanation: `${coeff}(x + ${const1}) = ${coeff}x + ${coeff * const1}`
-        };
-      } else if (type === 'simplify') {
-        const terms = [[3, 2, 5], [4, 1, 5], [2, 3, 5]];
-        const [a, b, c] = terms[Math.floor(rand * terms.length)];
-        const simplified = a + b;
-        question = {
-          prompt: `Simplify: ${a}x + ${b}x - ${c}x`,
-          correct_answer: `${simplified - c}x`,
-          allowed_forms: ['expression'],
-          type: 'algebra',
-          explanation: `(${a} + ${b} - ${c})x = ${simplified - c}x`
-        };
-      }
-
-      question.difficulty = difficulty;
-      question.tags = ['algebra', type];
-      questions.push(question);
-    }
-    return questions;
-  }
-
-  static generateIndicesQuestions(lessonId, topicId, seed = 6) {
-    const questions = [];
-    const types = ['powers', 'roots', 'zero_power', 'multiply_powers'];
-    const difficulties = ['easy', 'easy', 'medium', 'medium', 'hard'];
-
-    for (let i = 0; i < 15; i++) {
-      const type = types[i % types.length];
-      const difficulty = difficulties[i % difficulties.length];
-      const rand = QuestionGenerator.seededRandom(seed + i);
-
-      let question = {};
-
-      if (type === 'powers') {
-        const bases = [2, 3, 4, 5, 10];
-        const base = bases[Math.floor(rand * bases.length)];
-        const exp = Math.floor(rand * 3) + 2; // 2, 3, or 4
-        const result = Math.pow(base, exp);
-        question = {
-          prompt: `Calculate: ${base}^${exp}`,
-          correct_answer: `${result}`,
-          allowed_forms: ['integer'],
-          type: 'indices',
-          explanation: `${base}^${exp} = ${base} × ${base}${exp > 2 ? ` × ${base}`.repeat(exp - 2) : ''} = ${result}`
-        };
-      } else if (type === 'roots') {
-        const pairs = [[4, 2], [9, 3], [16, 4], [25, 5], [100, 10]];
-        const [num, root] = pairs[Math.floor(rand * pairs.length)];
-        question = {
-          prompt: `Calculate: √${num}`,
-          correct_answer: `${root}`,
-          allowed_forms: ['integer'],
-          type: 'indices',
-          explanation: `√${num} = ${root} (because ${root}² = ${num})`
-        };
-      } else if (type === 'zero_power') {
-        const bases = [2, 3, 5, 7];
-        const base = bases[Math.floor(rand * bases.length)];
-        question = {
-          prompt: `Calculate: ${base}^0`,
-          correct_answer: `1`,
-          allowed_forms: ['integer'],
-          type: 'indices',
-          explanation: `Any number to the power of 0 equals 1. ${base}^0 = 1`
-        };
-      } else if (type === 'multiply_powers') {
-        const bases = [2, 3, 4];
-        const base = bases[Math.floor(rand * bases.length)];
-        const exp1 = Math.floor(rand * 2) + 2;
-        const exp2 = Math.floor(rand * 2) + 1;
-        const result = exp1 + exp2;
-        question = {
-          prompt: `Simplify: ${base}^${exp1} × ${base}^${exp2}`,
-          correct_answer: `${base}^${result}`,
-          allowed_forms: ['expression'],
-          type: 'indices',
-          explanation: `When multiplying powers with the same base, add exponents: ${base}^${exp1} × ${base}^${exp2} = ${base}^${result}`
-        };
-      }
-
-      question.difficulty = difficulty;
-      question.tags = ['indices', type];
-      questions.push(question);
-    }
-    return questions;
-  }
-
-  static gcd(a, b) {
-    a = Math.abs(a);
-    b = Math.abs(b);
-    while (b) {
-      const t = b;
-      b = a % b;
-      a = t;
-    }
-    return a || 1;
-  }
-}
-
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
@@ -548,68 +29,172 @@ Deno.serve(async (req) => {
     if (!allTopics) allTopics = [];
     
     const topicMap = {};
-    allTopics.forEach(t => topicMap[t.id] = t);
+    for (let i = 0; i < allTopics.length; i++) {
+      topicMap[allTopics[i].id] = allTopics[i];
+    }
 
     let totalCreated = 0;
     const lessonStats = [];
 
-    // Seed questions for each lesson
-    for (const lesson of (allLessons || [])) {
+    // Seeding templates
+    const questionTemplates = {
+      fractions: [
+        { prompt: 'Simplify 6/8', answer: '3/4', explanation: 'Divide by 2' },
+        { prompt: 'Simplify 10/15', answer: '2/3', explanation: 'Divide by 5' },
+        { prompt: 'Add 1/2 + 1/4', answer: '3/4', explanation: '2/4 + 1/4 = 3/4' },
+        { prompt: 'Add 1/3 + 1/3', answer: '2/3', explanation: 'Same denominator' },
+        { prompt: 'Subtract 3/4 - 1/4', answer: '1/2', explanation: '(3-1)/4 = 2/4 = 1/2' },
+        { prompt: 'Multiply 1/2 × 2/3', answer: '1/3', explanation: '(1×2)/(2×3) = 2/6 = 1/3' },
+        { prompt: 'Multiply 1/2 × 3/4', answer: '3/8', explanation: '(1×3)/(2×4) = 3/8' },
+        { prompt: 'Divide 1/2 ÷ 1/4', answer: '2', explanation: '1/2 × 4/1 = 4/2 = 2' },
+        { prompt: '1/2 = ?/10', answer: '5', explanation: 'Multiply numerator and denominator by 5' },
+        { prompt: '2/5 = ?/10', answer: '4', explanation: 'Multiply by 2' },
+        { prompt: 'Convert 1/2 to decimal', answer: '0.5', explanation: '1 ÷ 2 = 0.5' },
+        { prompt: 'Convert 3/4 to decimal', answer: '0.75', explanation: '3 ÷ 4 = 0.75' },
+        { prompt: 'Convert 1/5 to decimal', answer: '0.2', explanation: '1 ÷ 5 = 0.2' },
+        { prompt: 'Order from smallest: 1/4, 1/2, 3/4', answer: '1/4, 1/2, 3/4', explanation: '0.25, 0.5, 0.75' },
+        { prompt: 'Is 2/6 equivalent to 1/3?', answer: 'Yes', explanation: 'Both equal 1/3 when simplified' }
+      ],
+      decimals: [
+        { prompt: 'Round 3.456 to 1 decimal place', answer: '3.5', explanation: '3.456 → 3.5' },
+        { prompt: 'Round 7.832 to 1 decimal place', answer: '7.8', explanation: '7.832 → 7.8' },
+        { prompt: 'Add 1.5 + 2.3', answer: '3.8', explanation: '1.5 + 2.3 = 3.8' },
+        { prompt: 'Add 3.2 + 1.8', answer: '5', explanation: '3.2 + 1.8 = 5.0' },
+        { prompt: 'Subtract 5.7 - 2.3', answer: '3.4', explanation: '5.7 - 2.3 = 3.4' },
+        { prompt: 'Subtract 8.4 - 3.2', answer: '5.2', explanation: '8.4 - 3.2 = 5.2' },
+        { prompt: 'Multiply 2.5 × 4', answer: '10', explanation: '2.5 × 4 = 10' },
+        { prompt: 'Multiply 3.2 × 2', answer: '6.4', explanation: '3.2 × 2 = 6.4' },
+        { prompt: 'Divide 6.4 ÷ 2', answer: '3.2', explanation: '6.4 ÷ 2 = 3.2' },
+        { prompt: 'Divide 9.6 ÷ 3', answer: '3.2', explanation: '9.6 ÷ 3 = 3.2' },
+        { prompt: 'What is 0.25 × 100?', answer: '25', explanation: '0.25 = 25%' },
+        { prompt: 'What is 0.5 × 100?', answer: '50', explanation: '0.5 = 50%' },
+        { prompt: 'Order: 0.3, 0.5, 0.2', answer: '0.2, 0.3, 0.5', explanation: 'From smallest to largest' },
+        { prompt: 'Is 0.25 less than 0.3?', answer: 'Yes', explanation: '0.25 < 0.3' },
+        { prompt: 'Convert 0.75 to a fraction', answer: '3/4', explanation: '0.75 = 75/100 = 3/4' }
+      ],
+      percentages: [
+        { prompt: 'What is 25% of 100?', answer: '25', explanation: '25/100 × 100 = 25' },
+        { prompt: 'What is 50% of 200?', answer: '100', explanation: '50/100 × 200 = 100' },
+        { prompt: 'What is 10% of 50?', answer: '5', explanation: '10/100 × 50 = 5' },
+        { prompt: 'What is 20% of 80?', answer: '16', explanation: '20/100 × 80 = 16' },
+        { prompt: 'Convert 1/2 to a percentage', answer: '50', explanation: '1/2 = 50%' },
+        { prompt: 'Convert 1/4 to a percentage', answer: '25', explanation: '1/4 = 25%' },
+        { prompt: 'Convert 3/4 to a percentage', answer: '75', explanation: '3/4 = 75%' },
+        { prompt: 'Convert 1/5 to a percentage', answer: '20', explanation: '1/5 = 20%' },
+        { prompt: 'Convert 50% to a fraction', answer: '1/2', explanation: '50% = 50/100 = 1/2' },
+        { prompt: 'Convert 25% to a fraction', answer: '1/4', explanation: '25% = 25/100 = 1/4' },
+        { prompt: 'Increase 100 by 10%', answer: '110', explanation: '100 + (10% of 100) = 110' },
+        { prompt: 'Increase 80 by 20%', answer: '96', explanation: '80 + (20% of 80) = 96' },
+        { prompt: 'Decrease 100 by 10%', answer: '90', explanation: '100 - (10% of 100) = 90' },
+        { prompt: 'Decrease 80 by 20%', answer: '64', explanation: '80 - (20% of 80) = 64' },
+        { prompt: 'Which is larger: 40% or 45%?', answer: '45%', explanation: '45% > 40%' }
+      ],
+      ratio: [
+        { prompt: 'Simplify the ratio 6:8', answer: '3:4', explanation: 'Divide by 2' },
+        { prompt: 'Simplify the ratio 10:15', answer: '2:3', explanation: 'Divide by 5' },
+        { prompt: 'Simplify the ratio 4:6', answer: '2:3', explanation: 'Divide by 2' },
+        { prompt: 'If the ratio is 2:3, what is it when scaled by 2?', answer: '4:6', explanation: 'Multiply both by 2' },
+        { prompt: 'If the ratio is 3:4, what is it when scaled by 3?', answer: '9:12', explanation: 'Multiply both by 3' },
+        { prompt: 'Share 100 in the ratio 1:1. First share?', answer: '50', explanation: '100 ÷ 2 = 50' },
+        { prompt: 'Share 100 in the ratio 2:1. First share?', answer: '66.67', explanation: '2/(2+1) × 100 ≈ 67' },
+        { prompt: 'Share 100 in the ratio 3:2. First share?', answer: '60', explanation: '3/(3+2) × 100 = 60' },
+        { prompt: 'Is the ratio 4:6 equivalent to 2:3?', answer: 'Yes', explanation: 'Both simplify to 2:3' },
+        { prompt: 'Is the ratio 3:5 equivalent to 6:10?', answer: 'Yes', explanation: 'Multiply first by 2' },
+        { prompt: 'If ratio is 1:2 and first part is 5, second part is?', answer: '10', explanation: '1:2 means second is double' },
+        { prompt: 'If ratio is 2:3 and first part is 8, second part is?', answer: '12', explanation: '8 ÷ 2 = 4, so 4 × 3 = 12' },
+        { prompt: 'Simplify 12:18:30', answer: '2:3:5', explanation: 'Divide by 6' },
+        { prompt: 'What does ratio 5:2 mean?', answer: '5/2', explanation: 'First is 2.5 times the second' },
+        { prompt: 'The ratio of boys to girls is 3:2. If there are 12 boys, how many girls?', answer: '8', explanation: '3:2, 12:x → x=8' }
+      ],
+      algebra: [
+        { prompt: 'Solve: 2x = 10', answer: '5', explanation: 'x = 10 ÷ 2 = 5' },
+        { prompt: 'Solve: 3x = 15', answer: '5', explanation: 'x = 15 ÷ 3 = 5' },
+        { prompt: 'Solve: 5x = 25', answer: '5', explanation: 'x = 25 ÷ 5 = 5' },
+        { prompt: 'Solve: 4x = 12', answer: '3', explanation: 'x = 12 ÷ 4 = 3' },
+        { prompt: 'If x = 2, find 3x + 1', answer: '7', explanation: '3(2) + 1 = 7' },
+        { prompt: 'If x = 3, find 2x + 5', answer: '11', explanation: '2(3) + 5 = 11' },
+        { prompt: 'If x = 4, find 5x - 3', answer: '17', explanation: '5(4) - 3 = 17' },
+        { prompt: 'If x = 2, find x² + 1', answer: '5', explanation: '2² + 1 = 5' },
+        { prompt: 'Expand: 2(x + 3)', answer: '2x + 6', explanation: 'Distribute the 2' },
+        { prompt: 'Expand: 3(x + 4)', answer: '3x + 12', explanation: 'Distribute the 3' },
+        { prompt: 'Simplify: 3x + 2x', answer: '5x', explanation: 'Combine like terms' },
+        { prompt: 'Simplify: 5x - 2x + 3', answer: '3x + 3', explanation: 'Combine like terms' },
+        { prompt: 'Simplify: 4x + 1 - 2x', answer: '2x + 1', explanation: 'Combine 4x and -2x' },
+        { prompt: 'Factor: 2x + 4', answer: '2(x + 2)', explanation: 'Common factor is 2' },
+        { prompt: 'Solve: x + 5 = 12', answer: '7', explanation: 'x = 12 - 5 = 7' }
+      ],
+      indices: [
+        { prompt: 'Calculate: 2²', answer: '4', explanation: '2 × 2 = 4' },
+        { prompt: 'Calculate: 2³', answer: '8', explanation: '2 × 2 × 2 = 8' },
+        { prompt: 'Calculate: 3²', answer: '9', explanation: '3 × 3 = 9' },
+        { prompt: 'Calculate: 4²', answer: '16', explanation: '4 × 4 = 16' },
+        { prompt: 'Calculate: 5²', answer: '25', explanation: '5 × 5 = 25' },
+        { prompt: 'Calculate: 10²', answer: '100', explanation: '10 × 10 = 100' },
+        { prompt: 'Calculate: 2⁴', answer: '16', explanation: '2 × 2 × 2 × 2 = 16' },
+        { prompt: 'Calculate: √4', answer: '2', explanation: 'Square root of 4 is 2' },
+        { prompt: 'Calculate: √9', answer: '3', explanation: 'Square root of 9 is 3' },
+        { prompt: 'Calculate: √16', answer: '4', explanation: 'Square root of 16 is 4' },
+        { prompt: 'Calculate: √25', answer: '5', explanation: 'Square root of 25 is 5' },
+        { prompt: 'Calculate: 3⁰', answer: '1', explanation: 'Any number to power 0 is 1' },
+        { prompt: 'Simplify: 2³ × 2²', answer: '2⁵', explanation: 'Add exponents: 3 + 2 = 5' },
+        { prompt: 'Simplify: 3⁴ ÷ 3²', answer: '3²', explanation: 'Subtract exponents: 4 - 2 = 2' },
+        { prompt: 'Is 2⁵ = 32?', answer: 'Yes', explanation: '2 × 2 × 2 × 2 × 2 = 32' }
+      ]
+    };
+
+    // Process each lesson
+    for (let i = 0; i < allLessons.length; i++) {
+      const lesson = allLessons[i];
       if (!lesson.topic_id) continue;
 
-      const topicName = topicMap[lesson.topic_id]?.name || '';
-      let generator;
+      const topicName = (topicMap[lesson.topic_id]?.name || '').toLowerCase();
+      let templates = [];
 
-      // Pick generator based on topic name
-      if (topicName.toLowerCase().includes('fraction')) {
-        generator = QuestionGenerator.generateFractionsQuestions;
-      } else if (topicName.toLowerCase().includes('decimal')) {
-        generator = QuestionGenerator.generateDecimalsQuestions;
-      } else if (topicName.toLowerCase().includes('percent')) {
-        generator = QuestionGenerator.generatePercentagesQuestions;
-      } else if (topicName.toLowerCase().includes('ratio')) {
-        generator = QuestionGenerator.generateRatioQuestions;
-      } else if (topicName.toLowerCase().includes('algebra')) {
-        generator = QuestionGenerator.generateAlgebraQuestions;
-      } else if (topicName.toLowerCase().includes('indice')) {
-        generator = QuestionGenerator.generateIndicesQuestions;
+      if (topicName.includes('fraction')) {
+        templates = questionTemplates.fractions;
+      } else if (topicName.includes('decimal')) {
+        templates = questionTemplates.decimals;
+      } else if (topicName.includes('percent')) {
+        templates = questionTemplates.percentages;
+      } else if (topicName.includes('ratio')) {
+        templates = questionTemplates.ratio;
+      } else if (topicName.includes('algebra')) {
+        templates = questionTemplates.algebra;
+      } else if (topicName.includes('indice')) {
+        templates = questionTemplates.indices;
       } else {
-        // Default to fractions
-        generator = QuestionGenerator.generateFractionsQuestions;
+        templates = questionTemplates.fractions;
       }
 
-      // Generate questions
-      const questions = generator.call(QuestionGenerator, lesson.id, lesson.topic_id, lesson.id.charCodeAt(0));
-
-      // Create each question
-      if (!questions || !Array.isArray(questions)) {
-        console.warn(`Generator returned invalid questions for lesson ${lesson.id}`);
-        continue;
-      }
-
-      for (const q of questions) {
+      // Create questions for this lesson
+      for (let j = 0; j < templates.length; j++) {
+        const template = templates[j];
         await base44.entities.QuestionBankItem.create({
-          subject_id: topicMap[lesson.topic_id]?.subject_id,
+          subject_id: topicMap[lesson.topic_id]?.subject_id || '',
           topic_id: lesson.topic_id,
           lesson_id: lesson.id,
-          type: q.type,
-          prompt: q.prompt,
-          correct_answer: q.correct_answer,
-          allowed_forms: q.allowed_forms,
-          difficulty: q.difficulty,
-          tags: q.tags,
-          explanation: q.explanation,
+          type: topicName.includes('fraction') ? 'fraction' : 
+                 topicName.includes('decimal') ? 'decimal' :
+                 topicName.includes('percent') ? 'percentage' :
+                 topicName.includes('ratio') ? 'ratio' :
+                 topicName.includes('algebra') ? 'algebra' : 'indices',
+          prompt: template.prompt,
+          correct_answer: template.answer,
+          allowed_forms: ['fraction', 'decimal', 'integer', 'string'],
+          difficulty: j < 5 ? 'easy' : j < 10 ? 'medium' : 'hard',
+          tags: [topicName],
+          explanation: template.explanation,
           teacher_email: user.email,
           is_active: true
         });
       }
 
-      totalCreated += questions.length;
+      totalCreated += templates.length;
       lessonStats.push({
         lessonId: lesson.id,
         lessonName: lesson.title,
-        topicName,
-        questionCount: questions.length
+        topicName: topicMap[lesson.topic_id]?.name || '',
+        questionCount: templates.length
       });
     }
 
