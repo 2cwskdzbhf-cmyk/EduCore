@@ -35,7 +35,8 @@ import {
   AlertTriangle,
   Award,
   Copy,
-  Check
+  Check,
+  Trophy
 } from 'lucide-react';
 import GlassCard from '@/components/ui/GlassCard';
 import { StatCard } from '@/components/ui/GlassCard';
@@ -197,6 +198,18 @@ export default function TeacherDashboard() {
             <Button variant="outline" className="border-white/10 text-slate-300 hover:bg-white/10 hover:text-white">
               <ClipboardList className="w-4 h-4 mr-2" />
               New Assignment
+            </Button>
+          </Link>
+          <Link to={createPageUrl('CreateQuiz')}>
+            <Button variant="outline" className="border-white/10 text-slate-300 hover:bg-white/10 hover:text-white">
+              <Plus className="w-4 h-4 mr-2" />
+              Create Quiz
+            </Button>
+          </Link>
+          <Link to={createPageUrl('QuizLibrary')}>
+            <Button variant="outline" className="border-white/10 text-slate-300 hover:bg-white/10 hover:text-white">
+              <Trophy className="w-4 h-4 mr-2" />
+              Quiz Library
             </Button>
           </Link>
         </div>
