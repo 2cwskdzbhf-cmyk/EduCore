@@ -579,9 +579,14 @@ Deno.serve(async (req) => {
       }
 
       // Generate questions
-      const questions = generator(lesson.id, lesson.topic_id, lesson.id.charCodeAt(0));
+      const questions = generator.call(QuestionGenerator, lesson.id, lesson.topic_id, lesson.id.charCodeAt(0));
 
       // Create each question
+      if (!questions || !Array.isArray(questions)) {
+        console.warn(`Generator returned invalid questions for lesson ${lesson.id}`);
+        continue;
+      }
+
       for (const q of questions) {
         await base44.entities.QuestionBankItem.create({
           subject_id: topicMap[lesson.topic_id]?.subject_id,
