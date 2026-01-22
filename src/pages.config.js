@@ -11,12 +11,13 @@ import Onboarding from './pages/Onboarding';
 import Quiz from './pages/Quiz';
 import QuizLibrary from './pages/QuizLibrary';
 import StartLiveQuiz from './pages/StartLiveQuiz';
+import StudentClassDetail from './pages/StudentClassDetail';
 import StudentDashboard from './pages/StudentDashboard';
 import StudentStats from './pages/StudentStats';
 import Subject from './pages/Subject';
 import TeacherDashboard from './pages/TeacherDashboard';
 import Topic from './pages/Topic';
-import StudentClassDetail from './pages/StudentClassDetail';
+import PracticeQuizPlay from './pages/PracticeQuizPlay';
 import __Layout from './Layout.jsx';
 
 
@@ -34,12 +35,13 @@ export const PAGES = {
     "Quiz": Quiz,
     "QuizLibrary": QuizLibrary,
     "StartLiveQuiz": StartLiveQuiz,
+    "StudentClassDetail": StudentClassDetail,
     "StudentDashboard": StudentDashboard,
     "StudentStats": StudentStats,
     "Subject": Subject,
     "TeacherDashboard": TeacherDashboard,
     "Topic": Topic,
-    "StudentClassDetail": StudentClassDetail,
+    "PracticeQuizPlay": PracticeQuizPlay,
 }
 
 export const pagesConfig = {
