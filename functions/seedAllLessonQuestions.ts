@@ -166,10 +166,11 @@ Deno.serve(async (req) => {
         templates = questionTemplates.fractions;
       }
 
-      // Create questions for this lesson
+      // Create questions for this lesson (batch mode)
+      const questionsToCreate = [];
       for (let j = 0; j < templates.length; j++) {
         const template = templates[j];
-        await base44.entities.QuestionBankItem.create({
+        questionsToCreate.push({
           subject_id: topicMap[lesson.topic_id]?.subject_id || '',
           topic_id: lesson.topic_id,
           lesson_id: lesson.id,
@@ -187,6 +188,13 @@ Deno.serve(async (req) => {
           teacher_email: user.email,
           is_active: true
         });
+      }
+
+      // Batch create with delay to avoid rate limits
+      if (questionsToCreate.length > 0) {
+        await base44.entities.QuestionBankItem.bulkCreate(questionsToCreate);
+        // Wait 100ms between lessons to avoid rate limits
+        await new Promise(resolve => setTimeout(resolve, 100));
       }
 
       totalCreated += templates.length;
