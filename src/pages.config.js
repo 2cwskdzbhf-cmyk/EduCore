@@ -11,11 +11,11 @@ import Onboarding from './pages/Onboarding';
 import Quiz from './pages/Quiz';
 import QuizLibrary from './pages/QuizLibrary';
 import StartLiveQuiz from './pages/StartLiveQuiz';
+import StudentDashboard from './pages/StudentDashboard';
 import StudentStats from './pages/StudentStats';
 import Subject from './pages/Subject';
 import TeacherDashboard from './pages/TeacherDashboard';
 import Topic from './pages/Topic';
-import StudentDashboard from './pages/StudentDashboard';
 import __Layout from './Layout.jsx';
 
 
@@ -33,11 +33,11 @@ export const PAGES = {
     "Quiz": Quiz,
     "QuizLibrary": QuizLibrary,
     "StartLiveQuiz": StartLiveQuiz,
+    "StudentDashboard": StudentDashboard,
     "StudentStats": StudentStats,
     "Subject": Subject,
     "TeacherDashboard": TeacherDashboard,
     "Topic": Topic,
-    "StudentDashboard": StudentDashboard,
 }
 
 export const pagesConfig = {
