@@ -1,4 +1,3 @@
-// src/pages/Topic.jsx
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { base44 } from '@/api/base44Client';
@@ -8,6 +7,7 @@ import { createPageUrl } from '@/utils';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
+import GlassCard from '@/components/ui/GlassCard';
 import {
   ChevronLeft,
   ChevronRight,
@@ -15,7 +15,6 @@ import {
   Trophy,
   CheckCircle2,
   Clock,
-  Zap,
   FileText
 } from 'lucide-react';
 
@@ -23,7 +22,6 @@ export default function TopicPage() {
   const [user, setUser] = useState(null);
   const urlParams = new URLSearchParams(window.location.search);
 
-  // Support multiple param names just in case
   const topicIdFromUrl =
     urlParams.get('id') ||
     urlParams.get('topicId') ||
@@ -48,7 +46,6 @@ export default function TopicPage() {
     enabled: !!topicIdFromUrl
   });
 
-  // ✅ Source-of-truth topic id (prevents “looks similar” id issues)
   const topicId = topic?.id || topicIdFromUrl;
 
   const { data: subject } = useQuery({
@@ -70,22 +67,16 @@ export default function TopicPage() {
     enabled: !!topicId
   });
 
-  // ✅ Robust quizzes loader:
-  // 1) try by topic_id
-  // 2) fallback by lesson_id IN [lesson ids]
   const { data: quizzes = [] } = useQuery({
     queryKey: ['quizzes', topicId, lessons.map(l => l.id).join(',')],
     queryFn: async () => {
       if (!topicId) return [];
 
-      // Attempt #1: by topic_id (ideal)
       let quizzesData = await base44.entities.Quiz.filter({ topic_id: topicId });
 
-      // Attempt #2: fallback by lesson_id (if topic_id filter is flaky / mismatched)
       if (!Array.isArray(quizzesData) || quizzesData.length === 0) {
         const lessonIds = lessons.map(l => l.id).filter(Boolean);
         if (lessonIds.length > 0) {
-          // Base44 filter supports $in on many entities; if it doesn’t, this will just return []
           const fallback = await base44.entities.Quiz.filter({
             lesson_id: { $in: lessonIds }
           });
@@ -95,17 +86,14 @@ export default function TopicPage() {
         }
       }
 
-      // Attach questions robustly
       const quizzesWithQuestions = await Promise.all(
         (quizzesData || []).map(async (quiz) => {
           let questions = [];
 
-          // Best: link by lesson_id (your schema shows this clearly)
           if (quiz.lesson_id) {
             questions = await base44.entities.Question.filter({ lesson_id: quiz.lesson_id });
           }
 
-          // Fallback: link by ids stored on quiz (some schemas store ids in quiz.questions or quiz.question_ids)
           if (!questions || questions.length === 0) {
             const ids = quiz.question_ids || quiz.questions || [];
             if (Array.isArray(ids) && ids.length > 0) {
@@ -156,7 +144,6 @@ export default function TopicPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900/20 to-slate-900 p-6">
       <div className="max-w-5xl mx-auto">
-        {/* Header */}
         <motion.div
           className="mb-8"
           initial={{ opacity: 0, y: -20 }}
@@ -192,7 +179,6 @@ export default function TopicPage() {
             </>
           )}
 
-          {/* Progress Bar */}
           <GlassCard className="mt-6 p-4">
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm font-medium text-slate-400">Topic Progress</span>
@@ -204,8 +190,8 @@ export default function TopicPage() {
             </p>
           </GlassCard>
         </motion.div>
+
         <div className="grid lg:grid-cols-3 gap-8">
-          {/* Lessons List */}
           <div className="lg:col-span-2">
             <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
               <BookOpen className="w-5 h-5 text-purple-400" />
@@ -274,7 +260,6 @@ export default function TopicPage() {
             )}
           </div>
 
-          {/* Sidebar - Quizzes */}
           <div>
             <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
               <Trophy className="w-5 h-5 text-amber-400" />
@@ -327,7 +312,6 @@ export default function TopicPage() {
               </GlassCard>
             )}
 
-            {/* AI Tutor Card */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
