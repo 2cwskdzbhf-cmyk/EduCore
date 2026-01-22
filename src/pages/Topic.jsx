@@ -125,8 +125,17 @@ export default function TopicPage() {
     return progress?.completed_lessons?.includes(lessonId);
   };
 
-  const completedLessonsCount = lessons.filter((l) => isLessonCompleted(l.id)).length;
-  const overallProgress = lessons.length > 0 ? (completedLessonsCount / lessons.length) * 100 : 0;
+  // Deduplicate lessons by ID
+  const uniqueLessons = lessons.reduce((acc, lesson) => {
+    const key = lesson.id || `${lesson.title}-${lesson.topic_id || topicId}`;
+    if (!acc.find(l => (l.id || `${l.title}-${l.topic_id || topicId}`) === key)) {
+      acc.push(lesson);
+    }
+    return acc;
+  }, []);
+
+  const completedLessonsCount = uniqueLessons.filter((l) => isLessonCompleted(l.id)).length;
+  const overallProgress = uniqueLessons.length > 0 ? (completedLessonsCount / uniqueLessons.length) * 100 : 0;
 
   if (!topicIdFromUrl) {
     return (
@@ -186,7 +195,7 @@ export default function TopicPage() {
             </div>
             <Progress value={overallProgress} className="h-3" />
             <p className="text-sm text-slate-500 mt-2">
-              {completedLessonsCount} of {lessons.length} lessons completed
+              {completedLessonsCount} of {uniqueLessons.length} lessons completed
             </p>
           </GlassCard>
         </motion.div>
@@ -204,9 +213,9 @@ export default function TopicPage() {
                   <Skeleton key={i} className="h-24 rounded-xl bg-white/5" />
                 ))}
               </div>
-            ) : lessons.length > 0 ? (
+            ) : uniqueLessons.length > 0 ? (
               <div className="space-y-3">
-                {lessons.map((lesson, index) => {
+                {uniqueLessons.map((lesson, index) => {
                   const completed = isLessonCompleted(lesson.id);
 
                   return (
@@ -275,7 +284,7 @@ export default function TopicPage() {
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: index * 0.1, duration: 0.3 }}
                   >
-                    <Link to={createPageUrl(`Quiz?id=${quiz.id}`)}>
+                    <Link to={quiz.lesson_id ? createPageUrl(`Lesson?id=${quiz.lesson_id}`) : createPageUrl(`PracticeQuizPlay?topicId=${topicId}&count=10`)}>
                       <GlassCard className="p-5 hover:scale-[1.02]">
                         <div className="flex items-center gap-3 mb-3">
                           <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center shadow-lg shadow-purple-500/30">
@@ -298,7 +307,7 @@ export default function TopicPage() {
                           >
                             {quiz.difficulty}
                           </span>
-                          <span className="text-xs text-slate-500">Quiz</span>
+                          <span className="text-xs text-slate-500">Practice</span>
                         </div>
                       </GlassCard>
                     </Link>
