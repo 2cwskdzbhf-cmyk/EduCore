@@ -19,6 +19,7 @@ import Topic from './pages/Topic';
 import PracticeQuizPlay from './pages/PracticeQuizPlay';
 import PracticeQuizResults from './pages/PracticeQuizResults';
 import TeacherQuestionBuilder from './pages/TeacherQuestionBuilder';
+import TeacherQuestionGenerator from './pages/TeacherQuestionGenerator';
 import __Layout from './Layout.jsx';
 
 
@@ -44,6 +45,7 @@ export const PAGES = {
     "PracticeQuizPlay": PracticeQuizPlay,
     "PracticeQuizResults": PracticeQuizResults,
     "TeacherQuestionBuilder": TeacherQuestionBuilder,
+    "TeacherQuestionGenerator": TeacherQuestionGenerator,
 }
 
 export const pagesConfig = {
