@@ -17,6 +17,8 @@ import {
 
 export default function StudentDashboard() {
   const [user, setUser] = useState(null);
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     const fetchUser = async () => {
