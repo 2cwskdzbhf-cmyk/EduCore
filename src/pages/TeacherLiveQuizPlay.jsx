@@ -1,12 +1,12 @@
-import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import React, { useState, useEffect, useRef } from 'react';
+import { motion } from 'framer-motion';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import { Button } from '@/components/ui/button';
 import GlassCard from '@/components/ui/GlassCard';
-import { ChevronRight, Trophy, Loader2, Clock } from 'lucide-react';
+import { ChevronRight, Trophy, Loader2, Clock, X } from 'lucide-react';
 
 export default function TeacherLiveQuizPlay() {
   const navigate = useNavigate();
@@ -16,6 +16,9 @@ export default function TeacherLiveQuizPlay() {
 
   const [timeLeft, setTimeLeft] = useState(15);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
+
+  // Prevent end-on-unmount when we intentionally navigate to results/dashboard
+  const isTransitioningRef = useRef(false);
 
   const { data: session } = useQuery({
     queryKey: ['liveQuizSession', sessionId],
@@ -27,10 +30,21 @@ export default function TeacherLiveQuizPlay() {
     refetchInterval: 1000
   });
 
+  const quizSetId = session?.quiz_set_id || session?.live_quiz_set_id || null;
+
   const { data: questions = [] } = useQuery({
-    queryKey: ['liveQuizQuestions', session?.live_quiz_set_id],
-    queryFn: () => base44.entities.LiveQuizQuestion.filter({ live_quiz_set_id: session.live_quiz_set_id }, 'order'),
-    enabled: !!session?.live_quiz_set_id
+    queryKey: ['questionsForPlay', quizSetId],
+    queryFn: async () => {
+      if (!quizSetId) return [];
+      try {
+        const qs = await base44.entities.QuizQuestion.filter({ quiz_set_id: quizSetId }, 'order');
+        if (qs?.length) return qs;
+      } catch (e) {}
+
+      const lqs = await base44.entities.LiveQuizQuestion.filter({ live_quiz_set_id: quizSetId }, 'order');
+      return lqs || [];
+    },
+    enabled: !!quizSetId
   });
 
   const { data: players = [] } = useQuery({
@@ -42,63 +56,89 @@ export default function TeacherLiveQuizPlay() {
 
   const { data: answers = [] } = useQuery({
     queryKey: ['liveQuizAnswers', sessionId, session?.current_question_index],
-    queryFn: () => base44.entities.LiveQuizAnswer.filter({ 
-      session_id: sessionId,
-      question_index: session.current_question_index
-    }),
+    queryFn: () =>
+      base44.entities.LiveQuizAnswer.filter({
+        session_id: sessionId,
+        question_index: session.current_question_index
+      }),
     enabled: !!sessionId && session?.current_question_index >= 0,
     refetchInterval: 1000
   });
 
+  const endSession = async (reason = 'teacher_left') => {
+    try {
+      if (!sessionId) return;
+      await base44.entities.LiveQuizSession.update(sessionId, {
+        status: 'ended',
+        ended_at: new Date().toISOString(),
+        end_reason: reason
+      });
+      queryClient.invalidateQueries(['liveQuizSession']);
+      queryClient.invalidateQueries(['activeLiveSessions']);
+    } catch (e) {
+      console.error('[TEACHER] Failed to end session:', e);
+    }
+  };
+
+  // End on refresh/close
   useEffect(() => {
-    if (!session || session.status !== 'live') return;
+    const handleBeforeUnload = () => endSession('teacher_beforeunload');
+    const handlePageHide = () => endSession('teacher_pagehide');
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    window.addEventListener('pagehide', handlePageHide);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      window.removeEventListener('pagehide', handlePageHide);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionId]);
+
+  // End on leaving this page (unmount) unless we intentionally navigate
+  useEffect(() => {
+    return () => {
+      if (isTransitioningRef.current) return;
+      if (session?.status === 'live' || session?.status === 'lobby') {
+        endSession('teacher_navigated_away');
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session?.status, sessionId]);
+
+  useEffect(() => {
+    if (!session || session.status !== 'live' || !session.question_started_at) return;
 
     const questionStartTime = new Date(session.question_started_at).getTime();
-    const elapsed = Math.floor((Date.now() - questionStartTime) / 1000);
-    const remaining = Math.max(0, 15 - elapsed);
-    setTimeLeft(remaining);
-
-    if (remaining === 0 && !showLeaderboard) {
-      setShowLeaderboard(true);
-    }
-
     const interval = setInterval(() => {
-      const newElapsed = Math.floor((Date.now() - questionStartTime) / 1000);
-      const newRemaining = Math.max(0, 15 - newElapsed);
-      setTimeLeft(newRemaining);
+      const elapsed = Math.floor((Date.now() - questionStartTime) / 1000);
+      const remaining = Math.max(0, 15 - elapsed);
+      setTimeLeft(remaining);
 
-      if (newRemaining === 0 && !showLeaderboard) {
-        setShowLeaderboard(true);
-      }
+      if (remaining === 0) setShowLeaderboard(true);
     }, 100);
 
     return () => clearInterval(interval);
-  }, [session, showLeaderboard]);
+  }, [session?.status, session?.question_started_at]);
 
   const nextQuestionMutation = useMutation({
     mutationFn: async () => {
-      const nextIndex = (session.current_question_index || 0) + 1;
-      
+      const nextIndex = (session.current_question_index ?? 0) + 1;
+
       if (nextIndex >= questions.length) {
-        console.log('[DEBUG] Last question reached, ending quiz');
-        await base44.entities.LiveQuizSession.update(sessionId, {
-          status: 'ended',
-          ended_at: new Date().toISOString()
-        });
+        await endSession('completed_all_questions');
         return { ended: true };
       }
 
-      console.log('[DEBUG] Moving to next question:', nextIndex + 1);
       await base44.entities.LiveQuizSession.update(sessionId, {
         current_question_index: nextIndex,
         question_started_at: new Date().toISOString()
       });
+
       return { ended: false };
     },
     onSuccess: (data) => {
       if (data.ended) {
-        queryClient.invalidateQueries(['liveQuizSession']);
-        queryClient.invalidateQueries(['activeLiveSessions']);
+        isTransitioningRef.current = true;
         navigate(createPageUrl(`TeacherLiveQuizResults?sessionId=${sessionId}`));
       } else {
         setShowLeaderboard(false);
@@ -107,8 +147,17 @@ export default function TeacherLiveQuizPlay() {
       }
     },
     onError: (error) => {
-      console.error('[ERROR] Failed to proceed:', error);
-      alert('Failed to proceed: ' + error.message);
+      alert('Failed to proceed: ' + (error.message || 'Unknown error'));
+    }
+  });
+
+  const endNowMutation = useMutation({
+    mutationFn: async () => {
+      await endSession('ended_button');
+    },
+    onSuccess: () => {
+      isTransitioningRef.current = true;
+      navigate(createPageUrl('TeacherDashboard'));
     }
   });
 
@@ -121,19 +170,19 @@ export default function TeacherLiveQuizPlay() {
   }
 
   const currentQuestion = questions[session.current_question_index];
+  const prompt =
+    currentQuestion?.prompt ||
+    currentQuestion?.question ||
+    currentQuestion?.question_text ||
+    currentQuestion?.text ||
+    'Question';
+
   const answeredCount = answers.length;
-  const allAnswered = answeredCount === players.length;
 
   const leaderboard = players
-    .map(player => ({
-      ...player,
-      rank: 0
-    }))
-    .sort((a, b) => b.total_points - a.total_points)
-    .map((player, index) => ({
-      ...player,
-      rank: index + 1
-    }));
+    .slice()
+    .sort((a, b) => (b.total_points || 0) - (a.total_points || 0))
+    .map((p, idx) => ({ ...p, rank: idx + 1 }));
 
   if (showLeaderboard) {
     return (
@@ -155,23 +204,18 @@ export default function TeacherLiveQuizPlay() {
                     key={player.id}
                     initial={{ opacity: 0, x: -50 }}
                     animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: index * 0.1 }}
+                    transition={{ delay: index * 0.08 }}
                     className={`bg-white/5 rounded-xl p-4 border ${
                       index === 0 ? 'border-amber-400/50' : 'border-white/10'
                     }`}
                   >
                     <div className="flex items-center gap-4">
-                      <div className={`w-12 h-12 rounded-full flex items-center justify-center text-white font-bold ${
-                        index === 0 ? 'bg-gradient-to-br from-amber-400 to-orange-500' :
-                        index === 1 ? 'bg-gradient-to-br from-slate-400 to-slate-500' :
-                        index === 2 ? 'bg-gradient-to-br from-amber-600 to-amber-700' :
-                        'bg-gradient-to-br from-purple-500 to-blue-500'
-                      }`}>
+                      <div className="w-12 h-12 rounded-full flex items-center justify-center text-white font-bold bg-gradient-to-br from-purple-500 to-blue-500">
                         {player.rank}
                       </div>
                       <p className="flex-1 text-white font-medium text-lg">{player.nickname}</p>
                       <div className="text-right">
-                        <p className="text-2xl font-bold text-white">{player.total_points}</p>
+                        <p className="text-2xl font-bold text-white">{player.total_points || 0}</p>
                         <p className="text-xs text-slate-400">points</p>
                       </div>
                     </div>
@@ -179,29 +223,38 @@ export default function TeacherLiveQuizPlay() {
                 ))}
               </div>
 
-              <Button
-                onClick={() => nextQuestionMutation.mutate()}
-                disabled={nextQuestionMutation.isPending}
-                className="w-full bg-gradient-to-r from-purple-500 to-blue-500 text-lg py-6"
-              >
-                {nextQuestionMutation.isPending ? (
-                  <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                ) : (
-                  <>
-                    {session.current_question_index + 1 < questions.length ? (
-                      <>
-                        <ChevronRight className="w-5 h-5 mr-2" />
-                        Next Question
-                      </>
-                    ) : (
-                      <>
-                        <Trophy className="w-5 h-5 mr-2" />
-                        Show Final Results
-                      </>
-                    )}
-                  </>
-                )}
-              </Button>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <Button
+                  onClick={() => nextQuestionMutation.mutate()}
+                  disabled={nextQuestionMutation.isPending}
+                  className="w-full bg-gradient-to-r from-purple-500 to-blue-500 text-lg py-6"
+                >
+                  {nextQuestionMutation.isPending ? (
+                    <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                  ) : (
+                    <>
+                      <ChevronRight className="w-5 h-5 mr-2" />
+                      {session.current_question_index + 1 < questions.length ? 'Next Question' : 'Show Final Results'}
+                    </>
+                  )}
+                </Button>
+
+                <Button
+                  variant="outline"
+                  onClick={() => endNowMutation.mutate()}
+                  disabled={endNowMutation.isPending}
+                  className="border-red-500/30 text-red-400 hover:bg-red-500/10 py-6"
+                >
+                  {endNowMutation.isPending ? (
+                    <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                  ) : (
+                    <>
+                      <X className="w-5 h-5 mr-2" />
+                      End Quiz Now
+                    </>
+                  )}
+                </Button>
+              </div>
             </GlassCard>
           </motion.div>
         </div>
@@ -214,14 +267,27 @@ export default function TeacherLiveQuizPlay() {
       <div className="max-w-6xl mx-auto">
         <div className="flex justify-between items-center mb-6">
           <div className="text-white">
-            <p className="text-sm text-slate-400">Question {session.current_question_index + 1} of {questions.length}</p>
+            <p className="text-sm text-slate-400">
+              Question {session.current_question_index + 1} of {questions.length}
+            </p>
             <p className="text-lg font-bold">{players.length} players</p>
           </div>
-          <div className="flex items-center gap-4">
+
+          <div className="flex items-center gap-3">
             <div className="flex items-center gap-2 text-white bg-white/10 px-4 py-2 rounded-lg">
               <Clock className="w-5 h-5" />
               <span className="text-2xl font-bold">{timeLeft}s</span>
             </div>
+
+            <Button
+              variant="outline"
+              onClick={() => endNowMutation.mutate()}
+              disabled={endNowMutation.isPending}
+              className="border-red-500/30 text-red-400 hover:bg-red-500/10"
+            >
+              <X className="w-4 h-4 mr-2" />
+              End
+            </Button>
           </div>
         </div>
 
@@ -231,7 +297,7 @@ export default function TeacherLiveQuizPlay() {
             animate={{ scale: 1, opacity: 1 }}
             className="text-4xl font-bold text-white mb-4"
           >
-            {currentQuestion?.prompt}
+            {prompt}
           </motion.h2>
         </GlassCard>
 
@@ -246,7 +312,7 @@ export default function TeacherLiveQuizPlay() {
             <motion.div
               className="bg-gradient-to-r from-emerald-500 to-teal-500 h-3 rounded-full"
               initial={{ width: 0 }}
-              animate={{ width: `${(answeredCount / players.length) * 100}%` }}
+              animate={{ width: `${players.length ? (answeredCount / players.length) * 100 : 0}%` }}
               transition={{ duration: 0.5 }}
             />
           </div>
