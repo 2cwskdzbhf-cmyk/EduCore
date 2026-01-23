@@ -102,6 +102,85 @@ export default function CreateQuiz() {
     }
   });
 
+  const startLiveQuizMutation = useMutation({
+    mutationFn: async () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const classId = urlParams.get('classId');
+
+      console.log('[DEBUG] Starting live quiz with', questions.length, 'questions');
+      
+      // Validate questions
+      if (questions.length === 0) {
+        throw new Error('No questions to start quiz with');
+      }
+
+      const invalidQuestions = questions.filter(q => 
+        !q.prompt || q.options.length !== 4 || q.options.some(o => !o.trim())
+      );
+      
+      if (invalidQuestions.length > 0) {
+        throw new Error(`${invalidQuestions.length} question(s) are incomplete. Each must have a prompt and 4 options.`);
+      }
+
+      // Generate unique join code
+      const generateCode = () => Math.random().toString(36).substr(2, 6).toUpperCase();
+      let joinCode = generateCode();
+      let attempts = 0;
+      while (attempts < 10) {
+        const existing = await base44.entities.LiveQuizSession.filter({ join_code: joinCode });
+        if (existing.length === 0) break;
+        joinCode = generateCode();
+        attempts++;
+      }
+
+      // Create session
+      const session = await base44.entities.LiveQuizSession.create({
+        class_id: classId,
+        host_email: user.email,
+        live_quiz_set_id: 'manual-' + Date.now(),
+        status: 'lobby',
+        current_question_index: -1,
+        player_count: 0,
+        join_code: joinCode,
+        settings: {
+          time_per_question: quizSet.time_limit_per_question,
+          base_points: 500,
+          round_multiplier_increment: 0.25
+        }
+      });
+
+      console.log('[DEBUG] Session created:', session.id);
+
+      // Create questions linked to session
+      for (let i = 0; i < questions.length; i++) {
+        const q = questions[i];
+        await base44.entities.LiveQuizQuestion.create({
+          live_quiz_set_id: session.id,
+          order: i,
+          prompt: q.prompt,
+          correct_answer: q.options[q.correct_index],
+          allowed_forms: ['exact'],
+          difficulty: q.difficulty || 'medium',
+          explanation: q.explanation || '',
+          type: 'multiple_choice',
+          hint: ''
+        });
+      }
+
+      console.log('[DEBUG] Created', questions.length, 'questions for session');
+
+      return session;
+    },
+    onSuccess: (session) => {
+      console.log('[DEBUG] Navigating to lobby for session:', session.id);
+      navigate(createPageUrl(`TeacherLiveQuizLobby?sessionId=${session.id}`));
+    },
+    onError: (error) => {
+      console.error('[ERROR] Failed to start live quiz:', error);
+      alert('Failed to start live quiz: ' + (error.message || 'Unknown error'));
+    }
+  });
+
   const handleGenerateQuestions = async () => {
     if (!selectedLesson) return;
 
@@ -261,10 +340,24 @@ export default function CreateQuiz() {
                     <Button
                       onClick={() => saveQuizMutation.mutate({ status: 'published' })}
                       disabled={!canSave || saveQuizMutation.isPending}
-                      className="w-full bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600"
+                      className="w-full bg-blue-500 hover:bg-blue-600"
                     >
                       <Check className="w-4 h-4 mr-2" />
-                      Publish Quiz
+                      Save to Library
+                    </Button>
+                    <Button
+                      onClick={() => startLiveQuizMutation.mutate()}
+                      disabled={!canSave || startLiveQuizMutation.isPending}
+                      className="w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 shadow-lg shadow-amber-500/30"
+                    >
+                      {startLiveQuizMutation.isPending ? (
+                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      ) : (
+                        <>
+                          <Play className="w-4 h-4 mr-2" />
+                          Start Quiz
+                        </>
+                      )}
                     </Button>
                   </div>
                 </div>
