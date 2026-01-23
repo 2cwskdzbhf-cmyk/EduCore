@@ -315,10 +315,13 @@ export default function AssignmentBuilder() {
             <Button
               onClick={() => saveDraftMutation.mutate()}
               disabled={saveDraftMutation.isPending}
-              variant="outline"
-              className="border-white/20 text-white hover:bg-white/10"
+              className="bg-gradient-to-r from-slate-600 to-slate-700 hover:from-slate-700 hover:to-slate-800 text-white shadow-lg shadow-slate-500/30"
             >
-              <Save className="w-4 h-4 mr-2" />
+              {saveDraftMutation.isPending ? (
+                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />
+              ) : (
+                <Save className="w-4 h-4 mr-2" />
+              )}
               Save Draft
             </Button>
             <Button
@@ -326,8 +329,17 @@ export default function AssignmentBuilder() {
               disabled={!canPublish || publishMutation.isPending}
               className="bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 shadow-lg shadow-emerald-500/30"
             >
-              <CheckCircle2 className="w-4 h-4 mr-2" />
-              Publish Assignment
+              {publishMutation.isPending ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />
+                  Publishing...
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 className="w-4 h-4 mr-2" />
+                  Publish Assignment
+                </>
+              )}
             </Button>
           </div>
         </div>
@@ -354,10 +366,10 @@ export default function AssignmentBuilder() {
                   <SelectValue placeholder="Select topic or create custom" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="custom">Custom topic...</SelectItem>
                   {topics.map(t => (
                     <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
                   ))}
-                  <SelectItem value="custom">Custom topic...</SelectItem>
                 </SelectContent>
               </Select>
             </div>
