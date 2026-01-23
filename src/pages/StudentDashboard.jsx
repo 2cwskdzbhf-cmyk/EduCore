@@ -88,32 +88,50 @@ export default function StudentDashboard() {
       if (enrolledClasses.length === 0) return [];
       const classIds = enrolledClasses.map(c => c.id);
       
-      // Fetch all sessions for student's classes
+      // Fetch sessions that are marked as lobby or live
       const allSessions = await base44.entities.LiveQuizSession.filter({
-        class_id: { $in: classIds }
+        class_id: { $in: classIds },
+        status: { $in: ['lobby', 'live'] }
       }, '-created_date');
       
-      console.log('[DEBUG] Total sessions found:', allSessions.length);
+      console.log('[DEBUG] Total lobby/live sessions found:', allSessions.length);
       
-      // Filter to ONLY active sessions: status is 'lobby' or 'live' AND ended_at is null
+      // STRICT FILTERING: Only show sessions that are TRULY active
+      const now = Date.now();
+      const ONE_HOUR_MS = 60 * 60 * 1000;
+      
       const activeSessions = allSessions.filter(s => {
-        const isActiveStatus = s.status === 'lobby' || s.status === 'live';
-        const isNotEnded = !s.ended_at;
-        const isActive = isActiveStatus && isNotEnded;
-        
-        if (isActive) {
-          console.log('[DEBUG] Active session found:', {
-            id: s.id.substring(0, 6),
-            status: s.status,
-            ended_at: s.ended_at,
-            class_id: s.class_id
-          });
+        // Must not have ended_at
+        if (s.ended_at) {
+          console.log('[DEBUG] Rejecting session - has ended_at:', s.id.substring(0, 6));
+          return false;
         }
         
-        return isActive;
+        // Must be lobby or live status
+        if (s.status !== 'lobby' && s.status !== 'live') {
+          console.log('[DEBUG] Rejecting session - wrong status:', s.id.substring(0, 6), s.status);
+          return false;
+        }
+        
+        // Reject sessions created more than 1 hour ago (stale sessions)
+        const createdAt = new Date(s.created_date).getTime();
+        const age = now - createdAt;
+        if (age > ONE_HOUR_MS) {
+          console.log('[DEBUG] Rejecting session - too old (created', Math.floor(age / 60000), 'min ago):', s.id.substring(0, 6));
+          return false;
+        }
+        
+        console.log('[DEBUG] ✓ Active session:', {
+          id: s.id.substring(0, 6),
+          status: s.status,
+          age_min: Math.floor(age / 60000),
+          class_id: s.class_id.substring(0, 6)
+        });
+        
+        return true;
       });
       
-      console.log('[DEBUG] Active sessions after filtering:', activeSessions.length);
+      console.log('[DEBUG] Active sessions after strict filtering:', activeSessions.length);
       return activeSessions;
     },
     enabled: enrolledClasses.length > 0,
@@ -238,20 +256,47 @@ export default function StudentDashboard() {
 
   const joinLiveQuizMutation = useMutation({
     mutationFn: async ({ sessionId, nickname }) => {
-      // Verify session is still active before joining
+      console.log('[JOIN] Attempting to join session:', sessionId.substring(0, 6));
+      
+      // STRICT validation: Verify session is CURRENTLY active
       const sessions = await base44.entities.LiveQuizSession.filter({ id: sessionId });
       const session = sessions[0];
       
       if (!session) {
+        console.error('[JOIN] Session not found');
         throw new Error('Quiz session not found');
       }
       
-      if (session.status === 'ended' || session.ended_at) {
-        throw new Error('This quiz has already ended');
+      console.log('[JOIN] Session state:', {
+        status: session.status,
+        ended_at: session.ended_at,
+        created: session.created_date
+      });
+      
+      // Check if ended
+      if (session.ended_at) {
+        console.error('[JOIN] Session has ended_at');
+        throw new Error('No live quiz is currently running');
+      }
+      
+      // Check status
+      if (session.status === 'ended') {
+        console.error('[JOIN] Session status is ended');
+        throw new Error('No live quiz is currently running');
       }
       
       if (session.status !== 'lobby' && session.status !== 'live') {
+        console.error('[JOIN] Invalid session status:', session.status);
         throw new Error('Cannot join this quiz at this time');
+      }
+      
+      // Check age (reject if older than 1 hour)
+      const createdAt = new Date(session.created_date).getTime();
+      const age = Date.now() - createdAt;
+      const ONE_HOUR_MS = 60 * 60 * 1000;
+      if (age > ONE_HOUR_MS) {
+        console.error('[JOIN] Session too old:', Math.floor(age / 60000), 'minutes');
+        throw new Error('No live quiz is currently running');
       }
 
       const trimmedNickname = nickname.trim();

@@ -80,6 +80,7 @@ export default function TeacherLiveQuizPlay() {
       const nextIndex = (session.current_question_index || 0) + 1;
       
       if (nextIndex >= questions.length) {
+        console.log('[DEBUG] Last question reached, ending quiz');
         await base44.entities.LiveQuizSession.update(sessionId, {
           status: 'ended',
           ended_at: new Date().toISOString()
@@ -87,6 +88,7 @@ export default function TeacherLiveQuizPlay() {
         return { ended: true };
       }
 
+      console.log('[DEBUG] Moving to next question:', nextIndex + 1);
       await base44.entities.LiveQuizSession.update(sessionId, {
         current_question_index: nextIndex,
         question_started_at: new Date().toISOString()
@@ -95,12 +97,18 @@ export default function TeacherLiveQuizPlay() {
     },
     onSuccess: (data) => {
       if (data.ended) {
+        queryClient.invalidateQueries(['liveQuizSession']);
+        queryClient.invalidateQueries(['activeLiveSessions']);
         navigate(createPageUrl(`TeacherLiveQuizResults?sessionId=${sessionId}`));
       } else {
         setShowLeaderboard(false);
         setTimeLeft(15);
         queryClient.invalidateQueries(['liveQuizSession']);
       }
+    },
+    onError: (error) => {
+      console.error('[ERROR] Failed to proceed:', error);
+      alert('Failed to proceed: ' + error.message);
     }
   });
 

@@ -99,13 +99,21 @@ export default function TeacherLiveQuizLobby() {
 
   const endQuizMutation = useMutation({
     mutationFn: async () => {
+      console.log('[DEBUG] Ending quiz session:', sessionId);
       await base44.entities.LiveQuizSession.update(sessionId, {
         status: 'ended',
         ended_at: new Date().toISOString()
       });
+      console.log('[DEBUG] Quiz session ended successfully');
     },
     onSuccess: () => {
+      queryClient.invalidateQueries(['liveQuizSession']);
+      queryClient.invalidateQueries(['activeLiveSessions']);
       navigate(createPageUrl('TeacherDashboard'));
+    },
+    onError: (error) => {
+      console.error('[ERROR] Failed to end quiz:', error);
+      alert('Failed to end quiz: ' + error.message);
     }
   });
 
