@@ -370,8 +370,13 @@ export default function StudentDashboard() {
           <p className="text-slate-300 drop-shadow-md">Track your assignments, classes, and quiz performance</p>
         </motion.div>
 
-        <AnimatePresence>
-          {activeLiveSessions.filter(s => s.id !== dismissedSessionId).map(session => {
+    <AnimatePresence>
+  {[...new Map(
+    activeLiveSessions
+      .filter(s => s.id !== dismissedSessionId)
+      .map(s => [s.id, s])
+  ).values()].map(session => {
+
             const sessionClass = enrolledClasses.find(c => c.id === session.class_id);
             const isLobby = session.status === 'lobby';
             const isLive = session.status === 'live';
