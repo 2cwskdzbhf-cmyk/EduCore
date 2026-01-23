@@ -6,43 +6,65 @@ import { useNavigate } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import { Button } from '@/components/ui/button';
 import GlassCard from '@/components/ui/GlassCard';
-import { ChevronRight, Trophy, Loader2, Clock, X } from 'lucide-react';
+import { ChevronRight, Trophy, Loader2, Clock, X, AlertTriangle } from 'lucide-react';
 
 export default function TeacherLiveQuizPlay() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const urlParams = new URLSearchParams(window.location.search);
-  const sessionId = urlParams.get('sessionId');
+  const params = new URLSearchParams(window.location.search);
+  const sessionId = params.get('sessionId');
 
   const [timeLeft, setTimeLeft] = useState(15);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
 
-  // Prevent end-on-unmount when we intentionally navigate to results/dashboard
+  // Prevent end-on-unmount when we intentionally navigate
   const isTransitioningRef = useRef(false);
 
-  const { data: session } = useQuery({
+  const { data: session, isFetching: isFetchingSession } = useQuery({
     queryKey: ['liveQuizSession', sessionId],
     queryFn: async () => {
       const sessions = await base44.entities.LiveQuizSession.filter({ id: sessionId });
-      return sessions[0];
+      return sessions[0] || null;
     },
     enabled: !!sessionId,
     refetchInterval: 1000
   });
 
+  // ✅ Only redirect if actually ended
+  useEffect(() => {
+    if (!sessionId) return;
+    if (session?.status === 'ended') {
+      isTransitioningRef.current = true;
+      navigate(createPageUrl('TeacherDashboard'), { replace: true });
+    }
+  }, [session?.status, sessionId, navigate]);
+
   const quizSetId = session?.quiz_set_id || session?.live_quiz_set_id || null;
 
-  const { data: questions = [] } = useQuery({
+  const { data: questions = [], isFetching: isFetchingQuestions } = useQuery({
     queryKey: ['questionsForPlay', quizSetId],
     queryFn: async () => {
       if (!quizSetId) return [];
+
+      // 1) QuizQuestion by quiz_set_id
       try {
         const qs = await base44.entities.QuizQuestion.filter({ quiz_set_id: quizSetId }, 'order');
         if (qs?.length) return qs;
-      } catch (e) {}
+      } catch {}
 
-      const lqs = await base44.entities.LiveQuizQuestion.filter({ live_quiz_set_id: quizSetId }, 'order');
-      return lqs || [];
+      // 2) LiveQuizQuestion by live_quiz_set_id
+      try {
+        const lqs = await base44.entities.LiveQuizQuestion.filter({ live_quiz_set_id: quizSetId }, 'order');
+        if (lqs?.length) return lqs;
+      } catch {}
+
+      // ✅ 3) LiveQuizQuestion by quiz_set_id (missing fallback in your current file)
+      try {
+        const lqs2 = await base44.entities.LiveQuizQuestion.filter({ quiz_set_id: quizSetId }, 'order');
+        if (lqs2?.length) return lqs2;
+      } catch {}
+
+      return [];
     },
     enabled: !!quizSetId
   });
@@ -80,7 +102,7 @@ export default function TeacherLiveQuizPlay() {
     }
   };
 
-  // End on refresh/close
+  // End on refresh/close (best-effort)
   useEffect(() => {
     const handleBeforeUnload = () => endSession('teacher_beforeunload');
     const handlePageHide = () => endSession('teacher_pagehide');
@@ -94,17 +116,18 @@ export default function TeacherLiveQuizPlay() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId]);
 
-  // End on leaving this page (unmount) unless we intentionally navigate
+  // ✅ Only auto-end from Play if the session is still LIVE (and teacher truly leaves)
   useEffect(() => {
     return () => {
       if (isTransitioningRef.current) return;
-      if (session?.status === 'live' || session?.status === 'lobby') {
+      if (session?.status === 'live') {
         endSession('teacher_navigated_away');
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session?.status, sessionId]);
 
+  // Timer logic
   useEffect(() => {
     if (!session || session.status !== 'live' || !session.question_started_at) return;
 
@@ -113,7 +136,6 @@ export default function TeacherLiveQuizPlay() {
       const elapsed = Math.floor((Date.now() - questionStartTime) / 1000);
       const remaining = Math.max(0, 15 - elapsed);
       setTimeLeft(remaining);
-
       if (remaining === 0) setShowLeaderboard(true);
     }, 100);
 
@@ -122,7 +144,7 @@ export default function TeacherLiveQuizPlay() {
 
   const nextQuestionMutation = useMutation({
     mutationFn: async () => {
-      const nextIndex = (session.current_question_index ?? 0) + 1;
+      const nextIndex = (session?.current_question_index ?? 0) + 1;
 
       if (nextIndex >= questions.length) {
         await endSession('completed_all_questions');
@@ -161,15 +183,60 @@ export default function TeacherLiveQuizPlay() {
     }
   });
 
-  if (!session || !questions.length) {
+  // ✅ Better loading / error UI (no random kicks)
+  if (isFetchingSession || !session) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900/20 to-slate-900 flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center">
         <Loader2 className="w-12 h-12 animate-spin text-purple-400" />
       </div>
     );
   }
 
-  const currentQuestion = questions[session.current_question_index];
+  if (session.status !== 'live') {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-6">
+        <GlassCard className="p-8 text-center max-w-md">
+          <AlertTriangle className="w-10 h-10 text-amber-400 mx-auto mb-3" />
+          <p className="text-white font-semibold mb-2">Quiz not live yet</p>
+          <p className="text-slate-400 mb-6">
+            This session is currently <span className="font-mono">{session.status}</span>.
+          </p>
+          <Button onClick={() => navigate(createPageUrl(`TeacherLiveQuizLobby?sessionId=${sessionId}`))}>
+            Back to Lobby
+          </Button>
+        </GlassCard>
+      </div>
+    );
+  }
+
+  if (isFetchingQuestions) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="w-12 h-12 animate-spin text-purple-400" />
+      </div>
+    );
+  }
+
+  if (questions.length === 0) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-6">
+        <GlassCard className="p-8 text-center max-w-md">
+          <AlertTriangle className="w-10 h-10 text-red-400 mx-auto mb-3" />
+          <p className="text-white font-semibold mb-2">No questions found</p>
+          <p className="text-slate-400 mb-6">
+            This quiz set has no questions (or they were saved under a different entity).
+          </p>
+          <Button onClick={() => navigate(createPageUrl('TeacherDashboard'))}>
+            Back to Dashboard
+          </Button>
+        </GlassCard>
+      </div>
+    );
+  }
+
+  const idx = session.current_question_index ?? 0;
+  const currentQuestion = questions[idx];
+
   const prompt =
     currentQuestion?.prompt ||
     currentQuestion?.question ||
@@ -182,7 +249,7 @@ export default function TeacherLiveQuizPlay() {
   const leaderboard = players
     .slice()
     .sort((a, b) => (b.total_points || 0) - (a.total_points || 0))
-    .map((p, idx) => ({ ...p, rank: idx + 1 }));
+    .map((p, i) => ({ ...p, rank: i + 1 }));
 
   if (showLeaderboard) {
     return (
@@ -194,28 +261,28 @@ export default function TeacherLiveQuizPlay() {
                 <Trophy className="w-16 h-16 text-amber-400 mx-auto mb-4" />
                 <h2 className="text-3xl font-bold text-white mb-2">Leaderboard</h2>
                 <p className="text-slate-400">
-                  Question {session.current_question_index + 1} of {questions.length}
+                  Question {idx + 1} of {questions.length}
                 </p>
               </div>
 
               <div className="space-y-3 mb-8">
-                {leaderboard.map((player, index) => (
+                {leaderboard.map((p, i) => (
                   <motion.div
-                    key={player.id}
+                    key={p.id}
                     initial={{ opacity: 0, x: -50 }}
                     animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: index * 0.08 }}
+                    transition={{ delay: i * 0.08 }}
                     className={`bg-white/5 rounded-xl p-4 border ${
-                      index === 0 ? 'border-amber-400/50' : 'border-white/10'
+                      i === 0 ? 'border-amber-400/50' : 'border-white/10'
                     }`}
                   >
                     <div className="flex items-center gap-4">
                       <div className="w-12 h-12 rounded-full flex items-center justify-center text-white font-bold bg-gradient-to-br from-purple-500 to-blue-500">
-                        {player.rank}
+                        {p.rank}
                       </div>
-                      <p className="flex-1 text-white font-medium text-lg">{player.nickname}</p>
+                      <p className="flex-1 text-white font-medium text-lg">{p.nickname}</p>
                       <div className="text-right">
-                        <p className="text-2xl font-bold text-white">{player.total_points || 0}</p>
+                        <p className="text-2xl font-bold text-white">{p.total_points || 0}</p>
                         <p className="text-xs text-slate-400">points</p>
                       </div>
                     </div>
@@ -234,7 +301,7 @@ export default function TeacherLiveQuizPlay() {
                   ) : (
                     <>
                       <ChevronRight className="w-5 h-5 mr-2" />
-                      {session.current_question_index + 1 < questions.length ? 'Next Question' : 'Show Final Results'}
+                      {idx + 1 < questions.length ? 'Next Question' : 'Show Final Results'}
                     </>
                   )}
                 </Button>
@@ -268,7 +335,7 @@ export default function TeacherLiveQuizPlay() {
         <div className="flex justify-between items-center mb-6">
           <div className="text-white">
             <p className="text-sm text-slate-400">
-              Question {session.current_question_index + 1} of {questions.length}
+              Question {idx + 1} of {questions.length}
             </p>
             <p className="text-lg font-bold">{players.length} players</p>
           </div>
