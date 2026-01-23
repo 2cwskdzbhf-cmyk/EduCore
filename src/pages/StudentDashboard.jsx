@@ -22,6 +22,7 @@ import {
   Clock,
   ChevronRight
 } from 'lucide-react';
+import LiveQuizJoinModal from '@/components/student/LiveQuizJoinModal';
 
 export default function StudentDashboard() {
   const [user, setUser] = useState(null);
