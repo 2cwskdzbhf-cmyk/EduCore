@@ -13,8 +13,11 @@ import { Textarea } from '@/components/ui/textarea';
 import GlassCard from '@/components/ui/GlassCard';
 import { 
   ChevronLeft, Users, Sparkles, Loader2, Trophy, ClipboardList, 
-  BarChart3, Plus, Trash2, RefreshCw, Save, CheckCircle2, Edit2, Zap
+  BarChart3, Plus, Trash2, RefreshCw, Save, CheckCircle2, Edit2, Zap,
+  Calendar, Clock, Target, TrendingUp, Eye
 } from 'lucide-react';
+import StudentStatsModal from '@/components/teacher/StudentStatsModal';
+import { AnimatePresence } from 'framer-motion';
 
 export default function TeacherClassDetail() {
   const navigate = useNavigate();
@@ -37,6 +40,8 @@ export default function TeacherClassDetail() {
   const [copiedCode, setCopiedCode] = useState(false);
   const [lastGenerateTime, setLastGenerateTime] = useState(0);
   const [cooldownRemaining, setCooldownRemaining] = useState(0);
+  const [selectedStudent, setSelectedStudent] = useState(null);
+  const [selectedAssignment, setSelectedAssignment] = useState(null);
 
   const copyJoinCode = (code) => {
     navigator.clipboard.writeText(code);
@@ -103,6 +108,30 @@ export default function TeacherClassDetail() {
     queryKey: ['liveQuizSets', classId],
     queryFn: () => base44.entities.LiveQuizSet.filter({ class_id: classId }, '-created_date'),
     enabled: !!classId
+  });
+
+  const { data: assignments = [] } = useQuery({
+    queryKey: ['assignments', classId],
+    queryFn: () => base44.entities.Assignment.filter({ class_id: classId }, '-created_date'),
+    enabled: !!classId
+  });
+
+  const { data: submissions = [] } = useQuery({
+    queryKey: ['submissions', classId],
+    queryFn: () => base44.entities.AssignmentSubmission.filter({ class_id: classId }),
+    enabled: !!classId
+  });
+
+  const { data: classStudents = [] } = useQuery({
+    queryKey: ['classStudents', classData?.student_emails],
+    queryFn: async () => {
+      if (!classData?.student_emails || classData.student_emails.length === 0) return [];
+      const students = await base44.entities.User.filter({ 
+        email: { $in: classData.student_emails } 
+      });
+      return students;
+    },
+    enabled: !!classData?.student_emails && classData.student_emails.length > 0
   });
 
   const generatePracticeMutation = useMutation({
@@ -285,9 +314,10 @@ export default function TeacherClassDetail() {
             </GlassCard>
           </div>
 
-          <Tabs defaultValue="practice" className="space-y-6">
+          <Tabs defaultValue="setAssignments" className="space-y-6">
             <TabsList className="bg-white/5 border border-white/10">
-              <TabsTrigger value="practice">Assignments</TabsTrigger>
+              <TabsTrigger value="setAssignments">Set Assignments</TabsTrigger>
+              <TabsTrigger value="practice">Create</TabsTrigger>
               <TabsTrigger value="live">Live Quizzes</TabsTrigger>
               <TabsTrigger value="analytics">Analytics</TabsTrigger>
             </TabsList>
@@ -659,16 +689,377 @@ export default function TeacherClassDetail() {
               </GlassCard>
             </TabsContent>
 
+            {/* Set Assignments Tab */}
+            <TabsContent value="setAssignments" className="space-y-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-2xl font-bold text-white">Class Assignments</h2>
+                <Button
+                  onClick={() => navigate(createPageUrl(`AssignmentBuilder?classId=${classId}`))}
+                  className="bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 shadow-lg shadow-emerald-500/30"
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  New Assignment
+                </Button>
+              </div>
+
+              {assignments.length > 0 ? (
+                <div className="space-y-4">
+                  {assignments.map((assignment) => {
+                    const assignmentSubmissions = submissions.filter(s => s.assignment_id === assignment.id);
+                    const started = assignmentSubmissions.filter(s => s.status !== 'not_started').length;
+                    const completed = assignmentSubmissions.filter(s => s.status === 'submitted' || s.status === 'graded').length;
+                    
+                    const totalQuestions = assignmentSubmissions.reduce((sum, s) => sum + (s.questions_answered || 0), 0);
+                    const totalCorrect = assignmentSubmissions.reduce((sum, s) => sum + (s.correct_answers || 0), 0);
+                    const avgAccuracy = totalQuestions > 0 ? ((totalCorrect / totalQuestions) * 100).toFixed(1) : 0;
+
+                    const topicName = assignment.custom_topic_name || 
+                      (assignment.topic_id ? topics.find(t => t.id === assignment.topic_id)?.name : null);
+
+                    return (
+                      <GlassCard 
+                        key={assignment.id} 
+                        className="p-6 hover:bg-white/10 transition-all cursor-pointer"
+                        onClick={() => setSelectedAssignment(assignment)}
+                      >
+                        <div className="flex items-start justify-between mb-4">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-3 mb-2">
+                              <h3 className="text-xl font-bold text-white">{assignment.title}</h3>
+                              <span className={`text-xs px-2 py-1 rounded-full ${
+                                assignment.status === 'published' 
+                                  ? 'bg-emerald-500/20 text-emerald-400'
+                                  : 'bg-amber-500/20 text-amber-400'
+                              }`}>
+                                {assignment.status}
+                              </span>
+                            </div>
+                            
+                            <div className="flex flex-wrap items-center gap-4 text-sm text-slate-400">
+                              {topicName && (
+                                <span className="flex items-center gap-1">
+                                  <ClipboardList className="w-4 h-4" />
+                                  {topicName}
+                                </span>
+                              )}
+                              {assignment.due_date && (
+                                <span className="flex items-center gap-1">
+                                  <Calendar className="w-4 h-4" />
+                                  Due: {new Date(assignment.due_date).toLocaleDateString()}
+                                </span>
+                              )}
+                              {!assignment.due_date && (
+                                <span className="text-slate-500">No due date</span>
+                              )}
+                              <span className="text-slate-500">
+                                Created {new Date(assignment.created_date).toLocaleDateString()}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-3 gap-4 pt-4 border-t border-white/10">
+                          <div>
+                            <p className="text-xs text-slate-500 mb-1">Started</p>
+                            <p className="text-2xl font-bold text-white">{started}</p>
+                            <p className="text-xs text-slate-400">of {classData.student_emails?.length || 0} students</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-slate-500 mb-1">Completed</p>
+                            <p className="text-2xl font-bold text-white">{completed}</p>
+                            <p className="text-xs text-slate-400">submissions</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-slate-500 mb-1">Avg Accuracy</p>
+                            <p className="text-2xl font-bold text-white">{avgAccuracy}%</p>
+                            <p className="text-xs text-slate-400">{totalQuestions} questions</p>
+                          </div>
+                        </div>
+                      </GlassCard>
+                    );
+                  })}
+                </div>
+              ) : (
+                <GlassCard className="p-12 text-center">
+                  <ClipboardList className="w-12 h-12 text-slate-600 mx-auto mb-4" />
+                  <p className="text-slate-400 mb-4">No assignments created yet</p>
+                  <Button
+                    onClick={() => navigate(createPageUrl(`AssignmentBuilder?classId=${classId}`))}
+                    className="bg-gradient-to-r from-purple-500 to-blue-500"
+                  >
+                    Create Your First Assignment
+                  </Button>
+                </GlassCard>
+              )}
+            </TabsContent>
+
             {/* Analytics Tab */}
-            <TabsContent value="analytics">
+            <TabsContent value="analytics" className="space-y-6">
               <GlassCard className="p-6">
-                <h3 className="text-lg font-bold text-white mb-4">Class Analytics</h3>
-                <p className="text-slate-400 text-sm">Analytics coming soon...</p>
+                <h3 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
+                  <Trophy className="w-6 h-6 text-amber-400" />
+                  Class Leaderboard
+                </h3>
+
+                {classStudents.length > 0 ? (
+                  <div className="space-y-2">
+                    {classStudents
+                      .map(student => {
+                        const studentSubmissions = submissions.filter(s => s.student_email === student.email);
+                        const totalQuestions = studentSubmissions.reduce((sum, s) => sum + (s.questions_answered || 0), 0);
+                        const totalCorrect = studentSubmissions.reduce((sum, s) => sum + (s.correct_answers || 0), 0);
+                        const totalTimeSeconds = studentSubmissions.reduce((sum, s) => sum + (s.time_spent_seconds || 0), 0);
+                        const accuracy = totalQuestions > 0 ? (totalCorrect / totalQuestions) * 100 : 0;
+                        const completedCount = studentSubmissions.filter(s => s.status === 'submitted' || s.status === 'graded').length;
+
+                        return {
+                          ...student,
+                          accuracy,
+                          totalQuestions,
+                          totalCorrect,
+                          totalTimeSeconds,
+                          completedCount
+                        };
+                      })
+                      .sort((a, b) => b.accuracy - a.accuracy)
+                      .map((student, index) => (
+                        <div
+                          key={student.id}
+                          className="bg-white/5 hover:bg-white/10 rounded-xl p-4 border border-white/10 cursor-pointer transition-all"
+                          onClick={() => setSelectedStudent(student)}
+                        >
+                          <div className="flex items-center gap-4">
+                            <div className="flex items-center justify-center w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 text-white font-bold flex-shrink-0">
+                              {index + 1}
+                            </div>
+
+                            <div className="flex-1 min-w-0">
+                              <p className="text-white font-medium truncate">{student.full_name}</p>
+                              <p className="text-xs text-slate-400 truncate">{student.email}</p>
+                            </div>
+
+                            <div className="grid grid-cols-4 gap-6 text-center">
+                              <div>
+                                <p className="text-xs text-slate-500 mb-1">Accuracy</p>
+                                <p className="text-lg font-bold text-white">
+                                  {student.totalQuestions > 0 ? `${student.accuracy.toFixed(1)}%` : '—'}
+                                </p>
+                              </div>
+                              <div>
+                                <p className="text-xs text-slate-500 mb-1">Questions</p>
+                                <p className="text-lg font-bold text-white">{student.totalQuestions}</p>
+                              </div>
+                              <div>
+                                <p className="text-xs text-slate-500 mb-1">Completed</p>
+                                <p className="text-lg font-bold text-white">{student.completedCount}</p>
+                              </div>
+                              <div>
+                                <p className="text-xs text-slate-500 mb-1">Time</p>
+                                <p className="text-lg font-bold text-white">
+                                  {Math.floor(student.totalTimeSeconds / 60)}m
+                                </p>
+                              </div>
+                            </div>
+
+                            <Eye className="w-5 h-5 text-slate-400 flex-shrink-0" />
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                ) : (
+                  <p className="text-slate-400 text-center py-8">No students in this class yet</p>
+                )}
               </GlassCard>
             </TabsContent>
           </Tabs>
         </motion.div>
+
+        <AnimatePresence>
+          {selectedStudent && (
+            <StudentStatsModal
+              student={selectedStudent}
+              assignments={assignments}
+              submissions={submissions}
+              onClose={() => setSelectedStudent(null)}
+            />
+          )}
+        </AnimatePresence>
+
+        <AnimatePresence>
+          {selectedAssignment && (
+            <AssignmentProgressModal
+              assignment={selectedAssignment}
+              classStudents={classStudents}
+              submissions={submissions}
+              topics={topics}
+              onClose={() => setSelectedAssignment(null)}
+              onViewStudent={(student) => {
+                setSelectedAssignment(null);
+                setSelectedStudent(student);
+              }}
+            />
+          )}
+        </AnimatePresence>
       </div>
     </div>
+  );
+}
+
+function AssignmentProgressModal({ assignment, classStudents, submissions, topics, onClose, onViewStudent }) {
+  const topicName = assignment.custom_topic_name || 
+    (assignment.topic_id ? topics.find(t => t.id === assignment.topic_id)?.name : 'No topic');
+
+  const studentProgress = classStudents.map(student => {
+    const submission = submissions.find(s => 
+      s.assignment_id === assignment.id && s.student_email === student.email
+    );
+
+    if (!submission) {
+      return {
+        ...student,
+        status: 'Not started',
+        questionsAnswered: 0,
+        correctAnswers: 0,
+        accuracy: null,
+        timeSpent: 0,
+        lastActivity: null
+      };
+    }
+
+    const accuracy = submission.questions_answered > 0 
+      ? ((submission.correct_answers / submission.questions_answered) * 100).toFixed(1)
+      : 0;
+
+    return {
+      ...student,
+      status: submission.status || 'In progress',
+      questionsAnswered: submission.questions_answered || 0,
+      correctAnswers: submission.correct_answers || 0,
+      accuracy,
+      timeSpent: submission.time_spent_seconds || 0,
+      lastActivity: submission.updated_date
+    };
+  });
+
+  const formatTime = (seconds) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}m ${secs}s`;
+  };
+
+  return (
+    <motion.div
+      className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-6"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      onClick={onClose}
+    >
+      <motion.div
+        className="max-w-5xl w-full max-h-[90vh] overflow-y-auto"
+        initial={{ scale: 0.9, y: 20 }}
+        animate={{ scale: 1, y: 0 }}
+        exit={{ scale: 0.9, y: 20 }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <GlassCard className="p-8">
+          <div className="flex items-start justify-between mb-6">
+            <div>
+              <h2 className="text-2xl font-bold text-white mb-2">{assignment.title}</h2>
+              <div className="flex items-center gap-4 text-sm text-slate-400">
+                <span className="flex items-center gap-1">
+                  <ClipboardList className="w-4 h-4" />
+                  {topicName}
+                </span>
+                {assignment.due_date && (
+                  <span className="flex items-center gap-1">
+                    <Calendar className="w-4 h-4" />
+                    Due: {new Date(assignment.due_date).toLocaleDateString()}
+                  </span>
+                )}
+              </div>
+            </div>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onClose}
+              className="text-slate-400 hover:text-white"
+            >
+              <X className="w-6 h-6" />
+            </Button>
+          </div>
+
+          <h3 className="text-lg font-bold text-white mb-4">Student Progress</h3>
+
+          <div className="space-y-2">
+            {studentProgress
+              .sort((a, b) => {
+                if (a.status === 'Not started' && b.status !== 'Not started') return 1;
+                if (a.status !== 'Not started' && b.status === 'Not started') return -1;
+                if (a.accuracy === null && b.accuracy !== null) return 1;
+                if (a.accuracy !== null && b.accuracy === null) return -1;
+                return (parseFloat(b.accuracy) || 0) - (parseFloat(a.accuracy) || 0);
+              })
+              .map((student) => (
+                <div
+                  key={student.id}
+                  className="bg-white/5 hover:bg-white/10 rounded-xl p-4 border border-white/10 cursor-pointer transition-all"
+                  onClick={() => onViewStudent(student)}
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="flex-1">
+                      <p className="text-white font-medium">{student.full_name}</p>
+                      <p className="text-xs text-slate-400">{student.email}</p>
+                    </div>
+
+                    <span className={`text-xs px-2 py-1 rounded-full ${
+                      student.status === 'Not started' 
+                        ? 'bg-slate-500/20 text-slate-400'
+                        : student.status === 'submitted' || student.status === 'graded'
+                        ? 'bg-emerald-500/20 text-emerald-400'
+                        : 'bg-blue-500/20 text-blue-400'
+                    }`}>
+                      {student.status}
+                    </span>
+
+                    <div className="grid grid-cols-4 gap-6 text-center">
+                      <div>
+                        <p className="text-xs text-slate-500 mb-1">Questions</p>
+                        <p className="text-lg font-bold text-white">{student.questionsAnswered}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-slate-500 mb-1">Correct</p>
+                        <p className="text-lg font-bold text-white">{student.correctAnswers}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-slate-500 mb-1">Accuracy</p>
+                        <p className="text-lg font-bold text-white">
+                          {student.accuracy !== null ? `${student.accuracy}%` : '—'}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-slate-500 mb-1">Time</p>
+                        <p className="text-lg font-bold text-white">{formatTime(student.timeSpent)}</p>
+                      </div>
+                    </div>
+
+                    <Eye className="w-5 h-5 text-slate-400" />
+                  </div>
+
+                  {student.lastActivity && (
+                    <p className="text-xs text-slate-500 mt-2">
+                      Last activity: {new Date(student.lastActivity).toLocaleString()}
+                    </p>
+                  )}
+                </div>
+              ))}
+          </div>
+
+          {studentProgress.length === 0 && (
+            <p className="text-slate-400 text-center py-8">No students in this class</p>
+          )}
+        </GlassCard>
+      </motion.div>
+    </motion.div>
   );
 }
