@@ -14,7 +14,7 @@ import GlassCard from '@/components/ui/GlassCard';
 import { 
   ChevronLeft, Users, Sparkles, Loader2, Trophy, ClipboardList, 
   BarChart3, Plus, Trash2, RefreshCw, Save, CheckCircle2, Edit2, Zap,
-  Calendar, Clock, Target, TrendingUp, Eye, X, AlertTriangle
+  Calendar, Clock, Target, TrendingUp, Eye, X, AlertTriangle, BookOpen
 } from 'lucide-react';
 import StudentStatsModal from '@/components/teacher/StudentStatsModal';
 import { AnimatePresence } from 'framer-motion';
@@ -871,13 +871,8 @@ export default function TeacherClassDetail() {
               ) : (
                 <GlassCard className="p-12 text-center">
                   <ClipboardList className="w-12 h-12 text-slate-600 mx-auto mb-4" />
-                  <p className="text-slate-400 mb-4">No assignments created yet</p>
-                  <Button
-                    onClick={() => navigate(createPageUrl(`AssignmentBuilder?classId=${classId}`))}
-                    className="bg-gradient-to-r from-purple-500 to-blue-500"
-                  >
-                    Create Your First Assignment
-                  </Button>
+                  <p className="text-slate-400 mb-2">No assignments created yet</p>
+                  <p className="text-slate-500 text-sm">Use the Create tab to build and publish assignments</p>
                 </GlassCard>
               )}
             </TabsContent>
