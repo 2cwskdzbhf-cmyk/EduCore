@@ -272,6 +272,74 @@ export default function TeacherClassDetail() {
     }
   });
 
+  const startLiveQuizMutation = useMutation({
+    mutationFn: async () => {
+      console.log('[DEBUG] Starting live quiz with', generatedLiveQuestions.length, 'questions');
+      
+      // Validate questions
+      if (generatedLiveQuestions.length === 0) {
+        throw new Error('No questions to start quiz with');
+      }
+
+      // Generate unique join code
+      const generateCode = () => Math.random().toString(36).substr(2, 6).toUpperCase();
+      let joinCode = generateCode();
+      let attempts = 0;
+      while (attempts < 10) {
+        const existing = await base44.entities.LiveQuizSession.filter({ join_code: joinCode });
+        if (existing.length === 0) break;
+        joinCode = generateCode();
+        attempts++;
+      }
+
+      // Create session
+      const session = await base44.entities.LiveQuizSession.create({
+        class_id: classId,
+        host_email: user.email,
+        live_quiz_set_id: 'temp-' + Date.now(), // temporary placeholder
+        status: 'lobby',
+        current_question_index: -1,
+        player_count: 0,
+        join_code: joinCode,
+        settings: {
+          time_per_question: 15000,
+          base_points: 500,
+          round_multiplier_increment: 0.25
+        }
+      });
+
+      console.log('[DEBUG] Session created:', session.id);
+
+      // Create questions linked to session
+      for (let i = 0; i < generatedLiveQuestions.length; i++) {
+        const q = generatedLiveQuestions[i];
+        await base44.entities.LiveQuizQuestion.create({
+          live_quiz_set_id: session.id, // Link to session instead of quiz set
+          order: i,
+          prompt: q.prompt,
+          correct_answer: q.correct_answer,
+          allowed_forms: q.allowed_forms || ['fraction', 'decimal'],
+          difficulty: q.difficulty || difficulty,
+          explanation: q.explanation || '',
+          type: q.type || 'fraction',
+          hint: q.hint || ''
+        });
+      }
+
+      console.log('[DEBUG] Created', generatedLiveQuestions.length, 'questions for session');
+
+      return session;
+    },
+    onSuccess: (session) => {
+      console.log('[DEBUG] Navigating to lobby for session:', session.id);
+      navigate(createPageUrl(`TeacherLiveQuizLobby?sessionId=${session.id}`));
+    },
+    onError: (error) => {
+      console.error('[ERROR] Failed to start live quiz:', error);
+      alert('Failed to start live quiz: ' + (error.message || 'Unknown error'));
+    }
+  });
+
   const deleteAssignmentMutation = useMutation({
     mutationFn: async (assignmentId) => {
       // Delete all submissions for this assignment
@@ -725,13 +793,32 @@ export default function TeacherClassDetail() {
                   <div className="mt-6 space-y-4">
                     <div className="flex items-center justify-between">
                       <h4 className="font-semibold text-white">Preview ({generatedLiveQuestions.length})</h4>
-                      <Button
-                        onClick={() => publishLiveQuizMutation.mutate()}
-                        disabled={publishLiveQuizMutation.isPending}
-                        className="bg-emerald-500"
-                      >
-                        {publishLiveQuizMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Save className="w-4 h-4 mr-1" /> Publish Set</>}
-                      </Button>
+                      <div className="flex gap-2">
+                        <Button
+                          onClick={() => publishLiveQuizMutation.mutate()}
+                          disabled={publishLiveQuizMutation.isPending}
+                          className="bg-blue-500"
+                        >
+                          {publishLiveQuizMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Save className="w-4 h-4 mr-1" /> Save to Library</>}
+                        </Button>
+                        <Button
+                          onClick={() => startLiveQuizMutation.mutate()}
+                          disabled={startLiveQuizMutation.isPending}
+                          className="bg-gradient-to-r from-amber-500 to-orange-500 shadow-lg shadow-amber-500/30"
+                        >
+                          {startLiveQuizMutation.isPending ? (
+                            <>
+                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                              Starting...
+                            </>
+                          ) : (
+                            <>
+                              <Zap className="w-4 h-4 mr-2" />
+                              Start Quiz
+                            </>
+                          )}
+                        </Button>
+                      </div>
                     </div>
 
                     {generatedLiveQuestions.map((q, idx) => (
