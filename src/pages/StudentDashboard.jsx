@@ -11,13 +11,16 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
   BookOpen,
-  Trophy,
   Target,
-  Flame,
   Zap,
-  Radio,
   UserPlus,
-  Users
+  Users,
+  TrendingUp,
+  TrendingDown,
+  Minus,
+  Calendar,
+  Clock,
+  ChevronRight
 } from 'lucide-react';
 
 export default function StudentDashboard() {
@@ -85,9 +88,87 @@ export default function StudentDashboard() {
     refetchInterval: 5000
   });
 
+  const { data: assignments = [] } = useQuery({
+    queryKey: ['studentAssignments', user?.email, enrolledClasses.map(c => c.id).join(',')],
+    queryFn: async () => {
+      if (!user?.email || enrolledClasses.length === 0) return [];
+      const classIds = enrolledClasses.map(c => c.id);
+      return base44.entities.Assignment.filter({
+        class_id: { $in: classIds },
+        status: 'published'
+      }, 'due_date');
+    },
+    enabled: !!user?.email && enrolledClasses.length > 0
+  });
+
+  const { data: submissions = [] } = useQuery({
+    queryKey: ['studentSubmissions', user?.email],
+    queryFn: async () => {
+      if (!user?.email) return [];
+      return base44.entities.AssignmentSubmission.filter({ student_email: user.email });
+    },
+    enabled: !!user?.email
+  });
+
   const avgResponseTime = recentAttempts.length > 0
-    ? Math.round(recentAttempts.reduce((sum, a) => sum + (a.time_taken_seconds || 0), 0) / recentAttempts.length * 1000)
-    : null;
+    ? Math.round(recentAttempts.reduce((sum, a) => sum + (a.time_taken_seconds || 0), 0) / recentAttempts.length)
+    : 0;
+
+  const getAccuracyTrend = () => {
+    if (recentAttempts.length < 2) return { label: 'Stable', icon: Minus, color: 'text-slate-400' };
+    
+    const recent = recentAttempts.slice(0, Math.ceil(recentAttempts.length / 2));
+    const older = recentAttempts.slice(Math.ceil(recentAttempts.length / 2));
+    
+    const recentAvg = recent.reduce((sum, a) => sum + (a.accuracy_percent || 0), 0) / recent.length;
+    const olderAvg = older.reduce((sum, a) => sum + (a.accuracy_percent || 0), 0) / older.length;
+    
+    const diff = recentAvg - olderAvg;
+    
+    if (diff > 5) return { label: 'Improving', icon: TrendingUp, color: 'text-emerald-400' };
+    if (diff < -5) return { label: 'Declining', icon: TrendingDown, color: 'text-red-400' };
+    return { label: 'Stable', icon: Minus, color: 'text-slate-400' };
+  };
+
+  const getDueAssignments = () => {
+    const now = new Date();
+    const pending = assignments.filter(a => {
+      if (!a.due_date) return false;
+      const dueDate = new Date(a.due_date);
+      const submission = submissions.find(s => s.assignment_id === a.id);
+      return dueDate > now && (!submission || submission.status === 'not_started' || submission.status === 'in_progress');
+    });
+    
+    return pending.slice(0, 5).map(a => {
+      const dueDate = new Date(a.due_date);
+      const diffMs = dueDate - now;
+      const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+      
+      let dueDateText = '';
+      let urgency = 'normal';
+      
+      if (diffDays === 0) {
+        dueDateText = 'Due today';
+        urgency = 'high';
+      } else if (diffDays === 1) {
+        dueDateText = 'Due tomorrow';
+        urgency = 'high';
+      } else if (diffDays <= 3) {
+        dueDateText = `Due in ${diffDays} days`;
+        urgency = 'medium';
+      } else {
+        dueDateText = `Due in ${diffDays} days`;
+        urgency = 'normal';
+      }
+      
+      const assignmentClass = enrolledClasses.find(c => c.id === a.class_id);
+      
+      return { ...a, dueDateText, urgency, className: assignmentClass?.name || 'Unknown Class' };
+    });
+  };
+
+  const trend = getAccuracyTrend();
+  const dueAssignments = getDueAssignments();
 
   const handleJoinClass = async () => {
     if (!classJoinCode || !user?.email) return;
@@ -133,10 +214,10 @@ export default function StudentDashboard() {
           animate={{ opacity: 1, y: 0 }}
           className="mb-8"
         >
-          <h1 className="text-3xl font-bold text-white mb-2">
-            Welcome back, {user?.full_name || 'Student'}!
+          <h1 className="text-3xl font-bold text-white mb-2 drop-shadow-lg">
+            Self Learning
           </h1>
-          <p className="text-slate-400">Continue your learning journey</p>
+          <p className="text-slate-300 drop-shadow-md">Track your progress across lessons, classes, and assignments</p>
         </motion.div>
 
         {activeLiveSessions.length > 0 && (
@@ -145,14 +226,14 @@ export default function StudentDashboard() {
             animate={{ opacity: 1, y: 0 }}
             className="mb-8"
           >
-            <GlassCard className="p-6 border-2 border-amber-500/30">
+            <GlassCard className="p-6 border-2 border-amber-500/30 bg-slate-950/60 backdrop-blur-xl">
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center animate-pulse">
                   <Zap className="w-6 h-6 text-white" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-white">Live Quiz Available!</h3>
-                  <p className="text-sm text-slate-400">Join now to compete with your classmates</p>
+                  <h3 className="font-bold text-white drop-shadow-md">Live Quiz Available!</h3>
+                  <p className="text-sm text-slate-300 drop-shadow-sm">Join now to compete with your classmates</p>
                 </div>
               </div>
               <div className="space-y-2">
@@ -174,59 +255,177 @@ export default function StudentDashboard() {
           </motion.div>
         )}
 
-        <motion.div
-          className="grid md:grid-cols-1 gap-4 mb-8"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-        >
-          <GlassCard className="p-6 cursor-pointer hover:scale-[1.02]" onClick={() => setJoinClassOpen(true)}>
-            <div className="flex items-center gap-4">
-              <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center shadow-lg shadow-blue-500/30">
-                <UserPlus className="w-7 h-7 text-white" />
-              </div>
-              <div>
-                <h3 className="text-lg font-bold text-white">Join Class</h3>
-                <p className="text-sm text-slate-400">Enter a class code to join</p>
-              </div>
-            </div>
-          </GlassCard>
-        </motion.div>
-
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <StatCard
             icon={Target}
             label="Overall Accuracy"
             value={`${Math.round(progress?.accuracy_percent || 0)}%`}
             delay={0}
           />
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1, duration: 0.3, ease: 'easeOut' }}
+          >
+            <GlassCard hover={false} className="p-8 text-center bg-slate-950/50 backdrop-blur-xl">
+              <div className="w-12 h-12 mx-auto mb-4 rounded-xl bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center">
+                <trend.icon className={`w-6 h-6 ${trend.color}`} />
+              </div>
+              <p className="text-4xl font-bold text-white mb-2 drop-shadow-lg">{trend.label}</p>
+              <p className="text-sm text-slate-300 drop-shadow-md">Accuracy Trend</p>
+            </GlassCard>
+          </motion.div>
           <StatCard
-            icon={Trophy}
-            label="Quizzes Completed"
-            value={progress?.quizzes_completed || 0}
-            delay={0.1}
-          />
-          <StatCard
-            icon={Flame}
-            label="Current Streak"
-            value={`${progress?.current_streak || 0} days`}
+            icon={Clock}
+            label="Avg Answer Time"
+            value={avgResponseTime > 0 ? `${avgResponseTime}s` : 'N/A'}
             delay={0.2}
           />
-          {avgResponseTime && (
-            <StatCard
-              icon={Zap}
-              label="Avg Answer Time"
-              value={`${avgResponseTime}ms`}
-              delay={0.3}
-            />
-          )}
         </div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+          className="mb-8"
+        >
+          <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2 drop-shadow-lg">
+            <Calendar className="w-5 h-5 text-purple-400" />
+            Due Assignments
+          </h2>
+          <GlassCard className="p-6 bg-slate-950/50 backdrop-blur-xl">
+            {dueAssignments.length > 0 ? (
+              <div className="space-y-3">
+                {dueAssignments.map((assignment, idx) => {
+                  const urgencyColors = {
+                    high: 'border-red-500/30 bg-red-500/5',
+                    medium: 'border-amber-500/30 bg-amber-500/5',
+                    normal: 'border-white/10 bg-white/5'
+                  };
+                  
+                  return (
+                    <Link
+                      key={assignment.id}
+                      to={createPageUrl(`StudentClassDetail?classId=${assignment.class_id}`)}
+                    >
+                      <motion.div
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: idx * 0.05 }}
+                        className={`p-4 rounded-xl border ${urgencyColors[assignment.urgency]} hover:bg-white/10 transition-all cursor-pointer group`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1">
+                            <h3 className="font-semibold text-white drop-shadow-md group-hover:text-purple-300 transition-colors">
+                              {assignment.title}
+                            </h3>
+                            <p className="text-sm text-slate-300 drop-shadow-sm">{assignment.className}</p>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <div className="text-right">
+                              <p className={`text-sm font-medium ${assignment.urgency === 'high' ? 'text-red-400' : assignment.urgency === 'medium' ? 'text-amber-400' : 'text-slate-300'} drop-shadow-md`}>
+                                {assignment.dueDateText}
+                              </p>
+                            </div>
+                            <ChevronRight className="w-5 h-5 text-slate-400 group-hover:text-white transition-colors" />
+                          </div>
+                        </div>
+                      </motion.div>
+                    </Link>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <Calendar className="w-12 h-12 text-slate-400 mx-auto mb-3" />
+                <p className="text-slate-300 drop-shadow-md">No upcoming assignments 🎉</p>
+              </div>
+            )}
+          </GlassCard>
+        </motion.div>
+
+        <motion.div
+          className="grid md:grid-cols-1 gap-4 mb-8"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.4 }}
+        >
+          <GlassCard className="p-6 cursor-pointer hover:scale-[1.02] bg-slate-950/50 backdrop-blur-xl" onClick={() => setJoinClassOpen(true)}>
+            <div className="flex items-center gap-4">
+              <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center shadow-lg shadow-blue-500/30">
+                <UserPlus className="w-7 h-7 text-white" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-white drop-shadow-md">Join a Class</h3>
+                <p className="text-sm text-slate-300 drop-shadow-sm">Enter a class code from your teacher</p>
+              </div>
+            </div>
+          </GlassCard>
+        </motion.div>
 
         <div className="grid lg:grid-cols-2 gap-8">
           <div>
-            <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
+            <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2 drop-shadow-lg">
+              <Users className="w-5 h-5 text-blue-400" />
+              My Classes
+            </h2>
+
+            <div className="space-y-3">
+              {enrolledClasses.length > 0 ? (
+                enrolledClasses.map((classItem, index) => {
+                  const classProgress = progress?.class_id === classItem.id ? progress : null;
+                  const classAccuracy = classProgress?.accuracy_percent || 0;
+                  const classAssignments = assignments.filter(a => a.class_id === classItem.id);
+                  const pendingAssignments = classAssignments.filter(a => {
+                    const submission = submissions.find(s => s.assignment_id === a.id);
+                    return !submission || submission.status === 'not_started' || submission.status === 'in_progress';
+                  }).length;
+                  
+                  return (
+                    <motion.div
+                      key={classItem.id}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: index * 0.1 }}
+                    >
+                      <Link to={createPageUrl(`StudentClassDetail?classId=${classItem.id}`)}>
+                        <GlassCard className="p-5 hover:scale-[1.02] bg-slate-950/50 backdrop-blur-xl">
+                          <div className="flex items-center justify-between mb-3">
+                            <div className="flex-1">
+                              <h3 className="font-semibold text-white drop-shadow-md">{classItem.name}</h3>
+                              <p className="text-sm text-slate-300 drop-shadow-sm">Teacher: {classItem.teacher_email.split('@')[0]}</p>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-2xl font-bold text-white drop-shadow-lg">{Math.round(classAccuracy)}%</p>
+                              <p className="text-xs text-slate-300 drop-shadow-sm">Accuracy</p>
+                            </div>
+                          </div>
+                          {pendingAssignments > 0 && (
+                            <div className="pt-3 border-t border-white/10">
+                              <p className="text-sm text-amber-400 drop-shadow-md">
+                                {pendingAssignments} active assignment{pendingAssignments > 1 ? 's' : ''}
+                              </p>
+                            </div>
+                          )}
+                        </GlassCard>
+                      </Link>
+                    </motion.div>
+                  );
+                })
+              ) : (
+                <GlassCard className="p-12 text-center bg-slate-950/50 backdrop-blur-xl">
+                  <Users className="w-12 h-12 text-slate-400 mx-auto mb-4" />
+                  <h3 className="font-semibold text-white mb-2 drop-shadow-md">No classes yet</h3>
+                  <p className="text-slate-300 text-sm drop-shadow-sm">Join a class to see it here.</p>
+                </GlassCard>
+              )}
+            </div>
+          </div>
+
+          <div>
+            <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2 drop-shadow-lg">
               <BookOpen className="w-5 h-5 text-purple-400" />
-              Your Subjects
+              Self Learning
             </h2>
 
             <div className="grid sm:grid-cols-2 gap-4">
@@ -238,67 +437,21 @@ export default function StudentDashboard() {
                   transition={{ delay: index * 0.1 }}
                 >
                   <Link to={createPageUrl(`Subject?id=${subject.id}`)}>
-                    <GlassCard className="p-6 hover:scale-[1.02]">
+                    <GlassCard className="p-6 hover:scale-[1.02] bg-slate-950/50 backdrop-blur-xl">
                       <div className="flex items-center gap-4 mb-4">
                         <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center shadow-lg shadow-purple-500/50">
                           <BookOpen className="w-6 h-6 text-white" />
                         </div>
                         <div>
-                          <h3 className="font-semibold text-white">{subject.name}</h3>
-                          <p className="text-sm text-slate-400">{subject.key_stage}</p>
+                          <h3 className="font-semibold text-white drop-shadow-md">{subject.name}</h3>
+                          <p className="text-sm text-slate-300 drop-shadow-sm">{subject.key_stage}</p>
                         </div>
                       </div>
-                      <p className="text-sm text-slate-400">{subject.description}</p>
+                      <p className="text-sm text-slate-300 drop-shadow-sm">{subject.description}</p>
                     </GlassCard>
                   </Link>
                 </motion.div>
               ))}
-            </div>
-          </div>
-
-          <div>
-            <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
-              <Users className="w-5 h-5 text-blue-400" />
-              Your Classes
-            </h2>
-
-            <div className="space-y-3">
-              {enrolledClasses.length > 0 ? (
-                enrolledClasses.map((classItem, index) => {
-                  const classProgress = progress?.class_id === classItem.id ? progress : null;
-                  const classAccuracy = classProgress?.accuracy_percent || 0;
-                  
-                  return (
-                    <motion.div
-                      key={classItem.id}
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: index * 0.1 }}
-                    >
-                      <Link to={createPageUrl(`StudentClassDetail?classId=${classItem.id}`)}>
-                        <GlassCard className="p-5 hover:scale-[1.02]">
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <h3 className="font-semibold text-white">{classItem.name}</h3>
-                              <p className="text-sm text-slate-400">Teacher: {classItem.teacher_email.split('@')[0]}</p>
-                            </div>
-                            <div className="text-right">
-                              <p className="text-2xl font-bold text-white">{Math.round(classAccuracy)}%</p>
-                              <p className="text-xs text-slate-400">Accuracy</p>
-                            </div>
-                          </div>
-                        </GlassCard>
-                      </Link>
-                    </motion.div>
-                  );
-                })
-              ) : (
-                <GlassCard className="p-12 text-center">
-                  <Users className="w-12 h-12 text-slate-400 mx-auto mb-4" />
-                  <h3 className="font-semibold text-white mb-2">No classes yet</h3>
-                  <p className="text-slate-400 text-sm">Join a class to see it here.</p>
-                </GlassCard>
-              )}
             </div>
           </div>
         </div>
