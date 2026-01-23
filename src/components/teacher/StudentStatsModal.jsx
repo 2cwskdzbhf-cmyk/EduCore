@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { X, TrendingUp, TrendingDown, Clock, Target, Award } from 'lucide-react';
+import { X, Clock, Target, Award } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import GlassCard from '@/components/ui/GlassCard';
 import { format } from 'date-fns';
