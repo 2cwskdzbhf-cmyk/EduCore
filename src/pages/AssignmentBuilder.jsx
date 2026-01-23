@@ -32,6 +32,8 @@ export default function AssignmentBuilder() {
   const navigate = useNavigate();
   const urlParams = new URLSearchParams(window.location.search);
   const classId = urlParams.get('classId');
+  const assignmentId = urlParams.get('assignmentId');
+  const isEditMode = !!assignmentId;
   
   const [user, setUser] = useState(null);
   const [assignmentTitle, setAssignmentTitle] = useState('');
@@ -52,6 +54,7 @@ export default function AssignmentBuilder() {
       workingKeywords: ['']
     }
   ]);
+  const [originalQuizId, setOriginalQuizId] = useState(null);
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -75,6 +78,59 @@ export default function AssignmentBuilder() {
     },
     enabled: !!classId
   });
+
+  const { data: existingAssignment } = useQuery({
+    queryKey: ['assignment', assignmentId],
+    queryFn: async () => {
+      const assignments = await base44.entities.Assignment.filter({ id: assignmentId });
+      return assignments[0] || null;
+    },
+    enabled: isEditMode
+  });
+
+  const { data: existingQuestions = [] } = useQuery({
+    queryKey: ['quizQuestions', existingAssignment?.quiz_id],
+    queryFn: async () => {
+      if (!existingAssignment?.quiz_id) return [];
+      return base44.entities.QuizQuestion.filter({ quiz_set_id: existingAssignment.quiz_id }, 'order');
+    },
+    enabled: !!existingAssignment?.quiz_id
+  });
+
+  useEffect(() => {
+    if (isEditMode && existingAssignment && existingQuestions.length > 0) {
+      setAssignmentTitle(existingAssignment.title);
+      
+      if (existingAssignment.custom_topic_name) {
+        setSelectedTopic('custom');
+        setCustomTopicName(existingAssignment.custom_topic_name);
+      } else if (existingAssignment.topic_id) {
+        setSelectedTopic(existingAssignment.topic_id);
+      }
+
+      if (existingAssignment.due_date) {
+        const date = new Date(existingAssignment.due_date);
+        const localDate = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+        setDueDate(localDate.toISOString().slice(0, 16));
+      }
+
+      setOriginalQuizId(existingAssignment.quiz_id);
+
+      const loadedQuestions = existingQuestions.map((q, idx) => ({
+        id: idx + 1,
+        type: q.question_type || 'multiple_choice',
+        prompt: q.prompt,
+        options: q.options || ['', '', '', ''],
+        correctIndex: q.correct_index ?? null,
+        explanation: q.explanation || '',
+        answerKeywords: q.answer_keywords || [''],
+        requireWorking: q.require_working || false,
+        workingKeywords: q.working_keywords || ['']
+      }));
+
+      setQuestions(loadedQuestions);
+    }
+  }, [isEditMode, existingAssignment, existingQuestions]);
 
   const currentQuestion = questions[currentQuestionIndex];
 
@@ -189,61 +245,120 @@ export default function AssignmentBuilder() {
         throw new Error('Missing user or class information');
       }
       
-      const quizSet = await base44.entities.QuizSet.create({
-        owner_email: user.email,
-        title: assignmentTitle,
-        topic_id: selectedTopic || null,
-        status: 'published',
-        question_count: questions.length
-      });
-
-      for (let i = 0; i < questions.length; i++) {
-        const q = questions[i];
-        const questionData = {
-          quiz_set_id: quizSet.id,
-          order: i,
-          prompt: q.prompt,
-          explanation: q.explanation,
-          question_type: q.type || 'multiple_choice'
-        };
-
-        if (q.type === 'multiple_choice') {
-          questionData.options = q.options;
-          questionData.correct_index = q.correctIndex;
-        } else if (q.type === 'written') {
-          questionData.answer_keywords = q.answerKeywords.filter(kw => kw.trim() !== '');
-          questionData.require_working = q.requireWorking;
-          if (q.requireWorking) {
-            questionData.working_keywords = q.workingKeywords.filter(kw => kw.trim() !== '');
-          }
+      if (isEditMode && originalQuizId) {
+        // Delete old questions
+        const oldQuestions = await base44.entities.QuizQuestion.filter({ quiz_set_id: originalQuizId });
+        for (const oldQ of oldQuestions) {
+          await base44.entities.QuizQuestion.delete(oldQ.id);
         }
 
-        await base44.entities.QuizQuestion.create(questionData);
+        // Create new questions
+        for (let i = 0; i < questions.length; i++) {
+          const q = questions[i];
+          const questionData = {
+            quiz_set_id: originalQuizId,
+            order: i,
+            prompt: q.prompt,
+            explanation: q.explanation,
+            question_type: q.type || 'multiple_choice'
+          };
+
+          if (q.type === 'multiple_choice') {
+            questionData.options = q.options;
+            questionData.correct_index = q.correctIndex;
+          } else if (q.type === 'written') {
+            questionData.answer_keywords = q.answerKeywords.filter(kw => kw.trim() !== '');
+            questionData.require_working = q.requireWorking;
+            if (q.requireWorking) {
+              questionData.working_keywords = q.workingKeywords.filter(kw => kw.trim() !== '');
+            }
+          }
+
+          await base44.entities.QuizQuestion.create(questionData);
+        }
+
+        // Update assignment
+        const assignmentData = {
+          title: assignmentTitle,
+          status: 'published',
+          max_points: questions.length * 10
+        };
+
+        if (selectedTopic === 'custom' && customTopicName.trim()) {
+          assignmentData.custom_topic_name = customTopicName.trim();
+          assignmentData.topic_id = null;
+        } else if (selectedTopic && selectedTopic !== 'custom') {
+          assignmentData.topic_id = selectedTopic;
+          assignmentData.custom_topic_name = null;
+        }
+
+        if (dueDate) {
+          assignmentData.due_date = new Date(dueDate).toISOString();
+        } else {
+          assignmentData.due_date = null;
+        }
+
+        await base44.entities.Assignment.update(assignmentId, assignmentData);
+
+        return { assignment: existingAssignment };
+      } else {
+        // Create mode
+        const quizSet = await base44.entities.QuizSet.create({
+          owner_email: user.email,
+          title: assignmentTitle,
+          topic_id: selectedTopic || null,
+          status: 'published',
+          question_count: questions.length
+        });
+
+        for (let i = 0; i < questions.length; i++) {
+          const q = questions[i];
+          const questionData = {
+            quiz_set_id: quizSet.id,
+            order: i,
+            prompt: q.prompt,
+            explanation: q.explanation,
+            question_type: q.type || 'multiple_choice'
+          };
+
+          if (q.type === 'multiple_choice') {
+            questionData.options = q.options;
+            questionData.correct_index = q.correctIndex;
+          } else if (q.type === 'written') {
+            questionData.answer_keywords = q.answerKeywords.filter(kw => kw.trim() !== '');
+            questionData.require_working = q.requireWorking;
+            if (q.requireWorking) {
+              questionData.working_keywords = q.workingKeywords.filter(kw => kw.trim() !== '');
+            }
+          }
+
+          await base44.entities.QuizQuestion.create(questionData);
+        }
+
+        const assignmentData = {
+          title: assignmentTitle,
+          class_id: classId,
+          teacher_email: user.email,
+          quiz_id: quizSet.id,
+          assignment_type: 'quiz',
+          status: 'published',
+          max_points: questions.length * 10
+        };
+
+        if (selectedTopic === 'custom' && customTopicName.trim()) {
+          assignmentData.custom_topic_name = customTopicName.trim();
+        } else if (selectedTopic && selectedTopic !== 'custom') {
+          assignmentData.topic_id = selectedTopic;
+        }
+
+        if (dueDate) {
+          assignmentData.due_date = new Date(dueDate).toISOString();
+        }
+
+        const assignment = await base44.entities.Assignment.create(assignmentData);
+
+        return { assignment, quizSet };
       }
-
-      const assignmentData = {
-        title: assignmentTitle,
-        class_id: classId,
-        teacher_email: user.email,
-        quiz_id: quizSet.id,
-        assignment_type: 'quiz',
-        status: 'published',
-        max_points: questions.length * 10
-      };
-
-      if (selectedTopic === 'custom' && customTopicName.trim()) {
-        assignmentData.custom_topic_name = customTopicName.trim();
-      } else if (selectedTopic && selectedTopic !== 'custom') {
-        assignmentData.topic_id = selectedTopic;
-      }
-
-      if (dueDate) {
-        assignmentData.due_date = new Date(dueDate).toISOString();
-      }
-
-      const assignment = await base44.entities.Assignment.create(assignmentData);
-
-      return { assignment, quizSet };
     },
     onSuccess: () => {
       navigate(createPageUrl(`TeacherClassDetail?id=${classId}`));
@@ -260,28 +375,50 @@ export default function AssignmentBuilder() {
         throw new Error('Missing user or class information');
       }
       
-      const assignmentData = {
-        title: assignmentTitle || 'Untitled Assignment',
-        class_id: classId,
-        teacher_email: user.email,
-        assignment_type: 'quiz',
-        status: 'draft',
-        max_points: questions.length * 10
-      };
+      if (isEditMode) {
+        const assignmentData = {
+          title: assignmentTitle || 'Untitled Assignment',
+          status: 'draft',
+          max_points: questions.length * 10
+        };
 
-      if (selectedTopic === 'custom' && customTopicName.trim()) {
-        assignmentData.custom_topic_name = customTopicName.trim();
-      } else if (selectedTopic && selectedTopic !== 'custom') {
-        assignmentData.topic_id = selectedTopic;
+        if (selectedTopic === 'custom' && customTopicName.trim()) {
+          assignmentData.custom_topic_name = customTopicName.trim();
+          assignmentData.topic_id = null;
+        } else if (selectedTopic && selectedTopic !== 'custom') {
+          assignmentData.topic_id = selectedTopic;
+          assignmentData.custom_topic_name = null;
+        }
+
+        if (dueDate) {
+          assignmentData.due_date = new Date(dueDate).toISOString();
+        } else {
+          assignmentData.due_date = null;
+        }
+
+        await base44.entities.Assignment.update(assignmentId, assignmentData);
+      } else {
+        const assignmentData = {
+          title: assignmentTitle || 'Untitled Assignment',
+          class_id: classId,
+          teacher_email: user.email,
+          assignment_type: 'quiz',
+          status: 'draft',
+          max_points: questions.length * 10
+        };
+
+        if (selectedTopic === 'custom' && customTopicName.trim()) {
+          assignmentData.custom_topic_name = customTopicName.trim();
+        } else if (selectedTopic && selectedTopic !== 'custom') {
+          assignmentData.topic_id = selectedTopic;
+        }
+
+        if (dueDate) {
+          assignmentData.due_date = new Date(dueDate).toISOString();
+        }
+
+        await base44.entities.Assignment.create(assignmentData);
       }
-
-      if (dueDate) {
-        assignmentData.due_date = new Date(dueDate).toISOString();
-      }
-
-      const assignment = await base44.entities.Assignment.create(assignmentData);
-
-      return assignment;
     },
     onSuccess: () => {
       navigate(createPageUrl(`TeacherClassDetail?id=${classId}`));
@@ -337,12 +474,20 @@ export default function AssignmentBuilder() {
               ) : (
                 <>
                   <CheckCircle2 className="w-4 h-4 mr-2" />
-                  Publish Assignment
+                  {isEditMode ? 'Update Assignment' : 'Publish Assignment'}
                 </>
               )}
             </Button>
           </div>
         </div>
+
+        {isEditMode && (
+          <div className="mb-4 px-4 py-2 bg-blue-500/20 border border-blue-500/30 rounded-lg">
+            <p className="text-blue-400 text-sm">
+              Editing mode: Changes will apply to the existing assignment
+            </p>
+          </div>
+        )}
 
         {/* Title, Topic, and Due Date */}
         <GlassCard className="p-6 mb-6">

@@ -14,7 +14,7 @@ import GlassCard from '@/components/ui/GlassCard';
 import { 
   ChevronLeft, Users, Sparkles, Loader2, Trophy, ClipboardList, 
   BarChart3, Plus, Trash2, RefreshCw, Save, CheckCircle2, Edit2, Zap,
-  Calendar, Clock, Target, TrendingUp, Eye, X
+  Calendar, Clock, Target, TrendingUp, Eye, X, AlertTriangle
 } from 'lucide-react';
 import StudentStatsModal from '@/components/teacher/StudentStatsModal';
 import { AnimatePresence } from 'framer-motion';
@@ -42,6 +42,7 @@ export default function TeacherClassDetail() {
   const [cooldownRemaining, setCooldownRemaining] = useState(0);
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [selectedAssignment, setSelectedAssignment] = useState(null);
+  const [deleteConfirmAssignment, setDeleteConfirmAssignment] = useState(null);
 
   const copyJoinCode = (code) => {
     navigator.clipboard.writeText(code);
@@ -256,6 +257,31 @@ export default function TeacherClassDetail() {
       setLiveQuizTitle('');
       setSelectedTopic('');
       setSelectedLesson('');
+    }
+  });
+
+  const deleteAssignmentMutation = useMutation({
+    mutationFn: async (assignmentId) => {
+      // Delete all submissions for this assignment
+      const assignmentSubmissions = await base44.entities.AssignmentSubmission.filter({ 
+        assignment_id: assignmentId 
+      });
+      
+      for (const submission of assignmentSubmissions) {
+        await base44.entities.AssignmentSubmission.delete(submission.id);
+      }
+
+      // Delete the assignment itself
+      await base44.entities.Assignment.delete(assignmentId);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries(['assignments']);
+      queryClient.invalidateQueries(['submissions']);
+      setDeleteConfirmAssignment(null);
+    },
+    onError: (error) => {
+      console.error('Failed to delete assignment:', error);
+      alert('Failed to delete assignment. Please try again.');
     }
   });
 
@@ -719,11 +745,10 @@ export default function TeacherClassDetail() {
                     return (
                       <GlassCard 
                         key={assignment.id} 
-                        className="p-6 hover:bg-white/10 transition-all cursor-pointer"
-                        onClick={() => setSelectedAssignment(assignment)}
+                        className="p-6 hover:bg-white/10 transition-all"
                       >
                         <div className="flex items-start justify-between mb-4">
-                          <div className="flex-1">
+                          <div className="flex-1 cursor-pointer" onClick={() => setSelectedAssignment(assignment)}>
                             <div className="flex items-center gap-3 mb-2">
                               <h3 className="text-xl font-bold text-white">{assignment.title}</h3>
                               <span className={`text-xs px-2 py-1 rounded-full ${
@@ -756,9 +781,28 @@ export default function TeacherClassDetail() {
                               </span>
                             </div>
                           </div>
+
+                          <div className="flex gap-2">
+                            <Button
+                              size="sm"
+                              onClick={() => navigate(createPageUrl(`AssignmentBuilder?classId=${classId}&assignmentId=${assignment.id}`))}
+                              className="bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 shadow-lg shadow-blue-500/30"
+                            >
+                              <Edit2 className="w-4 h-4 mr-1" />
+                              Edit
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => setDeleteConfirmAssignment(assignment)}
+                              className="border-red-500/30 text-red-400 hover:bg-red-500/10"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
                         </div>
 
-                        <div className="grid grid-cols-3 gap-4 pt-4 border-t border-white/10">
+                        <div className="grid grid-cols-3 gap-4 pt-4 border-t border-white/10" onClick={() => setSelectedAssignment(assignment)}>
                           <div>
                             <p className="text-xs text-slate-500 mb-1">Started</p>
                             <p className="text-2xl font-bold text-white">{started}</p>
@@ -898,6 +942,71 @@ export default function TeacherClassDetail() {
                 setSelectedStudent(student);
               }}
             />
+          )}
+        </AnimatePresence>
+
+        <AnimatePresence>
+          {deleteConfirmAssignment && (
+            <motion.div
+              className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-6"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => !deleteAssignmentMutation.isPending && setDeleteConfirmAssignment(null)}
+            >
+              <motion.div
+                className="max-w-md w-full"
+                initial={{ scale: 0.9, y: 20 }}
+                animate={{ scale: 1, y: 0 }}
+                exit={{ scale: 0.9, y: 20 }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <GlassCard className="p-8">
+                  <div className="flex items-start gap-4 mb-6">
+                    <div className="w-12 h-12 rounded-full bg-red-500/20 flex items-center justify-center flex-shrink-0">
+                      <AlertTriangle className="w-6 h-6 text-red-400" />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-bold text-white mb-2">Delete Assignment?</h3>
+                      <p className="text-slate-400 text-sm mb-1">
+                        Are you sure you want to delete <span className="text-white font-semibold">"{deleteConfirmAssignment.title}"</span>?
+                      </p>
+                      <p className="text-red-400 text-sm">
+                        This will permanently remove the assignment and all student submission data.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-3 justify-end">
+                    <Button
+                      variant="outline"
+                      onClick={() => setDeleteConfirmAssignment(null)}
+                      disabled={deleteAssignmentMutation.isPending}
+                      className="border-white/20 text-white hover:bg-white/10"
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      onClick={() => deleteAssignmentMutation.mutate(deleteConfirmAssignment.id)}
+                      disabled={deleteAssignmentMutation.isPending}
+                      className="bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white shadow-lg shadow-red-500/30"
+                    >
+                      {deleteAssignmentMutation.isPending ? (
+                        <>
+                          <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />
+                          Deleting...
+                        </>
+                      ) : (
+                        <>
+                          <Trash2 className="w-4 h-4 mr-2" />
+                          Delete Assignment
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </GlassCard>
+              </motion.div>
+            </motion.div>
           )}
         </AnimatePresence>
       </div>
