@@ -37,6 +37,7 @@ export default function StartLiveQuiz() {
     queryKey: ['liveQuizQuestions', setId],
     queryFn: async () => {
       if (!setId) return [];
+      // Keep your existing ordering approach
       return base44.entities.LiveQuizQuestion.filter({ live_quiz_set_id: setId }, 'order');
     },
     enabled: !!setId
@@ -44,12 +45,25 @@ export default function StartLiveQuiz() {
 
   const createSessionMutation = useMutation({
     mutationFn: async () => {
+      if (!user?.email) throw new Error('User not loaded');
+      if (!classId) throw new Error('Missing classId');
+      if (!setId) throw new Error('Missing setId');
+      if (!quizSet) throw new Error('Quiz set not loaded');
+      if (!questions || questions.length === 0) throw new Error('This quiz has no questions');
+
       const session = await base44.entities.LiveQuizSession.create({
         class_id: classId,
         host_email: user.email,
         live_quiz_set_id: setId,
+
+        // ✅ IMPORTANT: Attach questions to the session so students can load them
+        question_ids: questions.map(q => q.id),
+
         status: 'lobby',
+
+        // Keep -1 so it doesn't show Q1 before the teacher actually starts
         current_question_index: -1,
+
         player_count: 0,
         settings: {
           time_per_question: quizSet.time_limit_per_question || 15000,
@@ -57,6 +71,10 @@ export default function StartLiveQuiz() {
           round_multiplier_increment: 0.25
         }
       });
+
+      // Optional debug (remove later)
+      console.log('LIVE QUIZ SESSION CREATED:', session);
+
       return session;
     },
     onSuccess: (session) => {
@@ -97,10 +115,7 @@ export default function StartLiveQuiz() {
           Back
         </Button>
 
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-        >
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
           <GlassCard className="p-8">
             <div className="text-center mb-8">
               <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center shadow-lg shadow-purple-500/50">
@@ -118,6 +133,7 @@ export default function StartLiveQuiz() {
                 <p className="text-2xl font-bold text-white">{questions.length}</p>
                 <p className="text-sm text-slate-400">Questions</p>
               </div>
+
               <div className="text-center">
                 <div className="w-12 h-12 mx-auto mb-2 rounded-xl bg-blue-500/20 flex items-center justify-center">
                   <Clock className="w-6 h-6 text-blue-400" />
@@ -127,6 +143,7 @@ export default function StartLiveQuiz() {
                 </p>
                 <p className="text-sm text-slate-400">Per Question</p>
               </div>
+
               <div className="text-center">
                 <div className="w-12 h-12 mx-auto mb-2 rounded-xl bg-emerald-500/20 flex items-center justify-center">
                   <Users className="w-6 h-6 text-emerald-400" />
@@ -138,7 +155,13 @@ export default function StartLiveQuiz() {
 
             <Button
               onClick={() => createSessionMutation.mutate()}
-              disabled={createSessionMutation.isPending || questions.length === 0}
+              disabled={
+                createSessionMutation.isPending ||
+                questions.length === 0 ||
+                !user?.email ||
+                !classId ||
+                !setId
+              }
               className="w-full h-14 text-lg bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 shadow-lg shadow-purple-500/30"
             >
               {createSessionMutation.isPending ? (
