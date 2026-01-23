@@ -210,12 +210,12 @@ export default function Layout({ children, currentPageName }) {
         </nav>
 
         <div className={cn(
-          "p-4 border-t border-white/10",
-          !sidebarExpanded && "flex flex-col items-center"
+          "border-t border-white/10",
+          sidebarExpanded ? "p-4" : "py-4 flex flex-col items-center"
         )}>
             <div className={cn(
-              "flex items-center mb-3",
-              sidebarExpanded ? "gap-3 overflow-hidden" : "justify-center"
+              "flex items-center",
+              sidebarExpanded ? "gap-3 overflow-hidden mb-3" : "justify-center mb-3"
             )}>
               <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center text-white font-bold flex-shrink-0 shadow-lg shadow-purple-500/50">
                 {user.full_name?.charAt(0) || user.email?.charAt(0) || '?'}
@@ -236,8 +236,8 @@ export default function Layout({ children, currentPageName }) {
           <Button 
             variant="ghost" 
             className={cn(
-              "w-full text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-all duration-300",
-              sidebarExpanded ? "justify-start" : "justify-center"
+              "text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-all duration-300",
+              sidebarExpanded ? "w-full justify-start px-4" : "w-10 h-10 justify-center p-0"
             )}
             onClick={handleLogout}
           >
