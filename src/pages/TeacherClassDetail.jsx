@@ -14,7 +14,7 @@ import GlassCard from '@/components/ui/GlassCard';
 import { 
   ChevronLeft, Users, Sparkles, Loader2, Trophy, ClipboardList, 
   BarChart3, Plus, Trash2, RefreshCw, Save, CheckCircle2, Edit2, Zap,
-  Calendar, Clock, Target, TrendingUp, Eye
+  Calendar, Clock, Target, TrendingUp, Eye, X
 } from 'lucide-react';
 import StudentStatsModal from '@/components/teacher/StudentStatsModal';
 import { AnimatePresence } from 'framer-motion';
