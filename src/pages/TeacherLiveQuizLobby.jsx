@@ -52,25 +52,27 @@ export default function TeacherLiveQuizLobby() {
   });
 
   const { data: questions = [] } = useQuery({
-    queryKey: ['liveQuizQuestions', sessionId],
+    queryKey: ['liveQuizQuestions', session?.live_quiz_set_id],
     queryFn: async () => {
+      if (!session?.live_quiz_set_id) return [];
       const qs = await base44.entities.LiveQuizQuestion.filter({ 
-        live_quiz_set_id: sessionId 
+        live_quiz_set_id: session.live_quiz_set_id 
       }, 'order');
-      console.log('[DEBUG] Found', qs.length, 'questions for session:', sessionId);
+      console.log('[DEBUG] Found', qs.length, 'questions for quiz set:', session.live_quiz_set_id.substring(0, 6));
       return qs;
     },
-    enabled: !!sessionId
+    enabled: !!session?.live_quiz_set_id
   });
 
   const startGameMutation = useMutation({
     mutationFn: async () => {
-      console.log('[DEBUG] Start Game clicked for session:', sessionId);
+      console.log('[DEBUG] Start Game clicked for session:', sessionId.substring(0, 6));
+      console.log('[DEBUG] Quiz set ID:', session?.live_quiz_set_id?.substring(0, 6));
       console.log('[DEBUG] Players:', players.length);
       console.log('[DEBUG] Questions:', questions.length);
 
       if (questions.length === 0) {
-        throw new Error('No questions in this live quiz');
+        throw new Error('No questions in this live quiz. Please add questions before starting.');
       }
 
       const updateData = {
@@ -80,15 +82,20 @@ export default function TeacherLiveQuizLobby() {
         started_at: new Date().toISOString()
       };
 
-      console.log('[DEBUG] Updating session with:', updateData);
+      console.log('[DEBUG] Updating session to live with data:', updateData);
 
       const result = await base44.entities.LiveQuizSession.update(sessionId, updateData);
       
-      console.log('[DEBUG] Session updated successfully:', result);
+      console.log('[DEBUG] Session updated successfully. New status:', result?.status || 'unknown');
+      
+      // Invalidate queries to force refresh
+      queryClient.invalidateQueries(['liveQuizSession']);
+      queryClient.invalidateQueries(['activeLiveSessions']);
+      
       return result;
     },
     onSuccess: () => {
-      console.log('[DEBUG] Navigating to play page');
+      console.log('[DEBUG] Navigating to teacher play page');
       navigate(createPageUrl(`TeacherLiveQuizPlay?sessionId=${sessionId}`));
     },
     onError: (error) => {
