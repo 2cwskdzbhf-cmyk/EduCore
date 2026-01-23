@@ -882,7 +882,7 @@ export default function TeacherClassDetail() {
                               <p className="text-xs text-slate-400 truncate">{student.email}</p>
                             </div>
 
-                            <div className="grid grid-cols-4 gap-6 text-center">
+                            <div className="grid grid-cols-5 gap-6 text-center">
                               <div>
                                 <p className="text-xs text-slate-500 mb-1">Accuracy</p>
                                 <p className="text-lg font-bold text-white">
@@ -901,6 +901,12 @@ export default function TeacherClassDetail() {
                                 <p className="text-xs text-slate-500 mb-1">Time</p>
                                 <p className="text-lg font-bold text-white">
                                   {Math.floor(student.totalTimeSeconds / 60)}m
+                                </p>
+                              </div>
+                              <div>
+                                <p className="text-xs text-slate-500 mb-1">Avg/Q</p>
+                                <p className="text-lg font-bold text-white">
+                                  {student.totalQuestions > 0 ? formatTime(Math.floor(student.totalTimeSeconds / student.totalQuestions)) : '—'}
                                 </p>
                               </div>
                             </div>
@@ -1051,9 +1057,11 @@ function AssignmentProgressModal({ assignment, classStudents, submissions, topic
   });
 
   const formatTime = (seconds) => {
+    if (seconds === 0) return '0s';
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
-    return `${mins}m ${secs}s`;
+    if (mins === 0) return `${secs}s`;
+    return secs > 0 ? `${mins}m ${secs}s` : `${mins}m`;
   };
 
   return (
@@ -1131,7 +1139,7 @@ function AssignmentProgressModal({ assignment, classStudents, submissions, topic
                       {student.status}
                     </span>
 
-                    <div className="grid grid-cols-4 gap-6 text-center">
+                    <div className="grid grid-cols-5 gap-6 text-center">
                       <div>
                         <p className="text-xs text-slate-500 mb-1">Questions</p>
                         <p className="text-lg font-bold text-white">{student.questionsAnswered}</p>
@@ -1149,6 +1157,12 @@ function AssignmentProgressModal({ assignment, classStudents, submissions, topic
                       <div>
                         <p className="text-xs text-slate-500 mb-1">Time</p>
                         <p className="text-lg font-bold text-white">{formatTime(student.timeSpent)}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-slate-500 mb-1">Avg/Q</p>
+                        <p className="text-lg font-bold text-white">
+                          {student.questionsAnswered > 0 ? formatTime(Math.floor(student.timeSpent / student.questionsAnswered)) : '—'}
+                        </p>
                       </div>
                     </div>
 

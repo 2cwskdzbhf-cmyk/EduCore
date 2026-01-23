@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { X, Clock, Target, Award } from 'lucide-react';
+import { X, Clock, Target, Award, TrendingUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import GlassCard from '@/components/ui/GlassCard';
 import { format } from 'date-fns';
@@ -44,10 +44,16 @@ export default function StudentStatsModal({ student, assignments, submissions, o
   });
 
   const formatTime = (seconds) => {
+    if (seconds === 0) return '0s';
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
-    return `${mins}m ${secs}s`;
+    if (mins === 0) return `${secs}s`;
+    return secs > 0 ? `${mins}m ${secs}s` : `${mins}m`;
   };
+  
+  const avgTimePerQuestion = totalQuestions > 0 
+    ? formatTime(Math.floor(totalTimeSeconds / totalQuestions))
+    : '—';
 
   return (
     <motion.div
@@ -81,7 +87,7 @@ export default function StudentStatsModal({ student, assignments, submissions, o
           </div>
 
           {/* Overall Stats */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
             <div className="bg-white/5 rounded-xl p-4 border border-white/10">
               <div className="flex items-center gap-2 mb-2">
                 <Target className="w-4 h-4 text-purple-400" />
@@ -109,9 +115,17 @@ export default function StudentStatsModal({ student, assignments, submissions, o
             <div className="bg-white/5 rounded-xl p-4 border border-white/10">
               <div className="flex items-center gap-2 mb-2">
                 <Clock className="w-4 h-4 text-amber-400" />
-                <p className="text-xs text-slate-400">Time Spent</p>
+                <p className="text-xs text-slate-400">Total Time</p>
               </div>
               <p className="text-2xl font-bold text-white">{formatTime(totalTimeSeconds)}</p>
+            </div>
+            
+            <div className="bg-white/5 rounded-xl p-4 border border-white/10">
+              <div className="flex items-center gap-2 mb-2">
+                <Clock className="w-4 h-4 text-cyan-400" />
+                <p className="text-xs text-slate-400">Avg/Question</p>
+              </div>
+              <p className="text-2xl font-bold text-white">{avgTimePerQuestion}</p>
             </div>
           </div>
 
