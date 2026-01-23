@@ -43,6 +43,7 @@ export default function TeacherClassDetail() {
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [selectedAssignment, setSelectedAssignment] = useState(null);
   const [deleteConfirmAssignment, setDeleteConfirmAssignment] = useState(null);
+  const [createMode, setCreateMode] = useState(''); // 'manual' or 'ai'
 
   const copyJoinCode = (code) => {
     navigator.clipboard.writeText(code);
@@ -359,13 +360,87 @@ export default function TeacherClassDetail() {
               <TabsTrigger value="analytics">Analytics</TabsTrigger>
             </TabsList>
 
-            {/* Assignments Tab */}
+            {/* Create Tab */}
             <TabsContent value="practice" className="space-y-6">
-              <GlassCard className="p-6">
-                <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-                  <Sparkles className="w-5 h-5 text-purple-400" />
-                  AI Generate Assignment Questions
-                </h3>
+              {!createMode && (
+                <GlassCard className="p-8">
+                  <h3 className="text-xl font-bold text-white mb-6 text-center">Choose Creation Method</h3>
+                  <div className="grid md:grid-cols-2 gap-6">
+                    <motion.div
+                      whileHover={{ scale: 1.02 }}
+                      className="cursor-pointer"
+                      onClick={() => setCreateMode('manual')}
+                    >
+                      <GlassCard className="p-8 text-center hover:bg-white/10 border-2 border-white/10 hover:border-purple-500/50">
+                        <div className="w-16 h-16 mx-auto mb-4 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center">
+                          <Edit2 className="w-8 h-8 text-white" />
+                        </div>
+                        <h4 className="text-xl font-bold text-white mb-2">Manual Create</h4>
+                        <p className="text-sm text-slate-400">Build assignments manually or add questions from the library</p>
+                      </GlassCard>
+                    </motion.div>
+
+                    <motion.div
+                      whileHover={{ scale: 1.02 }}
+                      className="cursor-pointer"
+                      onClick={() => setCreateMode('ai')}
+                    >
+                      <GlassCard className="p-8 text-center hover:bg-white/10 border-2 border-white/10 hover:border-purple-500/50">
+                        <div className="w-16 h-16 mx-auto mb-4 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
+                          <Sparkles className="w-8 h-8 text-white" />
+                        </div>
+                        <h4 className="text-xl font-bold text-white mb-2">AI Generate</h4>
+                        <p className="text-sm text-slate-400">Let AI create practice questions for your students</p>
+                      </GlassCard>
+                    </motion.div>
+                  </div>
+                </GlassCard>
+              )}
+
+              {createMode === 'manual' && (
+                <GlassCard className="p-6">
+                  <div className="flex items-center justify-between mb-6">
+                    <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                      <Edit2 className="w-5 h-5 text-blue-400" />
+                      Manual Create
+                    </h3>
+                    <Button variant="ghost" onClick={() => setCreateMode('')} className="text-slate-400">
+                      <X className="w-5 h-5" />
+                    </Button>
+                  </div>
+                  
+                  <div className="space-y-4">
+                    <Button
+                      onClick={() => navigate(createPageUrl(`AssignmentBuilder?classId=${classId}`))}
+                      className="w-full bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 shadow-lg shadow-emerald-500/30 text-white"
+                    >
+                      <Plus className="w-5 h-5 mr-2" />
+                      Create Assignment from Scratch
+                    </Button>
+
+                    <Button
+                      onClick={() => navigate(createPageUrl('TeacherAssignmentLibrary'))}
+                      className="w-full bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 shadow-lg shadow-blue-500/30 text-white"
+                    >
+                      <BookOpen className="w-5 h-5 mr-2" />
+                      Add Questions from Library
+                    </Button>
+                  </div>
+                </GlassCard>
+              )}
+
+              {createMode === 'ai' && (
+                <>
+                  <GlassCard className="p-6">
+                    <div className="flex items-center justify-between mb-6">
+                      <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                        <Sparkles className="w-5 h-5 text-purple-400" />
+                        AI Generate Assignment Questions
+                      </h3>
+                      <Button variant="ghost" onClick={() => setCreateMode('')} className="text-slate-400">
+                        <X className="w-5 h-5" />
+                      </Button>
+                    </div>
 
                 <div className="space-y-4">
                   <div className="grid md:grid-cols-2 gap-4">
@@ -424,33 +499,25 @@ export default function TeacherClassDetail() {
                     </div>
                   </div>
 
-                  <div className="space-y-3">
-                    <Button
-                      onClick={() => generatePracticeMutation.mutate({ regenerateIndex: null, regenerateFeedback: '' })}
-                      disabled={!selectedTopic || generatePracticeMutation.isPending || cooldownRemaining > 0}
-                      className="w-full bg-gradient-to-r from-purple-500 to-blue-500"
-                    >
-                      {generatePracticeMutation.isPending ? (
-                        <>
-                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                          Generating...
-                        </>
-                      ) : cooldownRemaining > 0 ? (
-                        <>Wait {cooldownRemaining}s...</>
-                      ) : (
-                        <>
-                          <Sparkles className="w-4 h-4 mr-2" />
-                          Generate Questions
-                        </>
-                      )}
-                    </Button>
-                    <Button
-                      onClick={() => navigate(createPageUrl('TeacherAssignmentLibrary'))}
-                      className="w-full bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 shadow-lg shadow-blue-500/30 text-white"
-                    >
-                      Assignment Library
-                    </Button>
-                  </div>
+                  <Button
+                    onClick={() => generatePracticeMutation.mutate({ regenerateIndex: null, regenerateFeedback: '' })}
+                    disabled={!selectedTopic || generatePracticeMutation.isPending || cooldownRemaining > 0}
+                    className="w-full bg-gradient-to-r from-purple-500 to-blue-500"
+                  >
+                    {generatePracticeMutation.isPending ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Generating...
+                      </>
+                    ) : cooldownRemaining > 0 ? (
+                      <>Wait {cooldownRemaining}s...</>
+                    ) : (
+                      <>
+                        <Sparkles className="w-4 h-4 mr-2" />
+                        Generate Questions
+                      </>
+                    )}
+                  </Button>
 
                   {generatePracticeMutation.isError && (
                     <div className="p-3 rounded-lg bg-red-500/20 border border-red-500/30 text-red-400 text-sm">
@@ -521,24 +588,26 @@ export default function TeacherClassDetail() {
                     Assignment questions published! Students can now practice.
                   </div>
                 )}
-              </GlassCard>
+                  </GlassCard>
 
-              <GlassCard className="p-6">
-                <h3 className="text-lg font-bold text-white mb-4">Assignment Question Bank ({questionBank.length})</h3>
-                {questionBank.length > 0 ? (
-                  <div className="space-y-2 max-h-96 overflow-y-auto">
-                    {questionBank.slice(0, 20).map((q, i) => (
-                      <div key={q.id} className="p-3 bg-white/5 rounded-lg text-sm">
-                        <p className="text-white">{q.prompt}</p>
-                        <p className="text-emerald-400 text-xs">Answer: {q.correct_answer}</p>
+                  <GlassCard className="p-6">
+                    <h3 className="text-lg font-bold text-white mb-4">Assignment Question Bank ({questionBank.length})</h3>
+                    {questionBank.length > 0 ? (
+                      <div className="space-y-2 max-h-96 overflow-y-auto">
+                        {questionBank.slice(0, 20).map((q, i) => (
+                          <div key={q.id} className="p-3 bg-white/5 rounded-lg text-sm">
+                            <p className="text-white">{q.prompt}</p>
+                            <p className="text-emerald-400 text-xs">Answer: {q.correct_answer}</p>
+                          </div>
+                        ))}
+                        {questionBank.length > 20 && <p className="text-slate-500 text-xs">...and {questionBank.length - 20} more</p>}
                       </div>
-                    ))}
-                    {questionBank.length > 20 && <p className="text-slate-500 text-xs">...and {questionBank.length - 20} more</p>}
-                  </div>
-                ) : (
-                  <p className="text-slate-400 text-sm">No assignment questions yet. Use AI generator above.</p>
-                )}
-              </GlassCard>
+                    ) : (
+                      <p className="text-slate-400 text-sm">No assignment questions yet. Use AI generator above.</p>
+                    )}
+                  </GlassCard>
+                </>
+              )}
             </TabsContent>
 
             {/* Live Quizzes Tab */}
@@ -712,16 +781,7 @@ export default function TeacherClassDetail() {
 
             {/* Set Assignments Tab */}
             <TabsContent value="setAssignments" className="space-y-6">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-2xl font-bold text-white">Class Assignments</h2>
-                <Button
-                  onClick={() => navigate(createPageUrl('TeacherAssignmentLibrary'))}
-                  className="bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 shadow-lg shadow-emerald-500/30"
-                >
-                  <Plus className="w-4 h-4 mr-2" />
-                  Assign from Library
-                </Button>
-              </div>
+              <h2 className="text-2xl font-bold text-white mb-6">Manage Assignments</h2>
 
               {assignments.length > 0 ? (
                 <div className="space-y-4">
@@ -777,24 +837,14 @@ export default function TeacherClassDetail() {
                             </div>
                           </div>
 
-                          <div className="flex gap-2">
-                            <Button
-                              size="sm"
-                              onClick={() => navigate(createPageUrl(`AssignmentBuilder?classId=${classId}&assignmentId=${assignment.id}`))}
-                              className="bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 shadow-lg shadow-blue-500/30"
-                            >
-                              <Edit2 className="w-4 h-4 mr-1" />
-                              Edit
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => setDeleteConfirmAssignment(assignment)}
-                              className="border-red-500/30 text-red-400 hover:bg-red-500/10"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          </div>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setDeleteConfirmAssignment(assignment)}
+                            className="border-red-500/30 text-red-400 hover:bg-red-500/10"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
                         </div>
 
                         <div className="grid grid-cols-3 gap-4 pt-4 border-t border-white/10" onClick={() => setSelectedAssignment(assignment)}>
