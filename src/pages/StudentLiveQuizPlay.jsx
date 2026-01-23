@@ -6,7 +6,7 @@ import { useNavigate } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import { Button } from '@/components/ui/button';
 import GlassCard from '@/components/ui/GlassCard';
-import { Trophy, Clock, Loader2, Zap, Target } from 'lucide-react';
+import { Trophy, Clock, Loader2, Zap, Target, CheckCircle2 } from 'lucide-react';
 
 export default function StudentLiveQuizPlay() {
   const navigate = useNavigate();

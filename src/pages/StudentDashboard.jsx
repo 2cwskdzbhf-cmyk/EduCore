@@ -452,6 +452,15 @@ export default function StudentDashboard() {
             </div>
           </DialogContent>
         </Dialog>
+
+        <AnimatePresence>
+          {showLiveQuizJoin && activeLiveSession && (
+            <LiveQuizJoinModal
+              session={activeLiveSession}
+              onClose={() => setShowLiveQuizJoin(false)}
+            />
+          )}
+        </AnimatePresence>
       </div>
     </div>
   );

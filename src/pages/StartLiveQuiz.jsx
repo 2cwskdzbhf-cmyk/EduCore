@@ -12,7 +12,8 @@ export default function StartLiveQuiz() {
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
   const urlParams = new URLSearchParams(window.location.search);
-  const quizSetId = urlParams.get('quizSetId');
+  const setId = urlParams.get('setId');
+  const classId = urlParams.get('classId');
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -23,38 +24,43 @@ export default function StartLiveQuiz() {
   }, []);
 
   const { data: quizSet, isLoading } = useQuery({
-    queryKey: ['quizSet', quizSetId],
+    queryKey: ['liveQuizSet', setId],
     queryFn: async () => {
-      if (!quizSetId) return null;
-      const sets = await base44.entities.QuizSet.filter({ id: quizSetId });
+      if (!setId) return null;
+      const sets = await base44.entities.LiveQuizSet.filter({ id: setId });
       return sets[0];
     },
-    enabled: !!quizSetId
+    enabled: !!setId
   });
 
   const { data: questions = [] } = useQuery({
-    queryKey: ['quizQuestions', quizSetId],
+    queryKey: ['liveQuizQuestions', setId],
     queryFn: async () => {
-      if (!quizSetId) return [];
-      return base44.entities.QuizQuestion.filter({ quiz_set_id: quizSetId }, 'order');
+      if (!setId) return [];
+      return base44.entities.LiveQuizQuestion.filter({ live_quiz_set_id: setId }, 'order');
     },
-    enabled: !!quizSetId
+    enabled: !!setId
   });
 
   const createSessionMutation = useMutation({
     mutationFn: async () => {
-      const response = await base44.functions.invoke('createLiveQuizSession', {
-        quizSetId,
+      const session = await base44.entities.LiveQuizSession.create({
+        class_id: classId,
+        host_email: user.email,
+        live_quiz_set_id: setId,
+        status: 'lobby',
+        current_question_index: -1,
+        player_count: 0,
         settings: {
-          timePerQuestion: quizSet.time_limit_per_question,
-          basePoints: 500,
-          roundMultiplierIncrement: 0.25
+          time_per_question: quizSet.time_limit_per_question || 15000,
+          base_points: 500,
+          round_multiplier_increment: 0.25
         }
       });
-      return response.data;
+      return session;
     },
-    onSuccess: (data) => {
-      navigate(createPageUrl(`LiveQuizHost?sessionId=${data.session.id}`));
+    onSuccess: (session) => {
+      navigate(createPageUrl(`TeacherLiveQuizLobby?sessionId=${session.id}`));
     }
   });
 
