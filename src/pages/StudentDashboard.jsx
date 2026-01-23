@@ -312,7 +312,7 @@ export default function StudentDashboard() {
                   return (
                     <Link
                       key={assignment.id}
-                      to={createPageUrl(`StudentClassDetail?classId=${assignment.class_id}`)}
+                      to={createPageUrl(`AssignmentDue?id=${assignment.id}`)}
                     >
                       <motion.div
                         initial={{ opacity: 0, x: -20 }}

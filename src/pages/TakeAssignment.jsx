@@ -47,6 +47,16 @@ export default function TakeAssignment() {
     enabled: !!assignmentId
   });
 
+  const { data: classData } = useQuery({
+    queryKey: ['class', assignment?.class_id],
+    queryFn: async () => {
+      if (!assignment?.class_id) return null;
+      const classes = await base44.entities.Class.filter({ id: assignment.class_id });
+      return classes[0] || null;
+    },
+    enabled: !!assignment?.class_id
+  });
+
   const { data: quizSet } = useQuery({
     queryKey: ['quizSet', assignment?.quiz_id],
     queryFn: async () => {
@@ -134,12 +144,18 @@ export default function TakeAssignment() {
     }
   });
 
-  if (!assignment || questions.length === 0) {
+  if (!assignment || questions.length === 0 || !classData) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900/20 to-slate-900 p-6 flex items-center justify-center">
         <div className="w-8 h-8 border-4 border-purple-500 border-t-transparent rounded-full animate-spin" />
       </div>
     );
+  }
+
+  // Security check: Ensure student is enrolled in the class
+  if (user && !classData.student_emails?.includes(user.email)) {
+    navigate(createPageUrl('StudentDashboard'));
+    return null;
   }
 
   const currentQuestion = questions[currentQuestionIndex];
@@ -187,11 +203,11 @@ export default function TakeAssignment() {
         {/* Header */}
         <div className="mb-6">
           <button
-            onClick={() => navigate(createPageUrl(`StudentClassDetail?classId=${assignment.class_id}`))}
+            onClick={() => navigate(createPageUrl(`AssignmentDue?id=${assignmentId}`))}
             className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors mb-4"
           >
             <ChevronLeft className="w-5 h-5" />
-            Back to Class
+            Back to Assignment Overview
           </button>
 
           <GlassCard className="p-6">

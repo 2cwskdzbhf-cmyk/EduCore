@@ -22,6 +22,7 @@ import TeacherDashboard from './pages/TeacherDashboard';
 import TeacherQuestionBuilder from './pages/TeacherQuestionBuilder';
 import TeacherQuestionGenerator from './pages/TeacherQuestionGenerator';
 import Topic from './pages/Topic';
+import AssignmentDue from './pages/AssignmentDue';
 import __Layout from './Layout.jsx';
 
 
@@ -50,6 +51,7 @@ export const PAGES = {
     "TeacherQuestionBuilder": TeacherQuestionBuilder,
     "TeacherQuestionGenerator": TeacherQuestionGenerator,
     "Topic": Topic,
+    "AssignmentDue": AssignmentDue,
 }
 
 export const pagesConfig = {
