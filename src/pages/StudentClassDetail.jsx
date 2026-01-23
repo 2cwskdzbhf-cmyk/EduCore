@@ -161,7 +161,7 @@ export default function StudentClassDetail() {
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: index * 0.1 }}
                     >
-                      <Link to={assignment.quiz_id ? createPageUrl(`Quiz?id=${assignment.quiz_id}`) : '#'}>
+                      <Link to={createPageUrl(`TakeAssignment?id=${assignment.id}`)}>
                         <GlassCard className="p-6 hover:scale-[1.01]">
                           <div className="flex items-start justify-between">
                             <div className="flex-1">

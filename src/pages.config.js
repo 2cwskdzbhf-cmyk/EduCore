@@ -1,5 +1,6 @@
 import AITutor from './pages/AITutor';
 import AdminPanel from './pages/AdminPanel';
+import AssignmentBuilder from './pages/AssignmentBuilder';
 import ClassDetails from './pages/ClassDetails';
 import CreateAssignment from './pages/CreateAssignment';
 import CreateQuiz from './pages/CreateQuiz';
@@ -21,13 +22,14 @@ import TeacherDashboard from './pages/TeacherDashboard';
 import TeacherQuestionBuilder from './pages/TeacherQuestionBuilder';
 import TeacherQuestionGenerator from './pages/TeacherQuestionGenerator';
 import Topic from './pages/Topic';
-import AssignmentBuilder from './pages/AssignmentBuilder';
+import TakeAssignment from './pages/TakeAssignment';
 import __Layout from './Layout.jsx';
 
 
 export const PAGES = {
     "AITutor": AITutor,
     "AdminPanel": AdminPanel,
+    "AssignmentBuilder": AssignmentBuilder,
     "ClassDetails": ClassDetails,
     "CreateAssignment": CreateAssignment,
     "CreateQuiz": CreateQuiz,
@@ -49,7 +51,7 @@ export const PAGES = {
     "TeacherQuestionBuilder": TeacherQuestionBuilder,
     "TeacherQuestionGenerator": TeacherQuestionGenerator,
     "Topic": Topic,
-    "AssignmentBuilder": AssignmentBuilder,
+    "TakeAssignment": TakeAssignment,
 }
 
 export const pagesConfig = {

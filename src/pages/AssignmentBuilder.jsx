@@ -16,6 +16,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import GlassCard from '@/components/ui/GlassCard';
+import { Switch } from '@/components/ui/switch';
 import { 
   ChevronLeft,
   Plus,
@@ -23,7 +24,8 @@ import {
   Save,
   CheckCircle2,
   AlertCircle,
-  Trash2
+  Trash2,
+  X
 } from 'lucide-react';
 
 export default function AssignmentBuilder() {
@@ -38,10 +40,14 @@ export default function AssignmentBuilder() {
   const [questions, setQuestions] = useState([
     {
       id: 1,
+      type: 'multiple_choice',
       prompt: '',
       options: ['', '', '', ''],
       correctIndex: null,
-      explanation: ''
+      explanation: '',
+      answerKeywords: [''],
+      requireWorking: false,
+      workingKeywords: ['']
     }
   ]);
 
@@ -89,13 +95,37 @@ export default function AssignmentBuilder() {
       ...questions,
       {
         id: questions.length + 1,
+        type: 'multiple_choice',
         prompt: '',
         options: ['', '', '', ''],
         correctIndex: null,
-        explanation: ''
+        explanation: '',
+        answerKeywords: [''],
+        requireWorking: false,
+        workingKeywords: ['']
       }
     ]);
     setCurrentQuestionIndex(questions.length);
+  };
+
+  const addKeyword = (field) => {
+    const updated = [...questions];
+    updated[currentQuestionIndex][field].push('');
+    setQuestions(updated);
+  };
+
+  const updateKeyword = (field, index, value) => {
+    const updated = [...questions];
+    updated[currentQuestionIndex][field][index] = value;
+    setQuestions(updated);
+  };
+
+  const removeKeyword = (field, index) => {
+    const updated = [...questions];
+    if (updated[currentQuestionIndex][field].length > 1) {
+      updated[currentQuestionIndex][field].splice(index, 1);
+      setQuestions(updated);
+    }
   };
 
   const deleteQuestion = (index) => {
@@ -108,13 +138,33 @@ export default function AssignmentBuilder() {
   };
 
   const isQuestionValid = (q) => {
-    return q.prompt.trim() !== '' && 
-           q.options.filter(opt => opt.trim() !== '').length >= 2 &&
-           q.correctIndex !== null;
+    if (q.prompt.trim() === '') return false;
+    
+    if (q.type === 'multiple_choice') {
+      return q.options.filter(opt => opt.trim() !== '').length >= 2 && q.correctIndex !== null;
+    } else if (q.type === 'written') {
+      const hasAnswerKeywords = q.answerKeywords.filter(kw => kw.trim() !== '').length > 0;
+      if (!hasAnswerKeywords) return false;
+      
+      if (q.requireWorking) {
+        return q.workingKeywords.filter(kw => kw.trim() !== '').length > 0;
+      }
+      return true;
+    }
+    
+    return false;
   };
 
   const isQuestionComplete = (q) => {
-    return isQuestionValid(q) && q.options.every(opt => opt.trim() !== '');
+    if (!isQuestionValid(q)) return false;
+    
+    if (q.type === 'multiple_choice') {
+      return q.options.every(opt => opt.trim() !== '');
+    } else if (q.type === 'written') {
+      return q.answerKeywords.every(kw => kw.trim() !== '');
+    }
+    
+    return isQuestionValid(q);
   };
 
   const goToNextQuestion = () => {
@@ -155,14 +205,26 @@ export default function AssignmentBuilder() {
 
       for (let i = 0; i < questions.length; i++) {
         const q = questions[i];
-        await base44.entities.QuizQuestion.create({
+        const questionData = {
           quiz_set_id: quizSet.id,
           order: i,
           prompt: q.prompt,
-          options: q.options,
-          correct_index: q.correctIndex,
-          explanation: q.explanation
-        });
+          explanation: q.explanation,
+          question_type: q.type || 'multiple_choice'
+        };
+
+        if (q.type === 'multiple_choice') {
+          questionData.options = q.options;
+          questionData.correct_index = q.correctIndex;
+        } else if (q.type === 'written') {
+          questionData.answer_keywords = q.answerKeywords.filter(kw => kw.trim() !== '');
+          questionData.require_working = q.requireWorking;
+          if (q.requireWorking) {
+            questionData.working_keywords = q.workingKeywords.filter(kw => kw.trim() !== '');
+          }
+        }
+
+        await base44.entities.QuizQuestion.create(questionData);
       }
 
       return { assignment, quizSet };
@@ -326,6 +388,23 @@ export default function AssignmentBuilder() {
           >
             <GlassCard className="p-8">
               <div className="space-y-6">
+                {/* Question Type */}
+                <div>
+                  <Label className="text-white mb-2">Question Type</Label>
+                  <Select 
+                    value={currentQuestion.type || 'multiple_choice'} 
+                    onValueChange={(value) => updateCurrentQuestion('type', value)}
+                  >
+                    <SelectTrigger className="bg-white/5 border-white/10 text-white">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="multiple_choice">Multiple Choice</SelectItem>
+                      <SelectItem value="written">Written Answer</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
                 {/* Question Prompt */}
                 <div>
                   <Label className="text-white mb-2 flex items-center gap-2">
@@ -345,37 +424,138 @@ export default function AssignmentBuilder() {
                   />
                 </div>
 
-                {/* Answer Options */}
-                <div>
-                  <Label className="text-white mb-3">Answer Options</Label>
-                  <div className="space-y-3">
-                    {currentQuestion.options.map((option, idx) => (
-                      <div key={idx} className="flex items-center gap-3">
-                        <button
-                          onClick={() => updateCurrentQuestion('correctIndex', idx)}
-                          className={`
-                            w-10 h-10 rounded-lg flex items-center justify-center font-bold transition-all
-                            ${currentQuestion.correctIndex === idx
-                              ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/50'
-                              : 'bg-white/5 text-slate-400 border border-white/10 hover:bg-white/10'
-                            }
-                          `}
+                {/* Conditional: Multiple Choice Options */}
+                {currentQuestion.type === 'multiple_choice' && (
+                  <div>
+                    <Label className="text-white mb-3">Answer Options</Label>
+                    <div className="space-y-3">
+                      {currentQuestion.options.map((option, idx) => (
+                        <div key={idx} className="flex items-center gap-3">
+                          <button
+                            onClick={() => updateCurrentQuestion('correctIndex', idx)}
+                            className={`
+                              w-10 h-10 rounded-lg flex items-center justify-center font-bold transition-all
+                              ${currentQuestion.correctIndex === idx
+                                ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/50'
+                                : 'bg-white/5 text-slate-400 border border-white/10 hover:bg-white/10'
+                              }
+                            `}
+                          >
+                            {String.fromCharCode(65 + idx)}
+                          </button>
+                          <Input
+                            placeholder={`Option ${String.fromCharCode(65 + idx)}`}
+                            value={option}
+                            onChange={(e) => updateOption(idx, e.target.value)}
+                            className="bg-white/5 border-white/10 text-white flex-1"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                    <p className="text-xs text-slate-500 mt-2">
+                      Click the letter to mark it as the correct answer
+                    </p>
+                  </div>
+                )}
+
+                {/* Conditional: Written Answer Keywords */}
+                {currentQuestion.type === 'written' && (
+                  <div className="space-y-6">
+                    <div>
+                      <Label className="text-white mb-2">Accepted Answer Keywords *</Label>
+                      <p className="text-xs text-slate-400 mb-3">
+                        Student answers will be marked as correct if they match any of these keywords (case-insensitive, fuzzy match)
+                      </p>
+                      <div className="space-y-2">
+                        {currentQuestion.answerKeywords.map((keyword, idx) => (
+                          <div key={idx} className="flex items-center gap-2">
+                            <Input
+                              placeholder="Enter keyword or phrase..."
+                              value={keyword}
+                              onChange={(e) => updateKeyword('answerKeywords', idx, e.target.value)}
+                              className="bg-white/5 border-white/10 text-white flex-1"
+                            />
+                            {currentQuestion.answerKeywords.length > 1 && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => removeKeyword('answerKeywords', idx)}
+                                className="text-red-400 hover:text-red-300"
+                              >
+                                <X className="w-4 h-4" />
+                              </Button>
+                            )}
+                          </div>
+                        ))}
+                        <Button
+                          size="sm"
+                          onClick={() => addKeyword('answerKeywords')}
+                          variant="outline"
+                          className="border-white/20 text-white hover:bg-white/10 w-full"
                         >
-                          {String.fromCharCode(65 + idx)}
-                        </button>
-                        <Input
-                          placeholder={`Option ${String.fromCharCode(65 + idx)}`}
-                          value={option}
-                          onChange={(e) => updateOption(idx, e.target.value)}
-                          className="bg-white/5 border-white/10 text-white flex-1"
+                          <Plus className="w-4 h-4 mr-1" />
+                          Add Keyword
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* Working/Explanation Requirements */}
+                    <div className="p-4 bg-white/5 rounded-xl border border-white/10">
+                      <div className="flex items-center justify-between mb-3">
+                        <div>
+                          <Label className="text-white">Require Explanation/Working?</Label>
+                          <p className="text-xs text-slate-400 mt-1">
+                            Students must provide working to show how they got their answer
+                          </p>
+                        </div>
+                        <Switch
+                          checked={currentQuestion.requireWorking}
+                          onCheckedChange={(checked) => updateCurrentQuestion('requireWorking', checked)}
                         />
                       </div>
-                    ))}
+
+                      {currentQuestion.requireWorking && (
+                        <div className="mt-4 pt-4 border-t border-white/10">
+                          <Label className="text-white mb-2">Required Working Keywords *</Label>
+                          <p className="text-xs text-slate-400 mb-3">
+                            All keywords must appear in the student's explanation for full credit
+                          </p>
+                          <div className="space-y-2">
+                            {currentQuestion.workingKeywords.map((keyword, idx) => (
+                              <div key={idx} className="flex items-center gap-2">
+                                <Input
+                                  placeholder="Enter required keyword..."
+                                  value={keyword}
+                                  onChange={(e) => updateKeyword('workingKeywords', idx, e.target.value)}
+                                  className="bg-white/5 border-white/10 text-white flex-1"
+                                />
+                                {currentQuestion.workingKeywords.length > 1 && (
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => removeKeyword('workingKeywords', idx)}
+                                    className="text-red-400 hover:text-red-300"
+                                  >
+                                    <X className="w-4 h-4" />
+                                  </Button>
+                                )}
+                              </div>
+                            ))}
+                            <Button
+                              size="sm"
+                              onClick={() => addKeyword('workingKeywords')}
+                              variant="outline"
+                              className="border-white/20 text-white hover:bg-white/10 w-full"
+                            >
+                              <Plus className="w-4 h-4 mr-1" />
+                              Add Working Keyword
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                  <p className="text-xs text-slate-500 mt-2">
-                    Click the letter to mark it as the correct answer
-                  </p>
-                </div>
+                )}
 
                 {/* Explanation (Optional) */}
                 <div>
