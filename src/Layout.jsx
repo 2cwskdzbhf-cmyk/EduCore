@@ -209,24 +209,30 @@ export default function Layout({ children, currentPageName }) {
           </div>
         </nav>
 
-        <div className="p-4 border-t border-white/10">
-          <div className="flex items-center gap-3 mb-3 overflow-hidden">
-            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center text-white font-bold flex-shrink-0 shadow-lg shadow-purple-500/50">
-              {user.full_name?.charAt(0) || user.email?.charAt(0) || '?'}
+        <div className={cn(
+          "p-4 border-t border-white/10",
+          !sidebarExpanded && "flex flex-col items-center"
+        )}>
+            <div className={cn(
+              "flex items-center mb-3",
+              sidebarExpanded ? "gap-3 overflow-hidden" : "justify-center"
+            )}>
+              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center text-white font-bold flex-shrink-0 shadow-lg shadow-purple-500/50">
+                {user.full_name?.charAt(0) || user.email?.charAt(0) || '?'}
+              </div>
+              <motion.div 
+                className="flex-1 min-w-0"
+                initial={{ opacity: 0, width: 0 }}
+                animate={{ 
+                  opacity: sidebarExpanded ? 1 : 0,
+                  width: sidebarExpanded ? 'auto' : 0
+                }}
+                transition={{ duration: 0.3 }}
+              >
+                <p className="font-medium text-white truncate text-sm">{user.full_name || 'User'}</p>
+                <p className="text-xs text-slate-400 truncate capitalize">{user.user_type || user.role || 'User'}</p>
+              </motion.div>
             </div>
-            <motion.div 
-              className="flex-1 min-w-0"
-              initial={{ opacity: 0, width: 0 }}
-              animate={{ 
-                opacity: sidebarExpanded ? 1 : 0,
-                width: sidebarExpanded ? 'auto' : 0
-              }}
-              transition={{ duration: 0.3 }}
-            >
-              <p className="font-medium text-white truncate text-sm">{user.full_name || 'User'}</p>
-              <p className="text-xs text-slate-400 truncate capitalize">{user.user_type || user.role || 'User'}</p>
-            </motion.div>
-          </div>
           <Button 
             variant="ghost" 
             className={cn(
