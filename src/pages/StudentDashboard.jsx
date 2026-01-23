@@ -36,8 +36,7 @@ export default function StudentDashboard() {
   const [joiningSessionId, setJoiningSessionId] = useState(null);
   const [nickname, setNickname] = useState('');
   const [dismissedLiveQuizSessionId, setDismissedLiveQuizSessionId] = useState(() => {
-    return sessionStorage.getItem('dismissedLiveQuizSessionId') || null;
-  });
+return localStorage.getItem('dismissedLiveQuizSessionId') || null;  });
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -104,7 +103,7 @@ export default function StudentDashboard() {
       const allSessions = await base44.entities.LiveQuizSession.filter(
         {
           class_id: { $in: classIds },
-          status: { $in: ['lobby', 'live'] }
+     status: { $in: ['lobby'] }
         },
         '-created_date'
       );
@@ -334,8 +333,7 @@ export default function StudentDashboard() {
   const dismissBanner = () => {
     if (!liveQuizBannerSession) return;
     setDismissedLiveQuizSessionId(liveQuizBannerSession.id);
-    sessionStorage.setItem('dismissedLiveQuizSessionId', liveQuizBannerSession.id);
-  };
+localStorage.setItem('dismissedLiveQuizSessionId', liveQuizBannerSession.id);  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900/20 to-slate-900 p-6">
