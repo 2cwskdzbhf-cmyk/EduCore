@@ -259,7 +259,7 @@ export default function AssignmentBuilder() {
             quiz_set_id: originalQuizId,
             order: i,
             prompt: q.prompt,
-            explanation: q.explanation,
+            explanation: q.explanation || '',
             question_type: q.type || 'multiple_choice'
           };
 
@@ -267,10 +267,24 @@ export default function AssignmentBuilder() {
             questionData.options = q.options;
             questionData.correct_index = q.correctIndex;
           } else if (q.type === 'written') {
-            questionData.answer_keywords = q.answerKeywords.filter(kw => kw.trim() !== '');
-            questionData.require_working = q.requireWorking;
+            // Normalize keywords: convert comma-separated string to array if needed
+            let keywords = q.answerKeywords;
+            if (typeof keywords === 'string') {
+              keywords = keywords.split(',').map(kw => kw.trim()).filter(kw => kw !== '');
+            } else if (Array.isArray(keywords)) {
+              keywords = keywords.filter(kw => kw.trim() !== '');
+            }
+            questionData.answer_keywords = keywords;
+            questionData.require_working = q.requireWorking || false;
+            
             if (q.requireWorking) {
-              questionData.working_keywords = q.workingKeywords.filter(kw => kw.trim() !== '');
+              let workingKw = q.workingKeywords;
+              if (typeof workingKw === 'string') {
+                workingKw = workingKw.split(',').map(kw => kw.trim()).filter(kw => kw !== '');
+              } else if (Array.isArray(workingKw)) {
+                workingKw = workingKw.filter(kw => kw.trim() !== '');
+              }
+              questionData.working_keywords = workingKw;
             }
           }
 
@@ -317,7 +331,7 @@ export default function AssignmentBuilder() {
             quiz_set_id: quizSet.id,
             order: i,
             prompt: q.prompt,
-            explanation: q.explanation,
+            explanation: q.explanation || '',
             question_type: q.type || 'multiple_choice'
           };
 
@@ -325,10 +339,24 @@ export default function AssignmentBuilder() {
             questionData.options = q.options;
             questionData.correct_index = q.correctIndex;
           } else if (q.type === 'written') {
-            questionData.answer_keywords = q.answerKeywords.filter(kw => kw.trim() !== '');
-            questionData.require_working = q.requireWorking;
+            // Normalize keywords: convert comma-separated string to array if needed
+            let keywords = q.answerKeywords;
+            if (typeof keywords === 'string') {
+              keywords = keywords.split(',').map(kw => kw.trim()).filter(kw => kw !== '');
+            } else if (Array.isArray(keywords)) {
+              keywords = keywords.filter(kw => kw.trim() !== '');
+            }
+            questionData.answer_keywords = keywords;
+            questionData.require_working = q.requireWorking || false;
+            
             if (q.requireWorking) {
-              questionData.working_keywords = q.workingKeywords.filter(kw => kw.trim() !== '');
+              let workingKw = q.workingKeywords;
+              if (typeof workingKw === 'string') {
+                workingKw = workingKw.split(',').map(kw => kw.trim()).filter(kw => kw !== '');
+              } else if (Array.isArray(workingKw)) {
+                workingKw = workingKw.filter(kw => kw.trim() !== '');
+              }
+              questionData.working_keywords = workingKw;
             }
           }
 
@@ -365,7 +393,9 @@ export default function AssignmentBuilder() {
     },
     onError: (error) => {
       console.error('Failed to publish assignment:', error);
-      alert('Failed to publish assignment. Please try again.');
+      console.error('Full error details:', JSON.stringify(error, null, 2));
+      const errorMessage = error?.message || error?.error || 'Unknown error occurred';
+      alert(`Failed to publish assignment:\n\n${errorMessage}\n\nCheck console for full details.`);
     }
   });
 
