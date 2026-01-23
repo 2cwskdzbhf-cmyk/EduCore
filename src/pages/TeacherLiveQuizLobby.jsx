@@ -9,7 +9,6 @@ import GlassCard from '@/components/ui/GlassCard';
 import {
   Users,
   Play,
-  X,
   Copy,
   CheckCircle2,
   Loader2,
@@ -23,6 +22,8 @@ export default function TeacherLiveQuizLobby() {
   const sessionId = params.get('sessionId');
 
   const [copied, setCopied] = useState(false);
+
+  // Prevent ending session when we intentionally navigate Lobby -> Play
   const leavingForPlayRef = useRef(false);
 
   /* ---------------- SESSION ---------------- */
@@ -33,8 +34,22 @@ export default function TeacherLiveQuizLobby() {
       return s[0];
     },
     enabled: !!sessionId,
-    refetchInterval: 2000
+    refetchInterval: 1500
   });
+
+  /* ✅ AUTO-REDIRECT WHEN SESSION STARTS */
+  useEffect(() => {
+    if (!sessionId || !session?.status) return;
+
+    if (session.status === 'live') {
+      leavingForPlayRef.current = true;
+      navigate(createPageUrl(`TeacherLiveQuizPlay?sessionId=${sessionId}`), { replace: true });
+    }
+
+    if (session.status === 'ended') {
+      navigate(createPageUrl('TeacherDashboard'), { replace: true });
+    }
+  }, [session?.status, sessionId, navigate]);
 
   /* ---------------- UNIVERSAL SET ID ---------------- */
   const quizSetId =
@@ -112,6 +127,7 @@ export default function TeacherLiveQuizLobby() {
   /* ---------------- END SESSION (SAFE) ---------------- */
   const endSession = async (reason) => {
     try {
+      if (!sessionId) return;
       await base44.entities.LiveQuizSession.update(sessionId, {
         status: 'ended',
         ended_at: new Date().toISOString(),
@@ -139,7 +155,7 @@ export default function TeacherLiveQuizLobby() {
         endSession('teacher_navigated_away');
       }
     };
-  }, [session?.status]);
+  }, [session?.status, sessionId]);
 
   /* ---------------- START QUIZ ---------------- */
   const startMutation = useMutation({
@@ -155,8 +171,9 @@ export default function TeacherLiveQuizLobby() {
       });
     },
     onSuccess: () => {
+      // We also navigate here, but the redirect effect above is a backup
       leavingForPlayRef.current = true;
-      navigate(createPageUrl(`TeacherLiveQuizPlay?sessionId=${sessionId}`));
+      navigate(createPageUrl(`TeacherLiveQuizPlay?sessionId=${sessionId}`), { replace: true });
     },
     onError: (e) => alert(e.message)
   });
@@ -169,16 +186,11 @@ export default function TeacherLiveQuizLobby() {
     );
   }
 
+  // ✅ Instead of a dead-end message, show a spinner while redirecting
   if (session.status !== 'lobby') {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <GlassCard className="p-8 text-center">
-          <AlertTriangle className="w-10 h-10 text-amber-400 mx-auto mb-3" />
-          <p className="text-white">Session no longer in lobby</p>
-          <Button onClick={() => navigate(createPageUrl('TeacherDashboard'))}>
-            Back
-          </Button>
-        </GlassCard>
+        <Loader2 className="w-12 h-12 animate-spin text-purple-400" />
       </div>
     );
   }
@@ -192,16 +204,12 @@ export default function TeacherLiveQuizLobby() {
           <h1 className="text-3xl font-bold text-white mb-1">
             {quizSet?.title || 'Live Quiz'}
           </h1>
-          <p className="text-slate-400 mb-6">
-            Waiting for students to join
-          </p>
+          <p className="text-slate-400 mb-6">Waiting for students to join</p>
 
           <div className="inline-flex items-center gap-4 bg-white/10 px-8 py-6 rounded-2xl mb-6">
             <div>
               <p className="text-sm text-slate-400">Join Code</p>
-              <p className="text-5xl font-mono font-bold text-white">
-                {joinCode}
-              </p>
+              <p className="text-5xl font-mono font-bold text-white">{joinCode}</p>
             </div>
             <Button
               variant="outline"
@@ -219,20 +227,29 @@ export default function TeacherLiveQuizLobby() {
             {players.length} player{players.length !== 1 && 's'} joined
           </p>
 
+          {questions.length === 0 && (
+            <div className="mb-4 p-3 rounded-lg bg-red-500/20 border border-red-500/30 text-red-400 text-sm flex items-center gap-2 justify-center">
+              <AlertTriangle className="w-4 h-4" />
+              No questions found for this quiz set
+            </div>
+          )}
+
           <Button
             onClick={() => startMutation.mutate()}
-            disabled={players.length === 0 || startMutation.isPending}
+            disabled={players.length === 0 || questions.length === 0 || startMutation.isPending}
             className="bg-gradient-to-r from-emerald-500 to-teal-500 px-10"
           >
-            <Play className="w-4 h-4 mr-2" />
+            {startMutation.isPending ? (
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            ) : (
+              <Play className="w-4 h-4 mr-2" />
+            )}
             Start Quiz ({questions.length} questions)
           </Button>
         </GlassCard>
 
         <GlassCard className="p-6">
-          <h3 className="text-lg font-bold text-white mb-4">
-            Players
-          </h3>
+          <h3 className="text-lg font-bold text-white mb-4">Players</h3>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
             <AnimatePresence>
               {players.map((p, i) => (
@@ -248,6 +265,12 @@ export default function TeacherLiveQuizLobby() {
               ))}
             </AnimatePresence>
           </div>
+
+          {players.length === 0 && (
+            <p className="text-slate-400 text-center py-8">
+              No players yet. Share the join code!
+            </p>
+          )}
         </GlassCard>
       </div>
     </div>
