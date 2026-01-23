@@ -51,17 +51,49 @@ export default function TeacherLiveQuizLobby() {
     refetchInterval: 2000
   });
 
+  const { data: questions = [] } = useQuery({
+    queryKey: ['liveQuizQuestions', sessionId],
+    queryFn: async () => {
+      const qs = await base44.entities.LiveQuizQuestion.filter({ 
+        live_quiz_set_id: sessionId 
+      }, 'order');
+      console.log('[DEBUG] Found', qs.length, 'questions for session:', sessionId);
+      return qs;
+    },
+    enabled: !!sessionId
+  });
+
   const startGameMutation = useMutation({
     mutationFn: async () => {
-      await base44.entities.LiveQuizSession.update(sessionId, {
+      console.log('[DEBUG] Start Game clicked for session:', sessionId);
+      console.log('[DEBUG] Players:', players.length);
+      console.log('[DEBUG] Questions:', questions.length);
+
+      if (questions.length === 0) {
+        throw new Error('No questions in this live quiz');
+      }
+
+      const updateData = {
         status: 'live',
         current_question_index: 0,
         question_started_at: new Date().toISOString(),
         started_at: new Date().toISOString()
-      });
+      };
+
+      console.log('[DEBUG] Updating session with:', updateData);
+
+      const result = await base44.entities.LiveQuizSession.update(sessionId, updateData);
+      
+      console.log('[DEBUG] Session updated successfully:', result);
+      return result;
     },
     onSuccess: () => {
+      console.log('[DEBUG] Navigating to play page');
       navigate(createPageUrl(`TeacherLiveQuizPlay?sessionId=${sessionId}`));
+    },
+    onError: (error) => {
+      console.error('[ERROR] Failed to start game:', error);
+      alert('Failed to start game: ' + (error.message || 'Unknown error'));
     }
   });
 
@@ -149,10 +181,17 @@ export default function TeacherLiveQuizLobby() {
               <span>players joined</span>
             </div>
 
+            {questions.length === 0 && (
+              <div className="mb-4 p-3 rounded-lg bg-red-500/20 border border-red-500/30 text-red-400 text-sm flex items-center gap-2 justify-center">
+                <AlertTriangle className="w-4 h-4" />
+                No questions in this live quiz
+              </div>
+            )}
+
             <div className="flex gap-4 justify-center">
               <Button
                 onClick={() => startGameMutation.mutate()}
-                disabled={players.length === 0 || startGameMutation.isPending}
+                disabled={players.length === 0 || questions.length === 0 || startGameMutation.isPending}
                 className="bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 shadow-lg shadow-emerald-500/30 px-8"
               >
                 {startGameMutation.isPending ? (
