@@ -20,9 +20,10 @@ import {
   Minus,
   Calendar,
   Clock,
-  ChevronRight
+  ChevronRight,
+  X,
+  Loader2
 } from 'lucide-react';
-import LiveQuizJoinModal from '@/components/student/LiveQuizJoinModal';
 
 export default function StudentDashboard() {
   const [user, setUser] = useState(null);
@@ -31,13 +32,18 @@ export default function StudentDashboard() {
 
   const [joinClassOpen, setJoinClassOpen] = useState(false);
   const [classJoinCode, setClassJoinCode] = useState('');
-  const [showLiveQuizJoin, setShowLiveQuizJoin] = useState(false);
-  const [activeLiveSession, setActiveLiveSession] = useState(null);
+  const [dismissedSessionId, setDismissedSessionId] = useState(null);
+  const [joiningSessionId, setJoiningSessionId] = useState(null);
+  const [nickname, setNickname] = useState('');
 
   useEffect(() => {
     const fetchUser = async () => {
       const userData = await base44.auth.me();
       setUser(userData);
+      
+      // Set default nickname from first name
+      const firstName = userData.full_name ? userData.full_name.split(' ')[0] : userData.email.split('@')[0];
+      setNickname(firstName);
     };
     fetchUser();
   }, []);
@@ -85,21 +91,13 @@ export default function StudentDashboard() {
         class_id: { $in: classIds },
         status: { $in: ['lobby', 'live'] }
       });
-      return sessions;
+      console.log('[DEBUG] Active live sessions:', sessions.length);
+      // Filter out ended sessions and those already dismissed
+      return sessions.filter(s => !s.ended_at);
     },
     enabled: enrolledClasses.length > 0,
     refetchInterval: 5000
   });
-
-  useEffect(() => {
-    if (activeLiveSessions.length > 0 && !activeLiveSession) {
-      setActiveLiveSession(activeLiveSessions[0]);
-      setShowLiveQuizJoin(true);
-    } else if (activeLiveSessions.length === 0 && activeLiveSession) {
-      setActiveLiveSession(null);
-      setShowLiveQuizJoin(false);
-    }
-  }, [activeLiveSessions]);
 
   const { data: assignments = [] } = useQuery({
     queryKey: ['studentAssignments', user?.email, enrolledClasses.map(c => c.id).join(',')],
@@ -217,12 +215,63 @@ export default function StudentDashboard() {
     }
   };
 
-  const handleJoinLiveQuiz = async (sessionId) => {
-    try {
-      navigate(createPageUrl(`LiveQuizStudent?sessionId=${sessionId}`));
-    } catch (error) {
-      alert('Failed to join live quiz');
+  const joinLiveQuizMutation = useMutation({
+    mutationFn: async ({ sessionId, nickname }) => {
+      const trimmedNickname = nickname.trim();
+      
+      if (trimmedNickname.length < 2 || trimmedNickname.length > 16) {
+        throw new Error('Nickname must be between 2-16 characters');
+      }
+
+      // Check for duplicate nicknames and auto-append number
+      const existingPlayers = await base44.entities.LiveQuizPlayer.filter({ 
+        session_id: sessionId 
+      });
+      
+      let finalNickname = trimmedNickname;
+      let counter = 2;
+      
+      while (existingPlayers.some(p => p.nickname === finalNickname)) {
+        finalNickname = `${trimmedNickname} ${counter}`;
+        counter++;
+      }
+
+      console.log('[DEBUG] Creating player with nickname:', finalNickname);
+
+      const player = await base44.entities.LiveQuizPlayer.create({
+        session_id: sessionId,
+        nickname: finalNickname,
+        student_email: user.email,
+        total_points: 0,
+        correct_count: 0,
+        questions_answered: 0,
+        average_response_time_ms: 0,
+        current_streak: 0,
+        longest_streak: 0,
+        connected: true
+      });
+
+      console.log('[DEBUG] Player created:', player.id);
+      return { player, sessionId };
+    },
+    onSuccess: ({ sessionId }) => {
+      navigate(createPageUrl(`StudentLiveQuizPlay?sessionId=${sessionId}`));
+    },
+    onError: (error) => {
+      console.error('[ERROR] Failed to join quiz:', error);
+      alert('Failed to join: ' + (error.message || 'Please try again'));
     }
+  });
+
+  const handleJoinLiveQuiz = (sessionId) => {
+    if (nickname.trim().length >= 2 && nickname.trim().length <= 16) {
+      setJoiningSessionId(sessionId);
+      joinLiveQuizMutation.mutate({ sessionId, nickname });
+    }
+  };
+
+  const handleDismissSession = (sessionId) => {
+    setDismissedSessionId(sessionId);
   };
 
   return (
@@ -239,40 +288,118 @@ export default function StudentDashboard() {
           <p className="text-slate-300 drop-shadow-md">Track your assignments, classes, and quiz performance</p>
         </motion.div>
 
-        {activeLiveSessions.length > 0 && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="mb-8"
-          >
-            <GlassCard className="p-6 border-2 border-amber-500/30 bg-slate-950/60 backdrop-blur-xl">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center animate-pulse">
-                  <Zap className="w-6 h-6 text-white" />
-                </div>
-                <div>
-                  <h3 className="font-bold text-white drop-shadow-md">Live Quiz Available!</h3>
-                  <p className="text-sm text-slate-300 drop-shadow-sm">Join now to compete with your classmates</p>
-                </div>
-              </div>
-              <div className="space-y-2">
-                {activeLiveSessions.map(session => {
-                  const sessionClass = enrolledClasses.find(c => c.id === session.class_id);
-                  return (
+        <AnimatePresence>
+          {activeLiveSessions.filter(s => s.id !== dismissedSessionId).map(session => {
+            const sessionClass = enrolledClasses.find(c => c.id === session.class_id);
+            const isLobby = session.status === 'lobby';
+            const isLive = session.status === 'live';
+            
+            return (
+              <motion.div
+                key={session.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                className="mb-8"
+              >
+                <GlassCard className="p-6 border-2 border-amber-500/30 bg-slate-950/60 backdrop-blur-xl">
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-12 h-12 rounded-xl bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center ${isLobby ? 'animate-pulse' : ''}`}>
+                        <Zap className="w-6 h-6 text-white" />
+                      </div>
+                      <div>
+                        <h3 className="font-bold text-white drop-shadow-md">
+                          {isLobby ? 'Live Quiz Starting!' : 'Live Quiz In Progress'}
+                        </h3>
+                        <p className="text-sm text-slate-300 drop-shadow-sm">{sessionClass?.name}</p>
+                      </div>
+                    </div>
                     <Button
-                      key={session.id}
-                      onClick={() => handleJoinLiveQuiz(session.id)}
-                      className="w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600"
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleDismissSession(session.id)}
+                      className="text-slate-400 hover:text-white"
                     >
-                      <Zap className="w-4 h-4 mr-2" />
-                      Join {sessionClass?.name} Live Quiz
+                      <X className="w-4 h-4" />
                     </Button>
-                  );
-                })}
-              </div>
-            </GlassCard>
-          </motion.div>
-        )}
+                  </div>
+                  
+                  {isLobby && (
+                    <div className="space-y-3">
+                      <div>
+                        <Label className="text-white text-sm mb-2">Your Nickname</Label>
+                        <Input
+                          value={nickname}
+                          onChange={(e) => setNickname(e.target.value)}
+                          placeholder="Enter nickname"
+                          minLength={2}
+                          maxLength={16}
+                          className="bg-white/5 border-white/10 text-white"
+                        />
+                        <p className="text-xs text-slate-400 mt-1">2-16 characters</p>
+                      </div>
+                      <Button
+                        onClick={() => handleJoinLiveQuiz(session.id)}
+                        disabled={nickname.trim().length < 2 || nickname.trim().length > 16 || joinLiveQuizMutation.isPending}
+                        className="w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600"
+                      >
+                        {joinLiveQuizMutation.isPending && joiningSessionId === session.id ? (
+                          <>
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            Joining...
+                          </>
+                        ) : (
+                          <>
+                            <Zap className="w-4 h-4 mr-2" />
+                            Join Quiz
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  )}
+                  
+                  {isLive && (
+                    <div className="space-y-3">
+                      <div className="p-3 rounded-lg bg-blue-500/20 border border-blue-500/30 text-blue-300 text-sm">
+                        Quiz has started! You can still join as a late entry.
+                      </div>
+                      <div>
+                        <Label className="text-white text-sm mb-2">Your Nickname</Label>
+                        <Input
+                          value={nickname}
+                          onChange={(e) => setNickname(e.target.value)}
+                          placeholder="Enter nickname"
+                          minLength={2}
+                          maxLength={16}
+                          className="bg-white/5 border-white/10 text-white"
+                        />
+                        <p className="text-xs text-slate-400 mt-1">2-16 characters</p>
+                      </div>
+                      <Button
+                        onClick={() => handleJoinLiveQuiz(session.id)}
+                        disabled={nickname.trim().length < 2 || nickname.trim().length > 16 || joinLiveQuizMutation.isPending}
+                        className="w-full bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600"
+                      >
+                        {joinLiveQuizMutation.isPending && joiningSessionId === session.id ? (
+                          <>
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            Joining...
+                          </>
+                        ) : (
+                          <>
+                            <Zap className="w-4 h-4 mr-2" />
+                            Join Now (Late Entry)
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  )}
+                </GlassCard>
+              </motion.div>
+            );
+          })}
+        </AnimatePresence>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <StatCard
@@ -466,14 +593,7 @@ export default function StudentDashboard() {
           </DialogContent>
         </Dialog>
 
-        <AnimatePresence>
-          {showLiveQuizJoin && activeLiveSession && (
-            <LiveQuizJoinModal
-              session={activeLiveSession}
-              onClose={() => setShowLiveQuizJoin(false)}
-            />
-          )}
-        </AnimatePresence>
+
       </div>
     </div>
   );
