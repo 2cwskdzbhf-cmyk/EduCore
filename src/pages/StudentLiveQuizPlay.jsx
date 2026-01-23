@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
@@ -21,30 +21,21 @@ export default function StudentLiveQuizPlay() {
   const [questionStartTime, setQuestionStartTime] = useState(null);
 
   useEffect(() => {
-    const fetchUser = async () => {
-      const userData = await base44.auth.me();
-      setUser(userData);
-    };
-    fetchUser();
+    base44.auth.me().then(setUser);
   }, []);
 
+  /* ---------------- SESSION ---------------- */
   const { data: session } = useQuery({
     queryKey: ['liveQuizSession', sessionId],
     queryFn: async () => {
       const sessions = await base44.entities.LiveQuizSession.filter({ id: sessionId });
-      const session = sessions[0];
-      console.log('[STUDENT] Session loaded:', {
-        id: sessionId.substring(0, 6),
-        status: session?.status,
-        quiz_set_id: session?.live_quiz_set_id?.substring(0, 6),
-        current_question_index: session?.current_question_index
-      });
-      return session;
+      return sessions[0];
     },
     enabled: !!sessionId,
     refetchInterval: 1000
   });
 
+  /* ---------------- PLAYER ---------------- */
   const { data: player } = useQuery({
     queryKey: ['myPlayer', sessionId, user?.email],
     queryFn: async () => {
@@ -52,114 +43,68 @@ export default function StudentLiveQuizPlay() {
         session_id: sessionId,
         student_email: user.email
       });
-      console.log('[STUDENT] Player loaded:', players[0]?.nickname);
       return players[0];
     },
     enabled: !!sessionId && !!user,
     refetchInterval: 1000
   });
 
+  /* ---------------- QUESTIONS (FIXED) ---------------- */
   const { data: questions = [] } = useQuery({
-    queryKey: ['liveQuizQuestions', session?.live_quiz_set_id],
+    queryKey: ['quizQuestions', session?.quiz_set_id],
     queryFn: async () => {
-      if (!session?.live_quiz_set_id) {
-        console.log('[STUDENT] No quiz set ID yet, waiting...');
-        return [];
-      }
-      const qs = await base44.entities.LiveQuizQuestion.filter({ 
-        live_quiz_set_id: session.live_quiz_set_id 
-      }, 'order');
-      console.log('[STUDENT] Questions loaded:', qs.length, 'for quiz set:', session.live_quiz_set_id.substring(0, 6));
-      if (qs.length > 0) {
-        console.log('[STUDENT] First question:', qs[0].prompt);
-      }
-      return qs;
+      if (!session?.quiz_set_id) return [];
+      return base44.entities.QuizQuestion.filter(
+        { quiz_set_id: session.quiz_set_id },
+        'order'
+      );
     },
-    enabled: !!session?.live_quiz_set_id,
-    refetchInterval: 2000
+    enabled: !!session?.quiz_set_id
   });
 
-  const { data: players = [] } = useQuery({
-    queryKey: ['allPlayers', sessionId],
-    queryFn: () => base44.entities.LiveQuizPlayer.filter({ session_id: sessionId }),
-    enabled: !!sessionId,
-    refetchInterval: 1000
-  });
+  const currentQuestion =
+    session?.current_question_index >= 0
+      ? questions[session.current_question_index]
+      : null;
 
-  const currentQuestion = session?.current_question_index >= 0 ? questions[session.current_question_index] : null;
-
-  useEffect(() => {
-    console.log('[STUDENT] Current state:', {
-      session_status: session?.status,
-      question_index: session?.current_question_index,
-      total_questions: questions.length,
-      has_current_question: !!currentQuestion
-    });
-  }, [session?.status, session?.current_question_index, questions.length, currentQuestion]);
-
+  /* ---------------- TIMER ---------------- */
   useEffect(() => {
     if (session?.status === 'live' && currentQuestion && session.question_started_at) {
-      console.log('[STUDENT] Starting question timer for:', currentQuestion.prompt);
       const startTime = new Date(session.question_started_at).getTime();
       setQuestionStartTime(startTime);
       setAnswered(false);
-      
-      setTimeout(() => setShowQuestion(true), 2000);
+      setShowQuestion(true);
 
       const interval = setInterval(() => {
         const elapsed = Math.floor((Date.now() - startTime) / 1000);
-        const remaining = Math.max(0, 15 - elapsed);
-        setTimeLeft(remaining);
+        setTimeLeft(Math.max(0, 15 - elapsed));
       }, 100);
 
-      return () => {
-        clearInterval(interval);
-        setShowQuestion(false);
-      };
+      return () => clearInterval(interval);
     }
-  }, [session?.current_question_index, session?.question_started_at, currentQuestion]);
+  }, [session?.current_question_index, session?.question_started_at]);
 
+  /* ---------------- ANSWER ---------------- */
   const answerMutation = useMutation({
     mutationFn: async (answerText) => {
       const responseTime = Date.now() - questionStartTime;
-      const isCorrect = answerText.trim().toLowerCase() === currentQuestion.correct_answer.trim().toLowerCase();
-      
-      const basePoints = 500;
-      const speedBonus = Math.max(0, Math.floor((15 - (responseTime / 1000)) * 20));
-      const roundMultiplier = 1 + (session.current_question_index * 0.25);
-      const pointsAwarded = isCorrect ? Math.floor((basePoints + speedBonus) * roundMultiplier) : 0;
+      const isCorrect =
+        answerText.trim().toLowerCase() ===
+        currentQuestion.correct_answer.trim().toLowerCase();
 
       await base44.entities.LiveQuizAnswer.create({
         session_id: sessionId,
         player_id: player.id,
         question_id: currentQuestion.id,
         question_index: session.current_question_index,
-        selected_option: 0,
         is_correct: isCorrect,
-        response_time_ms: responseTime,
-        points_awarded: pointsAwarded,
-        round_multiplier: roundMultiplier
+        response_time_ms: responseTime
       });
-
-      const newTotalPoints = player.total_points + pointsAwarded;
-      const newCorrectCount = player.correct_count + (isCorrect ? 1 : 0);
-      const newQuestionsAnswered = player.questions_answered + 1;
-      const newStreak = isCorrect ? player.current_streak + 1 : 0;
-      const newLongestStreak = Math.max(player.longest_streak, newStreak);
-      
-      const totalResponseTime = (player.average_response_time_ms * player.questions_answered) + responseTime;
-      const newAvgResponseTime = Math.floor(totalResponseTime / newQuestionsAnswered);
 
       await base44.entities.LiveQuizPlayer.update(player.id, {
-        total_points: newTotalPoints,
-        correct_count: newCorrectCount,
-        questions_answered: newQuestionsAnswered,
-        current_streak: newStreak,
-        longest_streak: newLongestStreak,
-        average_response_time_ms: newAvgResponseTime
+        questions_answered: player.questions_answered + 1,
+        correct_count: player.correct_count + (isCorrect ? 1 : 0)
       });
-
-      return { isCorrect, pointsAwarded };
     },
     onSuccess: () => {
       setAnswered(true);
@@ -167,75 +112,21 @@ export default function StudentLiveQuizPlay() {
     }
   });
 
+  /* ---------------- STATES ---------------- */
   if (!session || !player) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900/20 to-slate-900 flex items-center justify-center">
-        <Loader2 className="w-12 h-12 animate-spin text-purple-400" />
-      </div>
-    );
-  }
-
-  if (session.status === 'ended') {
-    const myRank = players.sort((a, b) => b.total_points - a.total_points).findIndex(p => p.id === player.id) + 1;
-
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900/20 to-slate-900 p-6 flex items-center justify-center">
-        <motion.div
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="max-w-2xl w-full"
-        >
-          <GlassCard className="p-12 text-center">
-            <Trophy className="w-24 h-24 text-amber-400 mx-auto mb-6" />
-            <h1 className="text-4xl font-bold text-white mb-4">Quiz Complete!</h1>
-            <div className="space-y-4 mb-8">
-              <div>
-                <p className="text-slate-400 mb-2">Your Rank</p>
-                <p className="text-6xl font-bold text-white">#{myRank}</p>
-              </div>
-              <div className="grid grid-cols-3 gap-4">
-                <div>
-                  <p className="text-slate-400 text-sm mb-1">Points</p>
-                  <p className="text-3xl font-bold text-white">{player.total_points}</p>
-                </div>
-                <div>
-                  <p className="text-slate-400 text-sm mb-1">Correct</p>
-                  <p className="text-3xl font-bold text-emerald-400">{player.correct_count}</p>
-                </div>
-                <div>
-                  <p className="text-slate-400 text-sm mb-1">Streak</p>
-                  <p className="text-3xl font-bold text-amber-400">{player.longest_streak}</p>
-                </div>
-              </div>
-            </div>
-            <Button
-              onClick={() => navigate(createPageUrl('StudentDashboard'))}
-              className="bg-gradient-to-r from-purple-500 to-blue-500"
-            >
-              Back to Dashboard
-            </Button>
-          </GlassCard>
-        </motion.div>
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="w-10 h-10 animate-spin text-purple-400" />
       </div>
     );
   }
 
   if (session.status === 'lobby') {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900/20 to-slate-900 p-6 flex items-center justify-center">
-        <GlassCard className="p-12 text-center max-w-2xl">
-          <motion.div
-            animate={{ scale: [1, 1.1, 1] }}
-            transition={{ repeat: Infinity, duration: 2 }}
-          >
-            <Zap className="w-24 h-24 text-amber-400 mx-auto mb-6" />
-          </motion.div>
-          <h1 className="text-4xl font-bold text-white mb-4">Get Ready!</h1>
-          <p className="text-xl text-slate-400 mb-8">Waiting for the teacher to start the quiz...</p>
-          <p className="text-slate-500">You're in as <span className="text-white font-bold">{player.nickname}</span></p>
-          {questions.length > 0 && (
-            <p className="text-xs text-slate-600 mt-4">{questions.length} questions loaded</p>
-          )}
+      <div className="min-h-screen flex items-center justify-center">
+        <GlassCard className="p-10 text-center">
+          <Zap className="w-16 h-16 text-amber-400 mx-auto mb-4" />
+          <h1 className="text-3xl font-bold text-white">Waiting for teacher…</h1>
         </GlassCard>
       </div>
     );
@@ -243,114 +134,58 @@ export default function StudentLiveQuizPlay() {
 
   if (session.status === 'live' && questions.length === 0) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900/20 to-slate-900 p-6 flex items-center justify-center">
-        <GlassCard className="p-12 text-center">
-          <Loader2 className="w-16 h-16 animate-spin text-purple-400 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-white mb-2">Loading Questions...</h2>
-          <p className="text-slate-400">Getting ready to start</p>
+      <div className="min-h-screen flex items-center justify-center">
+        <GlassCard className="p-10 text-center">
+          <Loader2 className="w-12 h-12 animate-spin text-purple-400 mb-4" />
+          <p className="text-white">Loading questions…</p>
         </GlassCard>
       </div>
     );
   }
 
-  if (!currentQuestion && session.status === 'live') {
+  if (!currentQuestion) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900/20 to-slate-900 p-6 flex items-center justify-center">
-        <GlassCard className="p-12 text-center">
-          <Trophy className="w-16 h-16 text-purple-400 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-white mb-2">Round Complete!</h2>
-          <p className="text-slate-400">Waiting for next question...</p>
-          <div className="mt-6 p-4 bg-white/5 rounded-xl">
-            <p className="text-4xl font-bold text-white mb-1">{player.total_points}</p>
-            <p className="text-sm text-slate-400">your points</p>
-          </div>
+      <div className="min-h-screen flex items-center justify-center">
+        <GlassCard className="p-10 text-center">
+          <Trophy className="w-12 h-12 text-purple-400 mx-auto mb-4" />
+          <p className="text-white">Waiting for next question…</p>
         </GlassCard>
       </div>
     );
   }
 
-  if (!showQuestion) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900/20 to-slate-900 flex items-center justify-center">
-        <motion.div
-          initial={{ scale: 0.5, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          transition={{ type: 'spring', stiffness: 200 }}
-        >
-          <GlassCard className="p-16 text-center">
-            <h2 className="text-6xl font-bold text-white mb-4">{currentQuestion.prompt}</h2>
-            <p className="text-slate-400">Get ready to answer!</p>
-          </GlassCard>
-        </motion.div>
-      </div>
-    );
-  }
-
+  /* ---------------- PLAY UI ---------------- */
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900/20 to-slate-900 p-6">
+    <div className="min-h-screen p-6">
       <div className="max-w-4xl mx-auto">
-        <div className="flex justify-between items-center mb-6">
-          <div className="flex items-center gap-4 text-white">
-            <div className="flex items-center gap-2">
-              <Target className="w-5 h-5" />
-              <span className="text-2xl font-bold">{player.total_points}</span>
-            </div>
-            <div className="text-sm text-slate-400">
-              {player.nickname}
-            </div>
-          </div>
-          <div className="flex items-center gap-2 text-white bg-white/10 px-4 py-2 rounded-lg">
-            <Clock className="w-5 h-5" />
-            <span className="text-3xl font-bold">{timeLeft}s</span>
-          </div>
+        <div className="flex justify-between mb-6 text-white">
+          <span className="text-2xl font-bold">{player.total_points}</span>
+          <span className="text-2xl">{timeLeft}s</span>
         </div>
 
-        <GlassCard className="p-8 mb-6">
-          <h2 className="text-3xl font-bold text-white text-center mb-2">{currentQuestion.prompt}</h2>
-          <p className="text-center text-slate-400 text-sm">Type your answer below</p>
+        <GlassCard className="p-8 mb-6 text-center">
+          <h2 className="text-3xl font-bold text-white">{currentQuestion.prompt}</h2>
         </GlassCard>
 
         {!answered ? (
-          <GlassCard className="p-8">
-            <form onSubmit={(e) => {
+          <form
+            onSubmit={(e) => {
               e.preventDefault();
-              const answer = e.target.answer.value;
-              if (answer.trim()) {
-                answerMutation.mutate(answer);
-              }
-            }}>
-              <input
-                name="answer"
-                type="text"
-                placeholder="Type your answer..."
-                disabled={answerMutation.isPending}
-                className="w-full bg-white/5 border border-white/10 text-white text-2xl p-6 rounded-xl mb-4 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                autoFocus
-              />
-              <Button
-                type="submit"
-                disabled={answerMutation.isPending}
-                className="w-full bg-gradient-to-r from-purple-500 to-blue-500 text-xl py-6"
-              >
-                {answerMutation.isPending ? (
-                  <Loader2 className="w-6 h-6 animate-spin" />
-                ) : (
-                  'Submit Answer'
-                )}
-              </Button>
-            </form>
-          </GlassCard>
+              answerMutation.mutate(e.target.answer.value);
+            }}
+          >
+            <input
+              name="answer"
+              className="w-full p-6 text-xl rounded-xl mb-4"
+              placeholder="Type your answer…"
+              autoFocus
+            />
+            <Button className="w-full py-6 text-xl">Submit</Button>
+          </form>
         ) : (
           <GlassCard className="p-8 text-center">
-            <motion.div
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              transition={{ type: 'spring', stiffness: 200 }}
-            >
-              <CheckCircle2 className="w-16 h-16 text-emerald-400 mx-auto mb-4" />
-              <h3 className="text-2xl font-bold text-white mb-2">Answer Submitted!</h3>
-              <p className="text-slate-400">Waiting for other players...</p>
-            </motion.div>
+            <CheckCircle2 className="w-12 h-12 text-emerald-400 mx-auto mb-3" />
+            <p className="text-white">Answer submitted</p>
           </GlassCard>
         )}
       </div>
