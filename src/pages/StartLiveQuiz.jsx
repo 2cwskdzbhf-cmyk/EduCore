@@ -23,22 +23,23 @@ export default function StartLiveQuiz() {
     fetchUser();
   }, []);
 
+  // ✅ Use QuizSet (matches createLiveQuizSession.ts)
   const { data: quizSet, isLoading } = useQuery({
-    queryKey: ['liveQuizSet', setId],
+    queryKey: ['quizSet', setId],
     queryFn: async () => {
       if (!setId) return null;
-      const sets = await base44.entities.LiveQuizSet.filter({ id: setId });
-      return sets[0];
+      const sets = await base44.entities.QuizSet.filter({ id: setId });
+      return sets?.[0] || null;
     },
     enabled: !!setId
   });
 
+  // ✅ Use QuizQuestion (matches quiz_set_id)
   const { data: questions = [] } = useQuery({
-    queryKey: ['liveQuizQuestions', setId],
+    queryKey: ['quizQuestions', setId],
     queryFn: async () => {
       if (!setId) return [];
-      // Keep your existing ordering approach
-      return base44.entities.LiveQuizQuestion.filter({ live_quiz_set_id: setId }, 'order');
+      return base44.entities.QuizQuestion.filter({ quiz_set_id: setId }, 'order');
     },
     enabled: !!setId
   });
@@ -51,19 +52,13 @@ export default function StartLiveQuiz() {
       if (!quizSet) throw new Error('Quiz set not loaded');
       if (!questions || questions.length === 0) throw new Error('This quiz has no questions');
 
+      // ✅ Create a session using quiz_set_id (not live_quiz_set_id)
       const session = await base44.entities.LiveQuizSession.create({
         class_id: classId,
         host_email: user.email,
-        live_quiz_set_id: setId,
-
-        // ✅ IMPORTANT: Attach questions to the session so students can load them
-        question_ids: questions.map(q => q.id),
-
+        quiz_set_id: setId,
         status: 'lobby',
-
-        // Keep -1 so it doesn't show Q1 before the teacher actually starts
         current_question_index: -1,
-
         player_count: 0,
         settings: {
           time_per_question: quizSet.time_limit_per_question || 15000,
@@ -72,9 +67,7 @@ export default function StartLiveQuiz() {
         }
       });
 
-      // Optional debug (remove later)
       console.log('LIVE QUIZ SESSION CREATED:', session);
-
       return session;
     },
     onSuccess: (session) => {
@@ -155,13 +148,7 @@ export default function StartLiveQuiz() {
 
             <Button
               onClick={() => createSessionMutation.mutate()}
-              disabled={
-                createSessionMutation.isPending ||
-                questions.length === 0 ||
-                !user?.email ||
-                !classId ||
-                !setId
-              }
+              disabled={createSessionMutation.isPending || questions.length === 0}
               className="w-full h-14 text-lg bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 shadow-lg shadow-purple-500/30"
             >
               {createSessionMutation.isPending ? (
