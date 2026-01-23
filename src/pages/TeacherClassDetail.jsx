@@ -126,10 +126,21 @@ export default function TeacherClassDetail() {
   const { data: classStudents = [] } = useQuery({
     queryKey: ['classStudents', classData?.student_emails],
     queryFn: async () => {
-      if (!classData?.student_emails || classData.student_emails.length === 0) return [];
+      if (!classData?.student_emails || classData.student_emails.length === 0) {
+        console.log('[DEBUG] No student emails in classData');
+        return [];
+      }
+      
+      console.log('[DEBUG] Fetching students for class:', classId);
+      console.log('[DEBUG] Student emails:', classData.student_emails);
+      
       const students = await base44.entities.User.filter({ 
         email: { $in: classData.student_emails } 
       });
+      
+      console.log('[DEBUG] Students fetched:', students.length);
+      console.log('[DEBUG] Student roles:', students.map(s => ({ email: s.email, role: s.role, user_type: s.user_type })));
+      
       return students;
     },
     enabled: !!classData?.student_emails && classData.student_emails.length > 0
@@ -845,7 +856,8 @@ export default function TeacherClassDetail() {
                   Class Leaderboard
                 </h3>
 
-                {classStudents.length > 0 ? (
+                {classData?.student_emails && classData.student_emails.length > 0 ? (
+                  classStudents.length > 0 ? (
                   <div className="space-y-2">
                     {classStudents
                       .map(student => {
@@ -865,7 +877,12 @@ export default function TeacherClassDetail() {
                           completedCount
                         };
                       })
-                      .sort((a, b) => b.accuracy - a.accuracy)
+                      .sort((a, b) => {
+                        // Sort by accuracy descending, but put students with no activity at the bottom
+                        if (a.totalQuestions === 0 && b.totalQuestions > 0) return 1;
+                        if (a.totalQuestions > 0 && b.totalQuestions === 0) return -1;
+                        return b.accuracy - a.accuracy;
+                      })
                       .map((student, index) => (
                         <div
                           key={student.id}
@@ -916,6 +933,14 @@ export default function TeacherClassDetail() {
                         </div>
                       ))}
                   </div>
+                  ) : (
+                    <div className="text-center py-8">
+                      <p className="text-slate-400 mb-2">Loading student data...</p>
+                      <p className="text-xs text-slate-500">
+                        {classData.student_emails.length} student(s) enrolled
+                      </p>
+                    </div>
+                  )
                 ) : (
                   <p className="text-slate-400 text-center py-8">No students in this class yet</p>
                 )}
@@ -1023,6 +1048,10 @@ export default function TeacherClassDetail() {
 function AssignmentProgressModal({ assignment, classStudents, submissions, topics, onClose, onViewStudent }) {
   const topicName = assignment.custom_topic_name || 
     (assignment.topic_id ? topics.find(t => t.id === assignment.topic_id)?.name : 'No topic');
+
+  console.log('[DEBUG AssignmentProgressModal] Assignment:', assignment.id);
+  console.log('[DEBUG AssignmentProgressModal] Class students:', classStudents.length);
+  console.log('[DEBUG AssignmentProgressModal] Submissions:', submissions.filter(s => s.assignment_id === assignment.id).length);
 
   const studentProgress = classStudents.map(student => {
     const submission = submissions.find(s => 
@@ -1179,7 +1208,11 @@ function AssignmentProgressModal({ assignment, classStudents, submissions, topic
           </div>
 
           {studentProgress.length === 0 && (
-            <p className="text-slate-400 text-center py-8">No students in this class</p>
+            <p className="text-slate-400 text-center py-8">No students enrolled in this class yet</p>
+          )}
+          
+          {studentProgress.length > 0 && studentProgress.every(s => s.status === 'Not started') && (
+            <p className="text-slate-500 text-center text-sm mt-4">No student activity yet</p>
           )}
         </GlassCard>
       </motion.div>
