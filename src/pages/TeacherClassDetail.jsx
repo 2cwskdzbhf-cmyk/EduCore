@@ -444,20 +444,12 @@ export default function TeacherClassDetail() {
                         </>
                       )}
                     </Button>
-                    <div className="grid grid-cols-2 gap-2">
-                      <Button
-                        onClick={() => navigate(createPageUrl(`AssignmentBuilder?classId=${classId}`))}
-                        className="bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 shadow-lg shadow-emerald-500/30 text-white"
-                      >
-                        Create Assignment
-                      </Button>
-                      <Button
-                        onClick={() => navigate(createPageUrl(`QuizLibrary?classId=${classId}`))}
-                        className="bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 shadow-lg shadow-blue-500/30 text-white"
-                      >
-                        Library
-                      </Button>
-                    </div>
+                    <Button
+                      onClick={() => navigate(createPageUrl('TeacherAssignmentLibrary'))}
+                      className="w-full bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 shadow-lg shadow-blue-500/30 text-white"
+                    >
+                      Assignment Library
+                    </Button>
                   </div>
 
                   {generatePracticeMutation.isError && (
@@ -644,20 +636,12 @@ export default function TeacherClassDetail() {
                         </>
                       )}
                     </Button>
-                    <div className="grid grid-cols-2 gap-2">
-                      <Button
-                        onClick={() => navigate(createPageUrl(`CreateQuiz?classId=${classId}`))}
-                        className="bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 shadow-lg shadow-emerald-500/30 text-white"
-                      >
-                        Create Manually
-                      </Button>
-                      <Button
-                        onClick={() => navigate(createPageUrl(`QuizLibrary?classId=${classId}`))}
-                        className="bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 shadow-lg shadow-blue-500/30 text-white"
-                      >
-                        Library
-                      </Button>
-                    </div>
+                    <Button
+                      onClick={() => navigate(createPageUrl(`CreateQuiz?classId=${classId}`))}
+                      className="w-full bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 shadow-lg shadow-emerald-500/30 text-white"
+                    >
+                      Create Manually
+                    </Button>
                   </div>
 
                   {generateLiveMutation.isError && (
@@ -731,11 +715,11 @@ export default function TeacherClassDetail() {
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-2xl font-bold text-white">Class Assignments</h2>
                 <Button
-                  onClick={() => navigate(createPageUrl(`AssignmentBuilder?classId=${classId}`))}
+                  onClick={() => navigate(createPageUrl('TeacherAssignmentLibrary'))}
                   className="bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 shadow-lg shadow-emerald-500/30"
                 >
                   <Plus className="w-4 h-4 mr-2" />
-                  New Assignment
+                  Assign from Library
                 </Button>
               </div>
 

@@ -109,14 +109,13 @@ export default function Layout({ children, currentPageName }) {
 
   const studentNav = [
     { name: 'Dashboard', icon: LayoutDashboard, page: 'StudentDashboard' },
-    { name: 'Subjects', icon: BookOpen, page: 'Subject' },
     { name: 'AI Tutor', icon: MessageSquare, page: 'AITutor' },
   ];
 
   const teacherNav = [
     { name: 'Dashboard', icon: LayoutDashboard, page: 'TeacherDashboard' },
     { name: 'Classes', icon: Users, page: 'TeacherDashboard' },
-    { name: 'Assignments', icon: ClipboardList, page: 'CreateAssignment' },
+    { name: 'Library', icon: ClipboardList, page: 'TeacherAssignmentLibrary' },
   ];
 
   const adminNav = [

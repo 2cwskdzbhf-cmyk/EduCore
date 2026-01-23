@@ -221,9 +221,9 @@ export default function StudentDashboard() {
           className="mb-8"
         >
           <h1 className="text-3xl font-bold text-white mb-2 drop-shadow-lg">
-            Self Learning
+            My Dashboard
           </h1>
-          <p className="text-slate-300 drop-shadow-md">Track your progress across lessons, classes, and assignments</p>
+          <p className="text-slate-300 drop-shadow-md">Track your assignments, classes, and quiz performance</p>
         </motion.div>
 
         {activeLiveSessions.length > 0 && (
@@ -369,14 +369,13 @@ export default function StudentDashboard() {
           </GlassCard>
         </motion.div>
 
-        <div className="grid lg:grid-cols-2 gap-8">
-          <div>
-            <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2 drop-shadow-lg">
-              <Users className="w-5 h-5 text-blue-400" />
-              My Classes
-            </h2>
+        <div>
+          <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2 drop-shadow-lg">
+            <Users className="w-5 h-5 text-blue-400" />
+            My Classes
+          </h2>
 
-            <div className="space-y-3">
+          <div className="space-y-3">
               {enrolledClasses.length > 0 ? (
                 enrolledClasses.map((classItem, index) => {
                   const classProgress = progress?.class_id === classItem.id ? progress : null;
@@ -428,38 +427,7 @@ export default function StudentDashboard() {
             </div>
           </div>
 
-          <div>
-            <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2 drop-shadow-lg">
-              <BookOpen className="w-5 h-5 text-purple-400" />
-              Self Learning
-            </h2>
 
-            <div className="grid sm:grid-cols-2 gap-4">
-              {subjects.map((subject, index) => (
-                <motion.div
-                  key={subject.id}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: index * 0.1 }}
-                >
-                  <Link to={createPageUrl(`Subject?id=${subject.id}`)}>
-                    <GlassCard className="p-6 hover:scale-[1.02] bg-slate-950/50 backdrop-blur-xl">
-                      <div className="flex items-center gap-4 mb-4">
-                        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center shadow-lg shadow-purple-500/50">
-                          <BookOpen className="w-6 h-6 text-white" />
-                        </div>
-                        <div>
-                          <h3 className="font-semibold text-white drop-shadow-md">{subject.name}</h3>
-                          <p className="text-sm text-slate-300 drop-shadow-sm">{subject.key_stage}</p>
-                        </div>
-                      </div>
-                      <p className="text-sm text-slate-300 drop-shadow-sm">{subject.description}</p>
-                    </GlassCard>
-                  </Link>
-                </motion.div>
-              ))}
-            </div>
-          </div>
         </div>
 
         <Dialog open={joinClassOpen} onOpenChange={setJoinClassOpen}>
