@@ -12,7 +12,7 @@ export default function StartLiveQuiz() {
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
   const urlParams = new URLSearchParams(window.location.search);
-  const setId = urlParams.get('setId');
+const setId = urlParams.get('quizSetId') || urlParams.get('setId');
   const classId = urlParams.get('classId');
 
   useEffect(() => {
@@ -53,19 +53,24 @@ export default function StartLiveQuiz() {
       if (!questions || questions.length === 0) throw new Error('This quiz has no questions');
 
       // ✅ Create a session using quiz_set_id (not live_quiz_set_id)
-      const session = await base44.entities.LiveQuizSession.create({
-        class_id: classId,
-        host_email: user.email,
-        quiz_set_id: setId,
-        status: 'lobby',
-        current_question_index: -1,
-        player_count: 0,
-        settings: {
-          time_per_question: quizSet.time_limit_per_question || 15000,
-          base_points: 500,
-          round_multiplier_increment: 0.25
-        }
-      });
+     const session = await base44.entities.LiveQuizSession.create({
+  class_id: classId,
+  host_email: user.email,
+
+  // ✅ store BOTH ids for full compatibility
+  quiz_set_id: setId,
+  live_quiz_set_id: setId,
+
+  status: 'lobby',
+  current_question_index: -1,
+  player_count: 0,
+  settings: {
+    time_per_question: quizSet.time_limit_per_question || 15000,
+    base_points: 500,
+    round_multiplier_increment: 0.25
+  }
+});
+
 
       console.log('LIVE QUIZ SESSION CREATED:', session);
       return session;
