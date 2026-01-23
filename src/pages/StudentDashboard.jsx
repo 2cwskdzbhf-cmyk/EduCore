@@ -424,10 +424,7 @@ export default function StudentDashboard() {
                   <p className="text-slate-300 text-sm drop-shadow-sm">Join a class to see it here.</p>
                 </GlassCard>
               )}
-            </div>
           </div>
-
-
         </div>
 
         <Dialog open={joinClassOpen} onOpenChange={setJoinClassOpen}>
