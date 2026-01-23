@@ -18,7 +18,20 @@ export default function TeacherLiveQuizResults() {
     queryKey: ['liveQuizSession', sessionId],
     queryFn: async () => {
       const sessions = await base44.entities.LiveQuizSession.filter({ id: sessionId });
-      return sessions[0];
+      const session = sessions[0];
+      
+      // Ensure session is marked as ended when on results page
+      if (session && session.status !== 'ended') {
+        console.log('[DEBUG] Session not marked as ended on results page, updating...');
+        await base44.entities.LiveQuizSession.update(sessionId, {
+          status: 'ended',
+          ended_at: new Date().toISOString()
+        });
+        session.status = 'ended';
+        session.ended_at = new Date().toISOString();
+      }
+      
+      return session;
     },
     enabled: !!sessionId
   });

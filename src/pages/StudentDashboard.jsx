@@ -87,13 +87,34 @@ export default function StudentDashboard() {
     queryFn: async () => {
       if (enrolledClasses.length === 0) return [];
       const classIds = enrolledClasses.map(c => c.id);
-      const sessions = await base44.entities.LiveQuizSession.filter({
-        class_id: { $in: classIds },
-        status: { $in: ['lobby', 'live'] }
+      
+      // Fetch all sessions for student's classes
+      const allSessions = await base44.entities.LiveQuizSession.filter({
+        class_id: { $in: classIds }
+      }, '-created_date');
+      
+      console.log('[DEBUG] Total sessions found:', allSessions.length);
+      
+      // Filter to ONLY active sessions: status is 'lobby' or 'live' AND ended_at is null
+      const activeSessions = allSessions.filter(s => {
+        const isActiveStatus = s.status === 'lobby' || s.status === 'live';
+        const isNotEnded = !s.ended_at;
+        const isActive = isActiveStatus && isNotEnded;
+        
+        if (isActive) {
+          console.log('[DEBUG] Active session found:', {
+            id: s.id.substring(0, 6),
+            status: s.status,
+            ended_at: s.ended_at,
+            class_id: s.class_id
+          });
+        }
+        
+        return isActive;
       });
-      console.log('[DEBUG] Active live sessions:', sessions.length);
-      // Filter out ended sessions and those already dismissed
-      return sessions.filter(s => !s.ended_at);
+      
+      console.log('[DEBUG] Active sessions after filtering:', activeSessions.length);
+      return activeSessions;
     },
     enabled: enrolledClasses.length > 0,
     refetchInterval: 5000
@@ -217,6 +238,22 @@ export default function StudentDashboard() {
 
   const joinLiveQuizMutation = useMutation({
     mutationFn: async ({ sessionId, nickname }) => {
+      // Verify session is still active before joining
+      const sessions = await base44.entities.LiveQuizSession.filter({ id: sessionId });
+      const session = sessions[0];
+      
+      if (!session) {
+        throw new Error('Quiz session not found');
+      }
+      
+      if (session.status === 'ended' || session.ended_at) {
+        throw new Error('This quiz has already ended');
+      }
+      
+      if (session.status !== 'lobby' && session.status !== 'live') {
+        throw new Error('Cannot join this quiz at this time');
+      }
+
       const trimmedNickname = nickname.trim();
       
       if (trimmedNickname.length < 2 || trimmedNickname.length > 16) {
