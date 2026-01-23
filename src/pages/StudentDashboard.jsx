@@ -30,6 +30,8 @@ export default function StudentDashboard() {
 
   const [joinClassOpen, setJoinClassOpen] = useState(false);
   const [classJoinCode, setClassJoinCode] = useState('');
+  const [showLiveQuizJoin, setShowLiveQuizJoin] = useState(false);
+  const [activeLiveSession, setActiveLiveSession] = useState(null);
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -87,6 +89,16 @@ export default function StudentDashboard() {
     enabled: enrolledClasses.length > 0,
     refetchInterval: 5000
   });
+
+  useEffect(() => {
+    if (activeLiveSessions.length > 0 && !activeLiveSession) {
+      setActiveLiveSession(activeLiveSessions[0]);
+      setShowLiveQuizJoin(true);
+    } else if (activeLiveSessions.length === 0 && activeLiveSession) {
+      setActiveLiveSession(null);
+      setShowLiveQuizJoin(false);
+    }
+  }, [activeLiveSessions]);
 
   const { data: assignments = [] } = useQuery({
     queryKey: ['studentAssignments', user?.email, enrolledClasses.map(c => c.id).join(',')],
