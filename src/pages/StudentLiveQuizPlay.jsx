@@ -32,7 +32,14 @@ export default function StudentLiveQuizPlay() {
     queryKey: ['liveQuizSession', sessionId],
     queryFn: async () => {
       const sessions = await base44.entities.LiveQuizSession.filter({ id: sessionId });
-      return sessions[0];
+      const session = sessions[0];
+      console.log('[STUDENT] Session loaded:', {
+        id: sessionId.substring(0, 6),
+        status: session?.status,
+        quiz_set_id: session?.live_quiz_set_id?.substring(0, 6),
+        current_question_index: session?.current_question_index
+      });
+      return session;
     },
     enabled: !!sessionId,
     refetchInterval: 1000
@@ -45,6 +52,7 @@ export default function StudentLiveQuizPlay() {
         session_id: sessionId,
         student_email: user.email
       });
+      console.log('[STUDENT] Player loaded:', players[0]?.nickname);
       return players[0];
     },
     enabled: !!sessionId && !!user,
@@ -53,8 +61,22 @@ export default function StudentLiveQuizPlay() {
 
   const { data: questions = [] } = useQuery({
     queryKey: ['liveQuizQuestions', session?.live_quiz_set_id],
-    queryFn: () => base44.entities.LiveQuizQuestion.filter({ live_quiz_set_id: session.live_quiz_set_id }, 'order'),
-    enabled: !!session?.live_quiz_set_id
+    queryFn: async () => {
+      if (!session?.live_quiz_set_id) {
+        console.log('[STUDENT] No quiz set ID yet, waiting...');
+        return [];
+      }
+      const qs = await base44.entities.LiveQuizQuestion.filter({ 
+        live_quiz_set_id: session.live_quiz_set_id 
+      }, 'order');
+      console.log('[STUDENT] Questions loaded:', qs.length, 'for quiz set:', session.live_quiz_set_id.substring(0, 6));
+      if (qs.length > 0) {
+        console.log('[STUDENT] First question:', qs[0].prompt);
+      }
+      return qs;
+    },
+    enabled: !!session?.live_quiz_set_id,
+    refetchInterval: 2000
   });
 
   const { data: players = [] } = useQuery({
@@ -67,7 +89,17 @@ export default function StudentLiveQuizPlay() {
   const currentQuestion = session?.current_question_index >= 0 ? questions[session.current_question_index] : null;
 
   useEffect(() => {
+    console.log('[STUDENT] Current state:', {
+      session_status: session?.status,
+      question_index: session?.current_question_index,
+      total_questions: questions.length,
+      has_current_question: !!currentQuestion
+    });
+  }, [session?.status, session?.current_question_index, questions.length, currentQuestion]);
+
+  useEffect(() => {
     if (session?.status === 'live' && currentQuestion && session.question_started_at) {
+      console.log('[STUDENT] Starting question timer for:', currentQuestion.prompt);
       const startTime = new Date(session.question_started_at).getTime();
       setQuestionStartTime(startTime);
       setAnswered(false);
@@ -201,12 +233,27 @@ export default function StudentLiveQuizPlay() {
           <h1 className="text-4xl font-bold text-white mb-4">Get Ready!</h1>
           <p className="text-xl text-slate-400 mb-8">Waiting for the teacher to start the quiz...</p>
           <p className="text-slate-500">You're in as <span className="text-white font-bold">{player.nickname}</span></p>
+          {questions.length > 0 && (
+            <p className="text-xs text-slate-600 mt-4">{questions.length} questions loaded</p>
+          )}
         </GlassCard>
       </div>
     );
   }
 
-  if (!currentQuestion) {
+  if (session.status === 'live' && questions.length === 0) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900/20 to-slate-900 p-6 flex items-center justify-center">
+        <GlassCard className="p-12 text-center">
+          <Loader2 className="w-16 h-16 animate-spin text-purple-400 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-white mb-2">Loading Questions...</h2>
+          <p className="text-slate-400">Getting ready to start</p>
+        </GlassCard>
+      </div>
+    );
+  }
+
+  if (!currentQuestion && session.status === 'live') {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900/20 to-slate-900 p-6 flex items-center justify-center">
         <GlassCard className="p-12 text-center">
