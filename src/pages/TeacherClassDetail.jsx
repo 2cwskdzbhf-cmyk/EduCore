@@ -287,17 +287,17 @@ export default function TeacherClassDetail() {
 
           <Tabs defaultValue="practice" className="space-y-6">
             <TabsList className="bg-white/5 border border-white/10">
-              <TabsTrigger value="practice">Practice Questions</TabsTrigger>
+              <TabsTrigger value="practice">Assignments</TabsTrigger>
               <TabsTrigger value="live">Live Quizzes</TabsTrigger>
               <TabsTrigger value="analytics">Analytics</TabsTrigger>
             </TabsList>
 
-            {/* Practice Questions Tab */}
+            {/* Assignments Tab */}
             <TabsContent value="practice" className="space-y-6">
               <GlassCard className="p-6">
                 <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
                   <Sparkles className="w-5 h-5 text-purple-400" />
-                  AI Generate Practice Questions
+                  AI Generate Assignment Questions
                 </h3>
 
                 <div className="space-y-4">
@@ -379,16 +379,14 @@ export default function TeacherClassDetail() {
                     </Button>
                     <div className="grid grid-cols-2 gap-2">
                       <Button
-                        onClick={() => navigate(createPageUrl(`CreateAssignment?classId=${classId}`))}
-                        variant="outline"
-                        className="border-white/20 text-white hover:bg-white/10"
+                        onClick={() => navigate(createPageUrl(`AssignmentBuilder?classId=${classId}`))}
+                        className="bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 shadow-lg shadow-emerald-500/30 text-white"
                       >
-                        Create Manually
+                        Create Assignment
                       </Button>
                       <Button
                         onClick={() => navigate(createPageUrl(`QuizLibrary?classId=${classId}`))}
-                        variant="outline"
-                        className="border-white/20 text-white hover:bg-white/10"
+                        className="bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 shadow-lg shadow-blue-500/30 text-white"
                       >
                         Library
                       </Button>
@@ -461,13 +459,13 @@ export default function TeacherClassDetail() {
                 {publishPracticeMutation.isSuccess && (
                   <div className="mt-4 p-3 rounded-lg bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 text-sm flex items-center gap-2">
                     <CheckCircle2 className="w-4 h-4" />
-                    Questions published! Students can now practice.
+                    Assignment questions published! Students can now practice.
                   </div>
                 )}
               </GlassCard>
 
               <GlassCard className="p-6">
-                <h3 className="text-lg font-bold text-white mb-4">Question Bank ({questionBank.length})</h3>
+                <h3 className="text-lg font-bold text-white mb-4">Assignment Question Bank ({questionBank.length})</h3>
                 {questionBank.length > 0 ? (
                   <div className="space-y-2 max-h-96 overflow-y-auto">
                     {questionBank.slice(0, 20).map((q, i) => (
@@ -479,7 +477,7 @@ export default function TeacherClassDetail() {
                     {questionBank.length > 20 && <p className="text-slate-500 text-xs">...and {questionBank.length - 20} more</p>}
                   </div>
                 ) : (
-                  <p className="text-slate-400 text-sm">No questions yet. Use AI generator above.</p>
+                  <p className="text-slate-400 text-sm">No assignment questions yet. Use AI generator above.</p>
                 )}
               </GlassCard>
             </TabsContent>
@@ -582,15 +580,13 @@ export default function TeacherClassDetail() {
                     <div className="grid grid-cols-2 gap-2">
                       <Button
                         onClick={() => navigate(createPageUrl(`CreateQuiz?classId=${classId}`))}
-                        variant="outline"
-                        className="border-white/20 text-white hover:bg-white/10"
+                        className="bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 shadow-lg shadow-emerald-500/30 text-white"
                       >
                         Create Manually
                       </Button>
                       <Button
                         onClick={() => navigate(createPageUrl(`QuizLibrary?classId=${classId}`))}
-                        variant="outline"
-                        className="border-white/20 text-white hover:bg-white/10"
+                        className="bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 shadow-lg shadow-blue-500/30 text-white"
                       >
                         Library
                       </Button>
