@@ -139,7 +139,13 @@ export default function StudentDashboard() {
       return dueDate > now && (!submission || submission.status === 'not_started' || submission.status === 'in_progress');
     });
     
-    return pending.slice(0, 5).map(a => {
+    const sorted = pending.sort((a, b) => {
+      const dateA = new Date(a.due_date);
+      const dateB = new Date(b.due_date);
+      return dateA - dateB;
+    });
+    
+    return sorted.slice(0, 5).map(a => {
       const dueDate = new Date(a.due_date);
       const diffMs = dueDate - now;
       const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));

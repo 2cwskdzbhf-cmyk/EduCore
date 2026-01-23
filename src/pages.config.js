@@ -2,7 +2,6 @@ import AITutor from './pages/AITutor';
 import AdminPanel from './pages/AdminPanel';
 import AssignmentBuilder from './pages/AssignmentBuilder';
 import ClassDetails from './pages/ClassDetails';
-import CreateAssignment from './pages/CreateAssignment';
 import CreateQuiz from './pages/CreateQuiz';
 import ImportMathsContent from './pages/ImportMathsContent';
 import JoinClass from './pages/JoinClass';
@@ -31,7 +30,6 @@ export const PAGES = {
     "AdminPanel": AdminPanel,
     "AssignmentBuilder": AssignmentBuilder,
     "ClassDetails": ClassDetails,
-    "CreateAssignment": CreateAssignment,
     "CreateQuiz": CreateQuiz,
     "ImportMathsContent": ImportMathsContent,
     "JoinClass": JoinClass,

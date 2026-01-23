@@ -36,6 +36,8 @@ export default function AssignmentBuilder() {
   const [user, setUser] = useState(null);
   const [assignmentTitle, setAssignmentTitle] = useState('');
   const [selectedTopic, setSelectedTopic] = useState('');
+  const [customTopicName, setCustomTopicName] = useState('');
+  const [dueDate, setDueDate] = useState('');
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [questions, setQuestions] = useState([
     {
@@ -183,22 +185,14 @@ export default function AssignmentBuilder() {
 
   const publishMutation = useMutation({
     mutationFn: async () => {
-      if (!user?.email || !classId) return;
+      if (!user?.email || !classId) {
+        throw new Error('Missing user or class information');
+      }
       
-      const assignment = await base44.entities.Assignment.create({
-        title: assignmentTitle,
-        class_id: classId,
-        teacher_email: user.email,
-        topic_id: selectedTopic,
-        assignment_type: 'quiz',
-        status: 'published',
-        max_points: questions.length * 10
-      });
-
       const quizSet = await base44.entities.QuizSet.create({
         owner_email: user.email,
         title: assignmentTitle,
-        topic_id: selectedTopic,
+        topic_id: selectedTopic || null,
         status: 'published',
         question_count: questions.length
       });
@@ -227,37 +221,82 @@ export default function AssignmentBuilder() {
         await base44.entities.QuizQuestion.create(questionData);
       }
 
+      const assignmentData = {
+        title: assignmentTitle,
+        class_id: classId,
+        teacher_email: user.email,
+        quiz_id: quizSet.id,
+        assignment_type: 'quiz',
+        status: 'published',
+        max_points: questions.length * 10
+      };
+
+      if (selectedTopic === 'custom' && customTopicName.trim()) {
+        assignmentData.custom_topic_name = customTopicName.trim();
+      } else if (selectedTopic && selectedTopic !== 'custom') {
+        assignmentData.topic_id = selectedTopic;
+      }
+
+      if (dueDate) {
+        assignmentData.due_date = new Date(dueDate).toISOString();
+      }
+
+      const assignment = await base44.entities.Assignment.create(assignmentData);
+
       return { assignment, quizSet };
     },
     onSuccess: () => {
       navigate(createPageUrl(`TeacherClassDetail?id=${classId}`));
+    },
+    onError: (error) => {
+      console.error('Failed to publish assignment:', error);
+      alert('Failed to publish assignment. Please try again.');
     }
   });
 
   const saveDraftMutation = useMutation({
     mutationFn: async () => {
-      if (!user?.email || !classId) return;
+      if (!user?.email || !classId) {
+        throw new Error('Missing user or class information');
+      }
       
-      const assignment = await base44.entities.Assignment.create({
+      const assignmentData = {
         title: assignmentTitle || 'Untitled Assignment',
         class_id: classId,
         teacher_email: user.email,
-        topic_id: selectedTopic,
         assignment_type: 'quiz',
         status: 'draft',
         max_points: questions.length * 10
-      });
+      };
+
+      if (selectedTopic === 'custom' && customTopicName.trim()) {
+        assignmentData.custom_topic_name = customTopicName.trim();
+      } else if (selectedTopic && selectedTopic !== 'custom') {
+        assignmentData.topic_id = selectedTopic;
+      }
+
+      if (dueDate) {
+        assignmentData.due_date = new Date(dueDate).toISOString();
+      }
+
+      const assignment = await base44.entities.Assignment.create(assignmentData);
 
       return assignment;
     },
     onSuccess: () => {
       navigate(createPageUrl(`TeacherClassDetail?id=${classId}`));
+    },
+    onError: (error) => {
+      console.error('Failed to save draft:', error);
+      alert('Failed to save draft. Please try again.');
     }
   });
 
   const canPublish = assignmentTitle.trim() !== '' && 
-                     selectedTopic !== '' && 
-                     questions.every(isQuestionValid);
+                     classId && 
+                     questions.length > 0 &&
+                     questions.every(isQuestionValid) &&
+                     (selectedTopic !== 'custom' || customTopicName.trim() !== '');
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900/20 to-slate-900 p-6">
@@ -293,7 +332,7 @@ export default function AssignmentBuilder() {
           </div>
         </div>
 
-        {/* Title and Topic */}
+        {/* Title, Topic, and Due Date */}
         <GlassCard className="p-6 mb-6">
           <div className="grid md:grid-cols-2 gap-6">
             <div>
@@ -306,18 +345,47 @@ export default function AssignmentBuilder() {
               />
             </div>
             <div>
-              <Label className="text-white mb-2">Topic *</Label>
-              <Select value={selectedTopic} onValueChange={setSelectedTopic}>
+              <Label className="text-white mb-2">Topic (Optional)</Label>
+              <Select value={selectedTopic} onValueChange={(value) => {
+                setSelectedTopic(value);
+                if (value !== 'custom') setCustomTopicName('');
+              }}>
                 <SelectTrigger className="bg-white/5 border-white/10 text-white">
-                  <SelectValue placeholder="Select topic" />
+                  <SelectValue placeholder="Select topic or create custom" />
                 </SelectTrigger>
                 <SelectContent>
                   {topics.map(t => (
                     <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
                   ))}
+                  <SelectItem value="custom">Custom topic...</SelectItem>
                 </SelectContent>
               </Select>
             </div>
+          </div>
+
+          {selectedTopic === 'custom' && (
+            <div className="mt-4">
+              <Label className="text-white mb-2">Custom Topic Name *</Label>
+              <Input
+                placeholder="Enter custom topic name"
+                value={customTopicName}
+                onChange={(e) => setCustomTopicName(e.target.value)}
+                className="bg-white/5 border-white/10 text-white"
+              />
+              <p className="text-xs text-slate-400 mt-1">
+                This topic will only apply to this assignment
+              </p>
+            </div>
+          )}
+
+          <div className="mt-4">
+            <Label className="text-white mb-2">Due Date (Optional)</Label>
+            <Input
+              type="datetime-local"
+              value={dueDate}
+              onChange={(e) => setDueDate(e.target.value)}
+              className="bg-white/5 border-white/10 text-white"
+            />
           </div>
         </GlassCard>
 
