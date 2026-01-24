@@ -237,4 +237,28 @@ export default function StudentLiveQuizPlay() {
             <p className="text-white">Answer submitted</p>
           </GlassCard>
         ) : options.length ? (
-          <div className="grid grid-cols-1 md:grid-cols
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {options.map((opt, i) => (
+              <Button
+                key={i}
+                onClick={() => {
+                  setSelected(i);
+                  submitAnswer.mutate(i);
+                }}
+                disabled={selected !== null}
+                className="h-20 text-lg"
+                variant={selected === i ? 'default' : 'outline'}
+              >
+                {opt}
+              </Button>
+            ))}
+          </div>
+        ) : (
+          <GlassCard className="p-6 text-center">
+            <p className="text-white">No options available</p>
+          </GlassCard>
+        )}
+      </div>
+    </div>
+  );
+}

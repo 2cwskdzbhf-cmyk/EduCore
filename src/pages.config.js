@@ -21,12 +21,12 @@ import TakeAssignment from './pages/TakeAssignment';
 import TeacherAssignmentLibrary from './pages/TeacherAssignmentLibrary';
 import TeacherClassDetail from './pages/TeacherClassDetail';
 import TeacherDashboard from './pages/TeacherDashboard';
+import TeacherLiveQuizLobby from './pages/TeacherLiveQuizLobby';
+import TeacherLiveQuizResults from './pages/TeacherLiveQuizResults';
 import TeacherQuestionBuilder from './pages/TeacherQuestionBuilder';
 import TeacherQuestionGenerator from './pages/TeacherQuestionGenerator';
 import Topic from './pages/Topic';
-import TeacherLiveQuizLobby from './pages/TeacherLiveQuizLobby';
 import TeacherLiveQuizPlay from './pages/TeacherLiveQuizPlay';
-import TeacherLiveQuizResults from './pages/TeacherLiveQuizResults';
 import StudentLiveQuizPlay from './pages/StudentLiveQuizPlay';
 import __Layout from './Layout.jsx';
 
@@ -55,12 +55,12 @@ export const PAGES = {
     "TeacherAssignmentLibrary": TeacherAssignmentLibrary,
     "TeacherClassDetail": TeacherClassDetail,
     "TeacherDashboard": TeacherDashboard,
+    "TeacherLiveQuizLobby": TeacherLiveQuizLobby,
+    "TeacherLiveQuizResults": TeacherLiveQuizResults,
     "TeacherQuestionBuilder": TeacherQuestionBuilder,
     "TeacherQuestionGenerator": TeacherQuestionGenerator,
     "Topic": Topic,
-    "TeacherLiveQuizLobby": TeacherLiveQuizLobby,
     "TeacherLiveQuizPlay": TeacherLiveQuizPlay,
-    "TeacherLiveQuizResults": TeacherLiveQuizResults,
     "StudentLiveQuizPlay": StudentLiveQuizPlay,
 }
 

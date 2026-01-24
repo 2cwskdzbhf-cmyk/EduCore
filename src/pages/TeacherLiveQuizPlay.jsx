@@ -308,4 +308,41 @@ export default function TeacherLiveQuizPlay() {
           </div>
 
           <div className="flex items-center gap-3">
-            <div className="f
+            <div className="flex items-center gap-2 bg-purple-500/20 px-4 py-2 rounded-lg">
+              <Clock className="w-5 h-5 text-amber-400" />
+              <span className="text-2xl font-bold">{timeLeft}s</span>
+            </div>
+            <Button
+              variant="outline"
+              onClick={() => setShowLeaderboard(true)}
+              className="border-purple-500/30"
+            >
+              View Leaderboard
+            </Button>
+          </div>
+        </div>
+
+        <GlassCard className="p-8 mb-6">
+          <h2 className="text-3xl font-bold text-white text-center mb-4">{prompt}</h2>
+          <div className="flex justify-center items-center gap-6 text-slate-300">
+            <div className="flex items-center gap-2">
+              <span className="text-lg">{answeredCount}</span>
+              <span className="text-sm">/ {players.length} answered</span>
+            </div>
+          </div>
+        </GlassCard>
+
+        <div className="text-center">
+          <Button
+            onClick={() => setShowLeaderboard(true)}
+            disabled={timeLeft > 0}
+            size="lg"
+            className="px-8 py-6 text-lg"
+          >
+            {timeLeft > 0 ? `Wait ${timeLeft}s` : 'Show Results'}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
