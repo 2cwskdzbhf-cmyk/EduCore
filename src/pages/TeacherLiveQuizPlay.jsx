@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -17,6 +17,8 @@ export default function TeacherLiveQuizPlay() {
   const [timeLeft, setTimeLeft] = useState(15);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
 
+  // Never end the session from “react unmount” (that’s what causes flashing).
+  // Only end from the End button or tab close.
   const isTransitioningRef = useRef(false);
   const statusRef = useRef(null);
 
@@ -31,23 +33,21 @@ export default function TeacherLiveQuizPlay() {
     }
   };
 
-  /* ---------------- SESSION ---------------- */
-  const { data: session, isFetching: isFetchingSession } = useQuery({
+  const { data: session, isFetching: fetchingSession } = useQuery({
     queryKey: ['liveQuizSession', sessionId],
     queryFn: async () => {
-      const sessions = await base44.entities.LiveQuizSession.filter({ id: sessionId });
-      return sessions?.[0] || null;
+      const s = await base44.entities.LiveQuizSession.filter({ id: sessionId });
+      return s?.[0] || null;
     },
     enabled: !!sessionId,
-    refetchInterval: 1000,
-    staleTime: 500
+    refetchInterval: 800
   });
 
   useEffect(() => {
     statusRef.current = session?.status ?? null;
   }, [session?.status]);
 
-  // Redirect only if ended
+  // Only redirect if ended
   useEffect(() => {
     if (!sessionId) return;
     if (session?.status === 'ended') {
@@ -65,7 +65,6 @@ export default function TeacherLiveQuizPlay() {
     session?.set_id ||
     null;
 
-  /* ---------------- QUIZ SET META (for inline questions) ---------------- */
   const { data: quizSet } = useQuery({
     queryKey: ['quizSetMetaForPlay', quizSetId],
     queryFn: async () => {
@@ -80,8 +79,7 @@ export default function TeacherLiveQuizPlay() {
       } catch {}
       return null;
     },
-    enabled: !!quizSetId,
-    staleTime: 10_000
+    enabled: !!quizSetId
   });
 
   const candidateIds = useMemo(() => {
@@ -90,24 +88,20 @@ export default function TeacherLiveQuizPlay() {
       quizSet?.id,
       session?.quiz_set_id,
       session?.live_quiz_set_id,
-      session?.quizSetId,
-      session?.liveQuizSetId,
       session?.quiz_id,
       session?.set_id,
-      sessionId // some schemas attach questions to session
+      sessionId
     ].filter(Boolean);
     return Array.from(new Set(ids));
   }, [quizSetId, quizSet?.id, sessionId, session]);
 
-  /* ---------------- QUESTIONS (schema-proof) ---------------- */
-  const { data: questions = [], isFetching: isFetchingQuestions } = useQuery({
+  const { data: questions = [], isFetching: fetchingQuestions } = useQuery({
     queryKey: ['questionsForPlay', sessionId, quizSetId],
     queryFn: async () => {
-      // inline questions
+      // inline
       const inline = [
         quizSet?.questions,
         quizSet?.items,
-        quizSet?.question_list,
         quizSet?.quiz_questions,
         quizSet?.content
       ];
@@ -125,32 +119,20 @@ export default function TeacherLiveQuizPlay() {
         q = await safeFilter('LiveQuizQuestion', { live_quiz_set_id: id }, 'order');
         if (q.length) return q;
 
-        q = await safeFilter('LiveQuizQuestion', { quiz_set_id: id }, 'order');
-        if (q.length) return q;
-
         q = await safeFilter('LiveQuizQuestion', { session_id: id }, 'order');
-        if (q.length) return q;
-
-        q = await safeFilter('Question', { quiz_id: id }, 'order');
-        if (q.length) return q;
-
-        q = await safeFilter('QuizItem', { quiz_id: id }, 'order');
         if (q.length) return q;
       }
 
       return [];
     },
-    enabled: !!sessionId && !!quizSetId,
-    staleTime: 10_000
+    enabled: !!sessionId && !!quizSetId
   });
 
-  /* ---------------- PLAYERS / ANSWERS ---------------- */
   const { data: players = [] } = useQuery({
     queryKey: ['liveQuizPlayers', sessionId],
     queryFn: () => base44.entities.LiveQuizPlayer.filter({ session_id: sessionId }),
     enabled: !!sessionId,
-    refetchInterval: 1000,
-    staleTime: 500
+    refetchInterval: 800
   });
 
   const { data: answers = [] } = useQuery({
@@ -161,25 +143,20 @@ export default function TeacherLiveQuizPlay() {
         question_index: session.current_question_index
       }),
     enabled: !!sessionId && (session?.current_question_index ?? -1) >= 0,
-    refetchInterval: 1000,
-    staleTime: 300
+    refetchInterval: 800
   });
 
-  const endSession = async (reason = 'teacher_left') => {
-    try {
-      if (!sessionId) return;
-      await base44.entities.LiveQuizSession.update(sessionId, {
-        status: 'ended',
-        ended_at: new Date().toISOString(),
-        end_reason: reason
-      });
-      queryClient.invalidateQueries();
-    } catch (e) {
-      console.error('[TEACHER] Failed to end session:', e);
-    }
+  const endSession = async (reason) => {
+    if (!sessionId) return;
+    await base44.entities.LiveQuizSession.update(sessionId, {
+      status: 'ended',
+      ended_at: new Date().toISOString(),
+      end_reason: reason
+    });
+    queryClient.invalidateQueries();
   };
 
-  // ✅ End only on REAL tab close/refresh
+  // Only end on REAL tab close/refresh
   useEffect(() => {
     const handleBeforeUnload = () => {
       if (isTransitioningRef.current) return;
@@ -190,16 +167,10 @@ export default function TeacherLiveQuizPlay() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId]);
 
-  // ✅ End only on real component unmount (NO deps!)
-  useEffect(() => {
-    return () => {
-      if (isTransitioningRef.current) return;
-      if (statusRef.current === 'live') endSession('teacher_navigated_away');
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // IMPORTANT: do NOT end on component unmount (that causes flashing in SPA routes)
+  // (Intentionally removed)
 
-  /* ---------------- TIMER ---------------- */
+  // Timer
   useEffect(() => {
     if (!session || session.status !== 'live' || !session.question_started_at) return;
 
@@ -245,17 +216,14 @@ export default function TeacherLiveQuizPlay() {
   });
 
   const endNowMutation = useMutation({
-    mutationFn: async () => {
-      await endSession('ended_button');
-    },
+    mutationFn: async () => endSession('ended_button'),
     onSuccess: () => {
       isTransitioningRef.current = true;
       navigate(createPageUrl('TeacherDashboard'));
     }
   });
 
-  /* ---------------- UI ---------------- */
-  if (isFetchingSession || !session) {
+  if (fetchingSession || !session) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Loader2 className="w-12 h-12 animate-spin text-purple-400" />
@@ -280,7 +248,7 @@ export default function TeacherLiveQuizPlay() {
     );
   }
 
-  if (isFetchingQuestions) {
+  if (fetchingQuestions) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Loader2 className="w-12 h-12 animate-spin text-purple-400" />
@@ -288,7 +256,7 @@ export default function TeacherLiveQuizPlay() {
     );
   }
 
-  if (questions.length === 0) {
+  if (!questions.length) {
     return (
       <div className="min-h-screen flex items-center justify-center p-6">
         <GlassCard className="p-8 text-center max-w-md">
@@ -303,14 +271,10 @@ export default function TeacherLiveQuizPlay() {
   }
 
   const idx = session.current_question_index ?? 0;
-  const currentQuestion = questions[idx];
+  const q = questions[idx];
 
   const prompt =
-    currentQuestion?.prompt ||
-    currentQuestion?.question ||
-    currentQuestion?.question_text ||
-    currentQuestion?.text ||
-    'Question';
+    q?.prompt || q?.question || q?.question_text || q?.text || 'Question';
 
   const answeredCount = answers.length;
 
@@ -375,6 +339,15 @@ export default function TeacherLiveQuizPlay() {
               <Clock className="w-5 h-5" />
               <span className="text-2xl font-bold">{timeLeft}s</span>
             </div>
+
+            <Button
+              variant="outline"
+              onClick={() => endNowMutation.mutate()}
+              className="border-red-500/30 text-red-400 hover:bg-red-500/10"
+            >
+              <X className="w-4 h-4 mr-2" />
+              End
+            </Button>
           </div>
         </div>
 
