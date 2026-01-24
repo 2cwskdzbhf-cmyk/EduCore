@@ -6,13 +6,7 @@ import { useNavigate } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import { Button } from '@/components/ui/button';
 import GlassCard from '@/components/ui/GlassCard';
-import {
-  Play,
-  Copy,
-  CheckCircle2,
-  Loader2,
-  AlertTriangle
-} from 'lucide-react';
+import { Play, Copy, CheckCircle2, Loader2, AlertTriangle } from 'lucide-react';
 
 export default function TeacherLiveQuizLobby() {
   const navigate = useNavigate();
@@ -33,18 +27,18 @@ export default function TeacherLiveQuizLobby() {
     queryKey: ['liveQuizSession', sessionId],
     queryFn: async () => {
       const s = await base44.entities.LiveQuizSession.filter({ id: sessionId });
-      return s[0];
+      return s?.[0] || null;
     },
     enabled: !!sessionId,
     refetchInterval: 1500
   });
 
-  // keep statusRef up to date
+  // Keep statusRef up to date (for unmount cleanup)
   useEffect(() => {
     statusRef.current = session?.status ?? null;
   }, [session?.status]);
 
-  /* ✅ AUTO-REDIRECT WHEN SESSION STARTS */
+  /* ✅ AUTO-REDIRECT WHEN SESSION STARTS/ENDS */
   useEffect(() => {
     if (!sessionId || !session?.status) return;
 
@@ -59,6 +53,7 @@ export default function TeacherLiveQuizLobby() {
   }, [session?.status, sessionId, navigate]);
 
   /* ---------------- UNIVERSAL SET ID ---------------- */
+  // In your app, quiz sets are QuizSet rows, and questions are typically linked by QuizQuestion.quiz_id = QuizSet.id
   const quizSetId =
     session?.quiz_set_id ||
     session?.live_quiz_set_id ||
@@ -71,47 +66,60 @@ export default function TeacherLiveQuizLobby() {
     queryKey: ['quizSetMeta', quizSetId],
     queryFn: async () => {
       if (!quizSetId) return null;
+
+      // Your library uses QuizSet (not LiveQuizSet), but keep fallback just in case
       try {
         const qs = await base44.entities.QuizSet.filter({ id: quizSetId });
         if (qs?.[0]) return qs[0];
       } catch {}
-      const lqs = await base44.entities.LiveQuizSet.filter({ id: quizSetId });
-      return lqs?.[0] || null;
+
+      try {
+        const lqs = await base44.entities.LiveQuizSet.filter({ id: quizSetId });
+        return lqs?.[0] || null;
+      } catch {}
+
+      return null;
     },
     enabled: !!quizSetId
   });
 
-  /* ---------------- LOAD QUESTIONS (BULLETPROOF) ---------------- */
+  /* ---------------- LOAD QUESTIONS (FIXED FOR YOUR SCHEMA) ---------------- */
   const { data: questions = [] } = useQuery({
     queryKey: ['lobbyQuestions', quizSetId],
     queryFn: async () => {
       if (!quizSetId) return [];
 
-      // 1️⃣ QuizQuestion → quiz_set_id
+      // ✅ PRIMARY (most Base44 quiz builders): QuizQuestion.quiz_id === QuizSet.id
       try {
-        const q1 = await base44.entities.QuizQuestion.filter(
-          { quiz_set_id: quizSetId },
-          'order'
-        );
-        if (q1?.length) return q1;
+        const q = await base44.entities.QuizQuestion.filter({ quiz_id: quizSetId }, 'order');
+        if (q?.length) return q;
       } catch {}
 
-      // 2️⃣ LiveQuizQuestion → live_quiz_set_id
+      // Fallbacks for variants / legacy
       try {
-        const q2 = await base44.entities.LiveQuizQuestion.filter(
-          { live_quiz_set_id: quizSetId },
-          'order'
-        );
-        if (q2?.length) return q2;
+        const q = await base44.entities.QuizQuestion.filter({ quiz_set_id: quizSetId }, 'order');
+        if (q?.length) return q;
       } catch {}
 
-      // 3️⃣ LiveQuizQuestion → quiz_set_id (legacy)
       try {
-        const q3 = await base44.entities.LiveQuizQuestion.filter(
-          { quiz_set_id: quizSetId },
-          'order'
-        );
-        if (q3?.length) return q3;
+        const q = await base44.entities.QuizQuestion.filter({ quizSetId: quizSetId }, 'order');
+        if (q?.length) return q;
+      } catch {}
+
+      try {
+        const q = await base44.entities.QuizQuestion.filter({ set_id: quizSetId }, 'order');
+        if (q?.length) return q;
+      } catch {}
+
+      // Some projects store live questions separately
+      try {
+        const q = await base44.entities.LiveQuizQuestion.filter({ live_quiz_set_id: quizSetId }, 'order');
+        if (q?.length) return q;
+      } catch {}
+
+      try {
+        const q = await base44.entities.LiveQuizQuestion.filter({ quiz_set_id: quizSetId }, 'order');
+        if (q?.length) return q;
       } catch {}
 
       return [];
@@ -122,16 +130,12 @@ export default function TeacherLiveQuizLobby() {
   /* ---------------- PLAYERS ---------------- */
   const { data: players = [] } = useQuery({
     queryKey: ['liveQuizPlayers', sessionId],
-    queryFn: () =>
-      base44.entities.LiveQuizPlayer.filter(
-        { session_id: sessionId },
-        '-created_date'
-      ),
+    queryFn: () => base44.entities.LiveQuizPlayer.filter({ session_id: sessionId }, '-created_date'),
     enabled: !!sessionId,
     refetchInterval: 2000
   });
 
-  /* ---------------- END SESSION (FIXED) ---------------- */
+  /* ---------------- END SESSION (SAFE) ---------------- */
   const endSession = async (reason) => {
     try {
       if (!sessionId) return;
@@ -146,7 +150,7 @@ export default function TeacherLiveQuizLobby() {
     }
   };
 
-  // Only end when the teacher truly closes/leaves the tab (not SPA route changes)
+  // Only end when teacher truly closes/leaves tab (not SPA navigation)
   useEffect(() => {
     const onBeforeUnload = () => {
       if (leavingForPlayRef.current) return;
@@ -172,6 +176,7 @@ export default function TeacherLiveQuizLobby() {
       if (questions.length === 0) {
         throw new Error('This quiz genuinely has no questions.');
       }
+
       await base44.entities.LiveQuizSession.update(sessionId, {
         status: 'live',
         current_question_index: 0,
@@ -186,6 +191,7 @@ export default function TeacherLiveQuizLobby() {
     onError: (e) => alert(e.message)
   });
 
+  /* ---------------- RENDER ---------------- */
   if (isLoading || !session) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -194,7 +200,7 @@ export default function TeacherLiveQuizLobby() {
     );
   }
 
-  // ✅ Instead of a dead-end message, show a spinner while redirecting
+  // Show spinner while redirecting (instead of flashing errors)
   if (session.status !== 'lobby') {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -258,6 +264,7 @@ export default function TeacherLiveQuizLobby() {
 
         <GlassCard className="p-6">
           <h3 className="text-lg font-bold text-white mb-4">Players</h3>
+
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
             <AnimatePresence>
               {players.map((p, i) => (
