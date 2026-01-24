@@ -35,7 +35,8 @@ export default function StudentLiveQuizPlay() {
       return s?.[0] || null;
     },
     enabled: !!sessionId,
-    refetchInterval: 900
+    refetchInterval: 1000,
+    staleTime: 800
   });
 
   const { data: player } = useQuery({
@@ -47,7 +48,8 @@ export default function StudentLiveQuizPlay() {
       });
       return p?.[0] || null;
     },
-    enabled: !!sessionId && !!user?.email
+    enabled: !!sessionId && !!user?.email,
+    staleTime: 10_000
   });
 
   const quizSetId =
@@ -57,51 +59,27 @@ export default function StudentLiveQuizPlay() {
     session?.set_id ||
     null;
 
-  const { data: quizSet } = useQuery({
-    queryKey: ['quizSetMetaForStudent', quizSetId],
-    queryFn: async () => {
-      if (!quizSetId) return null;
-      try {
-        const qs = await base44.entities.QuizSet.filter({ id: quizSetId });
-        if (qs?.[0]) return qs[0];
-      } catch {}
-      try {
-        const lqs = await base44.entities.LiveQuizSet.filter({ id: quizSetId });
-        if (lqs?.[0]) return lqs[0];
-      } catch {}
-      return null;
-    },
-    enabled: !!quizSetId
-  });
-
-  const candidateIds = useMemo(() => {
-    const ids = [quizSetId, quizSet?.id, sessionId].filter(Boolean);
-    return Array.from(new Set(ids));
-  }, [quizSetId, quizSet?.id, sessionId]);
-
   const { data: questions = [], isFetching } = useQuery({
     queryKey: ['studentQuestions', sessionId, quizSetId],
     queryFn: async () => {
-      // inline
-      const inline = [quizSet?.questions, quizSet?.items, quizSet?.quiz_questions, quizSet?.content];
-      for (const arr of inline) if (Array.isArray(arr) && arr.length) return arr;
+      if (!quizSetId) return [];
 
-      for (const id of candidateIds) {
-        let q = await safeFilter('QuizQuestion', { quiz_id: id }, 'order');
-        if (q.length) return q;
+      let q = await safeFilter('QuizQuestion', { quiz_id: quizSetId }, 'order');
+      if (q.length) return q;
 
-        q = await safeFilter('QuizQuestion', { quiz_set_id: id }, 'order');
-        if (q.length) return q;
+      q = await safeFilter('QuizQuestion', { quiz_set_id: quizSetId }, 'order');
+      if (q.length) return q;
 
-        q = await safeFilter('LiveQuizQuestion', { live_quiz_set_id: id }, 'order');
-        if (q.length) return q;
+      q = await safeFilter('LiveQuizQuestion', { live_quiz_set_id: quizSetId }, 'order');
+      if (q.length) return q;
 
-        q = await safeFilter('LiveQuizQuestion', { session_id: id }, 'order');
-        if (q.length) return q;
-      }
+      q = await safeFilter('LiveQuizQuestion', { session_id: sessionId }, 'order');
+      if (q.length) return q;
+
       return [];
     },
-    enabled: !!quizSetId
+    enabled: !!quizSetId,
+    staleTime: 10_000
   });
 
   const idx = session?.current_question_index ?? -1;
@@ -120,52 +98,63 @@ export default function StudentLiveQuizPlay() {
     return () => clearInterval(i);
   }, [session?.question_started_at]);
 
-  const extractOptions = (q) => {
+  const options = useMemo(() => {
+    const q = currentQuestion;
     if (!q) return [];
 
-    // Array forms
-    if (Array.isArray(q.options) && q.options.length) return q.options;
-    if (Array.isArray(q.answers) && q.answers.length) return q.answers;
-    if (Array.isArray(q.choices) && q.choices.length) return q.choices;
-
-    // Array-of-objects forms: [{text:'...'}], [{label:'...'}], [{value:'...'}]
-    const objArr = q.options || q.answers || q.choices;
-    if (Array.isArray(objArr) && objArr.length && typeof objArr[0] === 'object') {
-      const mapped = objArr
-        .map(o => o?.text ?? o?.label ?? o?.value ?? o?.answer ?? o?.choice)
-        .filter(v => typeof v === 'string' && v.trim().length);
-      if (mapped.length) return mapped;
+    // 1) array of strings
+    for (const k of ['options', 'answers', 'choices']) {
+      if (Array.isArray(q[k]) && q[k].length) {
+        const arr = q[k]
+          .map(v => (typeof v === 'string' ? v : (v?.text ?? v?.label ?? v?.value)))
+          .filter(v => typeof v === 'string' && v.trim().length);
+        if (arr.length) return arr;
+      }
     }
 
-    // JSON string forms
-    for (const key of ['options_json', 'answers_json', 'choices_json', 'optionsJson', 'answersJson']) {
-      if (typeof q[key] === 'string') {
+    // 2) object map {A:'1',B:'2',C:'3',D:'4'} or {0:'1',1:'2'...}
+    for (const k of ['options', 'answers', 'choices']) {
+      if (q[k] && typeof q[k] === 'object' && !Array.isArray(q[k])) {
+        const obj = q[k];
+        const byLetters = [obj.A, obj.B, obj.C, obj.D].filter(v => typeof v === 'string' && v.trim().length);
+        if (byLetters.length) return byLetters;
+
+        const byIndex = [obj[0], obj[1], obj[2], obj[3]].filter(v => typeof v === 'string' && v.trim().length);
+        if (byIndex.length) return byIndex;
+      }
+    }
+
+    // 3) JSON string
+    for (const k of ['options_json', 'answers_json', 'choices_json', 'optionsJson', 'answersJson', 'choicesJson']) {
+      if (typeof q[k] === 'string') {
         try {
-          const parsed = JSON.parse(q[key]);
+          const parsed = JSON.parse(q[k]);
           if (Array.isArray(parsed)) {
-            return parsed
-              .map(o => (typeof o === 'string' ? o : (o?.text ?? o?.label ?? o?.value)))
+            const arr = parsed
+              .map(v => (typeof v === 'string' ? v : (v?.text ?? v?.label ?? v?.value)))
               .filter(v => typeof v === 'string' && v.trim().length);
+            if (arr.length) return arr;
+          }
+          if (parsed && typeof parsed === 'object') {
+            const byLetters = [parsed.A, parsed.B, parsed.C, parsed.D].filter(v => typeof v === 'string' && v.trim().length);
+            if (byLetters.length) return byLetters;
           }
         } catch {}
       }
     }
 
-    // Field forms (A/B/C/D, option_a etc.)
+    // 4) flat fields
     const flat = [
       q.option_a, q.option_b, q.option_c, q.option_d,
       q.answer_a, q.answer_b, q.answer_c, q.answer_d,
       q.choice_a, q.choice_b, q.choice_c, q.choice_d,
       q.option1, q.option2, q.option3, q.option4,
       q.answer1, q.answer2, q.answer3, q.answer4,
-      q.choice1, q.choice2, q.choice3, q.choice4,
       q.A, q.B, q.C, q.D
     ].filter(v => typeof v === 'string' && v.trim().length);
 
     return flat;
-  };
-
-  const options = useMemo(() => extractOptions(currentQuestion), [currentQuestion]);
+  }, [currentQuestion]);
 
   const submitAnswer = useMutation({
     mutationFn: async (optionIndex) => {
@@ -248,30 +237,4 @@ export default function StudentLiveQuizPlay() {
             <p className="text-white">Answer submitted</p>
           </GlassCard>
         ) : options.length ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {options.map((opt, i) => (
-              <Button
-                key={i}
-                onClick={() => {
-                  setSelected(i);
-                  submitAnswer.mutate(i);
-                }}
-                disabled={submitAnswer.isPending || selected !== null}
-                className="py-6 text-lg"
-              >
-                {opt}
-              </Button>
-            ))}
-          </div>
-        ) : (
-          <GlassCard className="p-6 text-center">
-            <p className="text-white font-semibold mb-2">No answer options found on this question</p>
-            <p className="text-slate-300 text-sm">
-              Your question record stores options in a different format. (We can fix it once we see one question’s fields.)
-            </p>
-          </GlassCard>
-        )}
-      </div>
-    </div>
-  );
-}
+          <div className="grid grid-cols-1 md:grid-cols
