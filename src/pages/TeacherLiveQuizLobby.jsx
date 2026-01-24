@@ -7,7 +7,6 @@ import { createPageUrl } from '@/utils';
 import { Button } from '@/components/ui/button';
 import GlassCard from '@/components/ui/GlassCard';
 import {
-  Users,
   Play,
   Copy,
   CheckCircle2,
@@ -26,6 +25,9 @@ export default function TeacherLiveQuizLobby() {
   // Prevent ending session when we intentionally navigate Lobby -> Play
   const leavingForPlayRef = useRef(false);
 
+  // Track latest session status safely (so unmount cleanup doesn't depend on effect deps)
+  const statusRef = useRef(null);
+
   /* ---------------- SESSION ---------------- */
   const { data: session, isLoading } = useQuery({
     queryKey: ['liveQuizSession', sessionId],
@@ -36,6 +38,11 @@ export default function TeacherLiveQuizLobby() {
     enabled: !!sessionId,
     refetchInterval: 1500
   });
+
+  // keep statusRef up to date
+  useEffect(() => {
+    statusRef.current = session?.status ?? null;
+  }, [session?.status]);
 
   /* ✅ AUTO-REDIRECT WHEN SESSION STARTS */
   useEffect(() => {
@@ -124,7 +131,7 @@ export default function TeacherLiveQuizLobby() {
     refetchInterval: 2000
   });
 
-  /* ---------------- END SESSION (SAFE) ---------------- */
+  /* ---------------- END SESSION (FIXED) ---------------- */
   const endSession = async (reason) => {
     try {
       if (!sessionId) return;
@@ -139,23 +146,25 @@ export default function TeacherLiveQuizLobby() {
     }
   };
 
+  // Only end when the teacher truly closes/leaves the tab (not SPA route changes)
   useEffect(() => {
-    const onUnload = () => endSession('teacher_left');
-    window.addEventListener('beforeunload', onUnload);
-    window.addEventListener('pagehide', onUnload);
-    return () => {
-      window.removeEventListener('beforeunload', onUnload);
-      window.removeEventListener('pagehide', onUnload);
+    const onBeforeUnload = () => {
+      if (leavingForPlayRef.current) return;
+      if (statusRef.current === 'lobby') endSession('teacher_left');
     };
+
+    window.addEventListener('beforeunload', onBeforeUnload);
+    return () => window.removeEventListener('beforeunload', onBeforeUnload);
   }, [sessionId]);
 
+  // End session on component unmount ONLY (NOT on status changes)
   useEffect(() => {
     return () => {
-      if (!leavingForPlayRef.current && session?.status !== 'ended') {
-        endSession('teacher_navigated_away');
-      }
+      if (leavingForPlayRef.current) return;
+      if (statusRef.current === 'lobby') endSession('teacher_navigated_away');
     };
-  }, [session?.status, sessionId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   /* ---------------- START QUIZ ---------------- */
   const startMutation = useMutation({
@@ -171,7 +180,6 @@ export default function TeacherLiveQuizLobby() {
       });
     },
     onSuccess: () => {
-      // We also navigate here, but the redirect effect above is a backup
       leavingForPlayRef.current = true;
       navigate(createPageUrl(`TeacherLiveQuizPlay?sessionId=${sessionId}`), { replace: true });
     },
