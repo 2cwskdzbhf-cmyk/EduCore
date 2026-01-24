@@ -1,5 +1,4 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { motion } from 'framer-motion';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
@@ -17,8 +16,6 @@ export default function TeacherLiveQuizPlay() {
   const [timeLeft, setTimeLeft] = useState(15);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
 
-  // Never end the session from “react unmount” (that’s what causes flashing).
-  // Only end from the End button or tab close.
   const isTransitioningRef = useRef(false);
   const statusRef = useRef(null);
 
@@ -33,21 +30,22 @@ export default function TeacherLiveQuizPlay() {
     }
   };
 
-  const { data: session, isFetching: fetchingSession } = useQuery({
+  // ✅ IMPORTANT: do NOT use isFetching to decide “loading screen”
+  const { data: session } = useQuery({
     queryKey: ['liveQuizSession', sessionId],
     queryFn: async () => {
       const s = await base44.entities.LiveQuizSession.filter({ id: sessionId });
       return s?.[0] || null;
     },
     enabled: !!sessionId,
-    refetchInterval: 800
+    refetchInterval: 1200,
+    staleTime: 800
   });
 
   useEffect(() => {
     statusRef.current = session?.status ?? null;
   }, [session?.status]);
 
-  // Only redirect if ended
   useEffect(() => {
     if (!sessionId) return;
     if (session?.status === 'ended') {
@@ -79,35 +77,20 @@ export default function TeacherLiveQuizPlay() {
       } catch {}
       return null;
     },
-    enabled: !!quizSetId
+    enabled: !!quizSetId,
+    staleTime: 10_000
   });
 
   const candidateIds = useMemo(() => {
-    const ids = [
-      quizSetId,
-      quizSet?.id,
-      session?.quiz_set_id,
-      session?.live_quiz_set_id,
-      session?.quiz_id,
-      session?.set_id,
-      sessionId
-    ].filter(Boolean);
+    const ids = [quizSetId, quizSet?.id, sessionId].filter(Boolean);
     return Array.from(new Set(ids));
-  }, [quizSetId, quizSet?.id, sessionId, session]);
+  }, [quizSetId, quizSet?.id, sessionId]);
 
-  const { data: questions = [], isFetching: fetchingQuestions } = useQuery({
+  const { data: questions = [] } = useQuery({
     queryKey: ['questionsForPlay', sessionId, quizSetId],
     queryFn: async () => {
-      // inline
-      const inline = [
-        quizSet?.questions,
-        quizSet?.items,
-        quizSet?.quiz_questions,
-        quizSet?.content
-      ];
-      for (const arr of inline) {
-        if (Array.isArray(arr) && arr.length) return arr;
-      }
+      const inline = [quizSet?.questions, quizSet?.items, quizSet?.quiz_questions, quizSet?.content];
+      for (const arr of inline) if (Array.isArray(arr) && arr.length) return arr;
 
       for (const id of candidateIds) {
         let q = await safeFilter('QuizQuestion', { quiz_id: id }, 'order');
@@ -122,17 +105,18 @@ export default function TeacherLiveQuizPlay() {
         q = await safeFilter('LiveQuizQuestion', { session_id: id }, 'order');
         if (q.length) return q;
       }
-
       return [];
     },
-    enabled: !!sessionId && !!quizSetId
+    enabled: !!sessionId && !!quizSetId,
+    staleTime: 10_000
   });
 
   const { data: players = [] } = useQuery({
     queryKey: ['liveQuizPlayers', sessionId],
     queryFn: () => base44.entities.LiveQuizPlayer.filter({ session_id: sessionId }),
     enabled: !!sessionId,
-    refetchInterval: 800
+    refetchInterval: 1200,
+    staleTime: 800
   });
 
   const { data: answers = [] } = useQuery({
@@ -143,7 +127,8 @@ export default function TeacherLiveQuizPlay() {
         question_index: session.current_question_index
       }),
     enabled: !!sessionId && (session?.current_question_index ?? -1) >= 0,
-    refetchInterval: 800
+    refetchInterval: 1200,
+    staleTime: 800
   });
 
   const endSession = async (reason) => {
@@ -156,7 +141,7 @@ export default function TeacherLiveQuizPlay() {
     queryClient.invalidateQueries();
   };
 
-  // Only end on REAL tab close/refresh
+  // Only end on actual tab close/refresh
   useEffect(() => {
     const handleBeforeUnload = () => {
       if (isTransitioningRef.current) return;
@@ -166,9 +151,6 @@ export default function TeacherLiveQuizPlay() {
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId]);
-
-  // IMPORTANT: do NOT end on component unmount (that causes flashing in SPA routes)
-  // (Intentionally removed)
 
   // Timer
   useEffect(() => {
@@ -223,7 +205,8 @@ export default function TeacherLiveQuizPlay() {
     }
   });
 
-  if (fetchingSession || !session) {
+  // ✅ Only show loader if session is genuinely missing
+  if (!session) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Loader2 className="w-12 h-12 animate-spin text-purple-400" />
@@ -248,14 +231,6 @@ export default function TeacherLiveQuizPlay() {
     );
   }
 
-  if (fetchingQuestions) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="w-12 h-12 animate-spin text-purple-400" />
-      </div>
-    );
-  }
-
   if (!questions.length) {
     return (
       <div className="min-h-screen flex items-center justify-center p-6">
@@ -272,9 +247,7 @@ export default function TeacherLiveQuizPlay() {
 
   const idx = session.current_question_index ?? 0;
   const q = questions[idx];
-
-  const prompt =
-    q?.prompt || q?.question || q?.question_text || q?.text || 'Question';
+  const prompt = q?.prompt || q?.question || q?.question_text || q?.text || 'Question';
 
   const answeredCount = answers.length;
 
@@ -335,38 +308,4 @@ export default function TeacherLiveQuizPlay() {
           </div>
 
           <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2 bg-white/10 px-4 py-2 rounded-lg">
-              <Clock className="w-5 h-5" />
-              <span className="text-2xl font-bold">{timeLeft}s</span>
-            </div>
-
-            <Button
-              variant="outline"
-              onClick={() => endNowMutation.mutate()}
-              className="border-red-500/30 text-red-400 hover:bg-red-500/10"
-            >
-              <X className="w-4 h-4 mr-2" />
-              End
-            </Button>
-          </div>
-        </div>
-
-        <GlassCard className="p-10 text-center mb-6">
-          <motion.h2
-            initial={{ scale: 0.9, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            className="text-4xl font-bold text-white"
-          >
-            {prompt}
-          </motion.h2>
-        </GlassCard>
-
-        <GlassCard className="p-6 text-white">
-          <p className="text-slate-300">
-            {answeredCount} / {players.length} answered
-          </p>
-        </GlassCard>
-      </div>
-    </div>
-  );
-}
+            <div className="f
