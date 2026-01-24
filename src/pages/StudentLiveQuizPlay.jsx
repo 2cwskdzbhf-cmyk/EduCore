@@ -1,24 +1,21 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { base44 } from '@/api/base44Client';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import { Button } from '@/components/ui/button';
 import GlassCard from '@/components/ui/GlassCard';
-import { Trophy, Clock, Loader2, Zap, Target, CheckCircle2 } from 'lucide-react';
+import { Loader2, Clock, CheckCircle2, Zap } from 'lucide-react';
 
 export default function StudentLiveQuizPlay() {
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
-  const urlParams = new URLSearchParams(window.location.search);
-  const sessionId = urlParams.get('sessionId');
+  const params = new URLSearchParams(window.location.search);
+  const sessionId = params.get('sessionId');
 
   const [user, setUser] = useState(null);
-  const [showQuestion, setShowQuestion] = useState(false);
-  const [answered, setAnswered] = useState(false);
+  const [selected, setSelected] = useState(null);
   const [timeLeft, setTimeLeft] = useState(15);
-  const [questionStartTime, setQuestionStartTime] = useState(null);
 
   useEffect(() => {
     base44.auth.me().then(setUser);
@@ -28,8 +25,8 @@ export default function StudentLiveQuizPlay() {
   const { data: session } = useQuery({
     queryKey: ['liveQuizSession', sessionId],
     queryFn: async () => {
-      const sessions = await base44.entities.LiveQuizSession.filter({ id: sessionId });
-      return sessions[0];
+      const s = await base44.entities.LiveQuizSession.filter({ id: sessionId });
+      return s?.[0] || null;
     },
     enabled: !!sessionId,
     refetchInterval: 1000
@@ -37,79 +34,97 @@ export default function StudentLiveQuizPlay() {
 
   /* ---------------- PLAYER ---------------- */
   const { data: player } = useQuery({
-    queryKey: ['myPlayer', sessionId, user?.email],
+    queryKey: ['myLiveQuizPlayer', sessionId, user?.email],
     queryFn: async () => {
-      const players = await base44.entities.LiveQuizPlayer.filter({
+      const p = await base44.entities.LiveQuizPlayer.filter({
         session_id: sessionId,
         student_email: user.email
       });
-      return players[0];
+      return p?.[0] || null;
     },
-    enabled: !!sessionId && !!user,
-    refetchInterval: 1000
+    enabled: !!sessionId && !!user
   });
 
-  /* ---------------- QUESTIONS (FIXED) ---------------- */
+  /* ---------------- QUIZ SET ID ---------------- */
+  const quizSetId =
+    session?.quiz_set_id ||
+    session?.live_quiz_set_id ||
+    session?.quiz_id ||
+    null;
+
+  /* ---------------- SAFE FILTER ---------------- */
+  const safeFilter = async (entityName, filter, order = 'order') => {
+    try {
+      const e = base44.entities?.[entityName];
+      if (!e?.filter) return [];
+      const r = await e.filter(filter, order);
+      return Array.isArray(r) ? r : [];
+    } catch {
+      return [];
+    }
+  };
+
+  /* ---------------- QUESTIONS (MATCH TEACHER) ---------------- */
   const { data: questions = [] } = useQuery({
-    queryKey: ['quizQuestions', session?.quiz_set_id],
+    queryKey: ['studentQuestions', sessionId, quizSetId],
     queryFn: async () => {
-      if (!session?.quiz_set_id) return [];
-      return base44.entities.QuizQuestion.filter(
-        { quiz_set_id: session.quiz_set_id },
-        'order'
-      );
+      if (!quizSetId) return [];
+
+      let q = await safeFilter('QuizQuestion', { quiz_id: quizSetId });
+      if (q.length) return q;
+
+      q = await safeFilter('QuizQuestion', { quiz_set_id: quizSetId });
+      if (q.length) return q;
+
+      q = await safeFilter('LiveQuizQuestion', { live_quiz_set_id: quizSetId });
+      if (q.length) return q;
+
+      return [];
     },
-    enabled: !!session?.quiz_set_id
+    enabled: !!quizSetId
   });
 
-  const currentQuestion =
-    session?.current_question_index >= 0
-      ? questions[session.current_question_index]
-      : null;
+  const idx = session?.current_question_index ?? -1;
+  const currentQuestion = idx >= 0 ? questions[idx] : null;
 
   /* ---------------- TIMER ---------------- */
   useEffect(() => {
-    if (session?.status === 'live' && currentQuestion && session.question_started_at) {
-      const startTime = new Date(session.question_started_at).getTime();
-      setQuestionStartTime(startTime);
-      setAnswered(false);
-      setShowQuestion(true);
+    if (!session?.question_started_at) return;
+    setSelected(null);
 
-      const interval = setInterval(() => {
-        const elapsed = Math.floor((Date.now() - startTime) / 1000);
-        setTimeLeft(Math.max(0, 15 - elapsed));
-      }, 100);
+    const start = new Date(session.question_started_at).getTime();
+    const i = setInterval(() => {
+      const elapsed = Math.floor((Date.now() - start) / 1000);
+      setTimeLeft(Math.max(0, 15 - elapsed));
+    }, 200);
 
-      return () => clearInterval(interval);
-    }
-  }, [session?.current_question_index, session?.question_started_at]);
+    return () => clearInterval(i);
+  }, [session?.question_started_at]);
 
-  /* ---------------- ANSWER ---------------- */
-  const answerMutation = useMutation({
-    mutationFn: async (answerText) => {
-      const responseTime = Date.now() - questionStartTime;
-      const isCorrect =
-        answerText.trim().toLowerCase() ===
-        currentQuestion.correct_answer.trim().toLowerCase();
+  /* ---------------- ANSWER SUBMIT ---------------- */
+  const submitAnswer = useMutation({
+    mutationFn: async (optionIndex) => {
+      if (!player || !session) return;
+
+      // prevent double answers
+      const existing = await base44.entities.LiveQuizAnswer.filter({
+        session_id: sessionId,
+        player_id: player.id,
+        question_index: idx
+      });
+      if (existing?.length) return;
 
       await base44.entities.LiveQuizAnswer.create({
         session_id: sessionId,
         player_id: player.id,
-        question_id: currentQuestion.id,
-        question_index: session.current_question_index,
-        is_correct: isCorrect,
-        response_time_ms: responseTime
-      });
-
-      await base44.entities.LiveQuizPlayer.update(player.id, {
-        questions_answered: player.questions_answered + 1,
-        correct_count: player.correct_count + (isCorrect ? 1 : 0)
+        question_index: idx,
+        selected_option_index: optionIndex,
+        answered_at: new Date().toISOString(),
+        response_time_ms:
+          Date.now() - new Date(session.question_started_at).getTime()
       });
     },
-    onSuccess: () => {
-      setAnswered(true);
-      queryClient.invalidateQueries(['myPlayer']);
-    }
+    onSuccess: () => setSelected('done')
   });
 
   /* ---------------- STATES ---------------- */
@@ -125,19 +140,8 @@ export default function StudentLiveQuizPlay() {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <GlassCard className="p-10 text-center">
-          <Zap className="w-16 h-16 text-amber-400 mx-auto mb-4" />
-          <h1 className="text-3xl font-bold text-white">Waiting for teacher…</h1>
-        </GlassCard>
-      </div>
-    );
-  }
-
-  if (session.status === 'live' && questions.length === 0) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <GlassCard className="p-10 text-center">
-          <Loader2 className="w-12 h-12 animate-spin text-purple-400 mb-4" />
-          <p className="text-white">Loading questions…</p>
+          <Zap className="w-14 h-14 text-amber-400 mx-auto mb-3" />
+          <p className="text-white text-xl">Waiting for teacher…</p>
         </GlassCard>
       </div>
     );
@@ -147,46 +151,62 @@ export default function StudentLiveQuizPlay() {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <GlassCard className="p-10 text-center">
-          <Trophy className="w-12 h-12 text-purple-400 mx-auto mb-4" />
+          <Loader2 className="w-10 h-10 animate-spin text-purple-400 mb-3" />
           <p className="text-white">Waiting for next question…</p>
         </GlassCard>
       </div>
     );
   }
 
-  /* ---------------- PLAY UI ---------------- */
+  const prompt =
+    currentQuestion.prompt ||
+    currentQuestion.question ||
+    currentQuestion.text ||
+    'Question';
+
+  const options =
+    currentQuestion.options ||
+    currentQuestion.answers ||
+    currentQuestion.choices ||
+    [];
+
+  /* ---------------- UI ---------------- */
   return (
     <div className="min-h-screen p-6">
       <div className="max-w-4xl mx-auto">
         <div className="flex justify-between mb-6 text-white">
-          <span className="text-2xl font-bold">{player.total_points}</span>
-          <span className="text-2xl">{timeLeft}s</span>
+          <span className="text-xl font-bold">{player.nickname}</span>
+          <div className="flex items-center gap-2">
+            <Clock />
+            <span className="text-2xl">{timeLeft}s</span>
+          </div>
         </div>
 
         <GlassCard className="p-8 mb-6 text-center">
-          <h2 className="text-3xl font-bold text-white">{currentQuestion.prompt}</h2>
+          <h2 className="text-3xl font-bold text-white">{prompt}</h2>
         </GlassCard>
 
-        {!answered ? (
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              answerMutation.mutate(e.target.answer.value);
-            }}
-          >
-            <input
-              name="answer"
-              className="w-full p-6 text-xl rounded-xl mb-4"
-              placeholder="Type your answer…"
-              autoFocus
-            />
-            <Button className="w-full py-6 text-xl">Submit</Button>
-          </form>
-        ) : (
-          <GlassCard className="p-8 text-center">
-            <CheckCircle2 className="w-12 h-12 text-emerald-400 mx-auto mb-3" />
+        {selected === 'done' ? (
+          <GlassCard className="p-6 text-center">
+            <CheckCircle2 className="w-10 h-10 text-emerald-400 mx-auto mb-2" />
             <p className="text-white">Answer submitted</p>
           </GlassCard>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {options.map((opt, i) => (
+              <Button
+                key={i}
+                onClick={() => {
+                  setSelected(i);
+                  submitAnswer.mutate(i);
+                }}
+                disabled={submitAnswer.isPending || selected !== null}
+                className="py-6 text-lg"
+              >
+                {opt}
+              </Button>
+            ))}
+          </div>
         )}
       </div>
     </div>
