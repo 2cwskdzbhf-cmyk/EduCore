@@ -29,6 +29,7 @@ import TeacherQuestionBuilder from './pages/TeacherQuestionBuilder';
 import TeacherQuestionGenerator from './pages/TeacherQuestionGenerator';
 import Topic from './pages/Topic';
 import QuestionBank from './pages/QuestionBank';
+import AdminSeedQuestions from './pages/AdminSeedQuestions';
 import __Layout from './Layout.jsx';
 
 
@@ -64,6 +65,7 @@ export const PAGES = {
     "TeacherQuestionGenerator": TeacherQuestionGenerator,
     "Topic": Topic,
     "QuestionBank": QuestionBank,
+    "AdminSeedQuestions": AdminSeedQuestions,
 }
 
 export const pagesConfig = {
