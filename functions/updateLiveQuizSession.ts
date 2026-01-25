@@ -1,5 +1,19 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
 
+function normalizeQuestions(raw: any): any[] {
+  if (!raw) return [];
+  if (Array.isArray(raw)) return raw;
+  if (typeof raw === 'string') {
+    try {
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+}
+
 async function safeFilter(base44: any, entityName: string, filter: any, order = 'order') {
   try {
     const entity = base44.asServiceRole.entities?.[entityName];
@@ -11,7 +25,7 @@ async function safeFilter(base44: any, entityName: string, filter: any, order = 
   }
 }
 
-async function loadQuestions(base44: any, session: any) {
+async function loadQuestionsFromDb(base44: any, session: any) {
   const quizSetId =
     session?.quiz_set_id ||
     session?.live_quiz_set_id ||
@@ -36,7 +50,6 @@ async function loadQuestions(base44: any, session: any) {
     q = await safeFilter(base44, 'LiveQuizQuestion', { session_id: id }, 'order');
     if (q.length) return q;
   }
-
   return [];
 }
 
@@ -44,50 +57,99 @@ Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
     const user = await base44.auth.me();
-
     if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
     const { sessionId, action, data } = await req.json();
-
     if (!sessionId || !action) {
       return Response.json({ error: 'sessionId and action required' }, { status: 400 });
     }
 
     const sessions = await base44.asServiceRole.entities.LiveQuizSession.filter({ id: sessionId });
     const session = sessions?.[0];
-
     if (!session) return Response.json({ error: 'Session not found' }, { status: 404 });
     if (session.host_email !== user.email) return Response.json({ error: 'Not the host' }, { status: 403 });
 
-    // Hard lock to stop double-advances
+    // Hard lock prevents double-click / race
     if (session.is_transitioning && action !== 'end') {
       return Response.json({ error: 'Session transitioning' }, { status: 409 });
     }
 
-    let updates: any = {};
     const now = new Date().toISOString();
 
-    if (action === 'start' || action === 'nextQuestion') {
-      // lock immediately
+    // ✅ IMPORTANT: manual quizzes often store questions directly on the session
+    // Try these common fields first:
+    let questions =
+      normalizeQuestions(session.questions) ||
+      normalizeQuestions(session.questions_json) ||
+      normalizeQuestions(session.quiz_questions) ||
+      normalizeQuestions(session.items);
+
+    // If host sent questions in the request (optional), store them:
+    if (Array.isArray(data?.questions) && data.questions.length) {
+      questions = data.questions;
+      await base44.asServiceRole.entities.LiveQuizSession.update(sessionId, {
+        questions: data.questions
+      });
+    }
+
+    // Fallback: DB lookup for non-manual sets
+    if (!questions || !questions.length) {
+      questions = await loadQuestionsFromDb(base44, session);
+    }
+
+    if ((action === 'start' || action === 'nextQuestion') && (!questions || !questions.length)) {
+      return Response.json(
+        {
+          error:
+            'No questions found. For manual quizzes, store questions on LiveQuizSession.questions (array) or questions_json (string).',
+          debug: {
+            quizSetId:
+              session?.quiz_set_id ||
+              session?.live_quiz_set_id ||
+              session?.quiz_id ||
+              session?.set_id ||
+              null
+          }
+        },
+        { status: 400 }
+      );
+    }
+
+    let updates: any = {};
+
+    if (action === 'start') {
+      const nextIndex = 0;
+      const q = questions[nextIndex];
+
+      updates = {
+        status: 'live',
+        current_question_index: nextIndex,
+        question_started_at: now,
+        started_at: session.started_at || now,
+
+        // ✅ push the current question so students never “race fetch”
+        current_question: q,
+        current_question_id: q?.id ?? null,
+
+        is_transitioning: false,
+        last_transition_at: now
+      };
+    } else if (action === 'nextQuestion') {
+      // lock first
       await base44.asServiceRole.entities.LiveQuizSession.update(sessionId, {
         is_transitioning: true,
         last_transition_at: now
       });
 
-      const questions = await loadQuestions(base44, session);
-      if (!questions.length) {
-        await base44.asServiceRole.entities.LiveQuizSession.update(sessionId, { is_transitioning: false });
-        return Response.json({ error: 'No questions found for this session' }, { status: 400 });
-      }
-
-      const nextIndex = action === 'start' ? 0 : (session.current_question_index ?? -1) + 1;
+      const nextIndex = (session.current_question_index ?? -1) + 1;
 
       if (nextIndex >= questions.length) {
         updates = {
           status: 'ended',
           ended_at: now,
           end_reason: 'completed_all_questions',
-          is_transitioning: false
+          is_transitioning: false,
+          last_transition_at: now
         };
       } else {
         const q = questions[nextIndex];
@@ -95,28 +157,20 @@ Deno.serve(async (req) => {
           status: 'live',
           current_question_index: nextIndex,
           question_started_at: now,
-          started_at: session.started_at || now,
 
-          // ✅ push question so students never race-fetch
           current_question: q,
           current_question_id: q?.id ?? null,
 
-          is_transitioning: false
+          is_transitioning: false,
+          last_transition_at: now
         };
       }
+    } else if (action === 'showLeaderboard') {
+      updates = { status: 'intermission' };
+    } else if (action === 'end') {
+      updates = { status: 'ended', ended_at: now, end_reason: data?.reason || 'ended' };
     } else {
-      switch (action) {
-        case 'showLeaderboard':
-          updates = { status: 'intermission' };
-          break;
-
-        case 'end':
-          updates = { status: 'ended', ended_at: now, end_reason: data?.reason || 'ended' };
-          break;
-
-        default:
-          return Response.json({ error: 'Invalid action' }, { status: 400 });
-      }
+      return Response.json({ error: 'Invalid action' }, { status: 400 });
     }
 
     const updatedSession = await base44.asServiceRole.entities.LiveQuizSession.update(sessionId, updates);
