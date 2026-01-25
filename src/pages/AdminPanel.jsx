@@ -39,6 +39,8 @@ export default function AdminPanel() {
   const [newTopicOpen, setNewTopicOpen] = useState(false);
   const [newSubject, setNewSubject] = useState({ name: '', description: '', color: 'indigo', icon: 'BookOpen' });
   const [newTopic, setNewTopic] = useState({ name: '', description: '', subject_id: '', difficulty_level: 'beginner', xp_reward: 50 });
+  const [merging, setMerging] = useState(false);
+  const [mergeResult, setMergeResult] = useState(null);
 
   const { data: users = [] } = useQuery({
     queryKey: ['users'],
@@ -62,12 +64,28 @@ export default function AdminPanel() {
 
   const createSubjectMutation = useMutation({
     mutationFn: async () => {
-      await base44.entities.Subject.create(newSubject);
+      // Check for duplicate (case-insensitive, trimmed)
+      const normalizedName = newSubject.name.trim().toLowerCase();
+      const duplicate = subjects.find(s => 
+        s.name.trim().toLowerCase() === normalizedName
+      );
+      
+      if (duplicate) {
+        throw new Error(`Subject "${duplicate.name}" already exists`);
+      }
+      
+      await base44.entities.Subject.create({
+        ...newSubject,
+        name: newSubject.name.trim()
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries(['subjects']);
       setNewSubjectOpen(false);
       setNewSubject({ name: '', description: '', color: 'indigo', icon: 'BookOpen' });
+    },
+    onError: (error) => {
+      alert(error.message);
     }
   });
 
@@ -90,6 +108,21 @@ export default function AdminPanel() {
       queryClient.invalidateQueries(['subjects']);
     }
   });
+
+  const handleMergeSubjects = async () => {
+    setMerging(true);
+    setMergeResult(null);
+    try {
+      const response = await base44.functions.invoke('mergeSubjects', {});
+      setMergeResult({ success: true, data: response.data });
+      queryClient.invalidateQueries(['subjects']);
+      queryClient.invalidateQueries(['topics']);
+    } catch (error) {
+      setMergeResult({ success: false, message: error.message });
+    } finally {
+      setMerging(false);
+    }
+  };
 
   const colors = ['indigo', 'blue', 'green', 'purple', 'orange', 'pink'];
 
@@ -166,8 +199,33 @@ export default function AdminPanel() {
           </TabsList>
 
           <TabsContent value="subjects">
+            {mergeResult && (
+              <div className={`mb-4 p-4 rounded-lg ${mergeResult.success ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
+                <p className={mergeResult.success ? 'text-green-800' : 'text-red-800'}>
+                  {mergeResult.success ? mergeResult.data.message : mergeResult.message}
+                </p>
+                {mergeResult.success && (
+                  <div className="text-sm text-green-700 mt-2">
+                    <p>• Subjects deleted: {mergeResult.data.subjects_deleted}</p>
+                    <p>• Topics updated: {mergeResult.data.topics_updated}</p>
+                    <p>• Questions updated: {mergeResult.data.questions_updated}</p>
+                  </div>
+                )}
+              </div>
+            )}
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-bold text-slate-900">Subjects</h2>
+              <div className="flex items-center gap-3">
+                <h2 className="text-xl font-bold text-slate-900">Subjects</h2>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleMergeSubjects}
+                  disabled={merging}
+                  className="text-orange-600 border-orange-300 hover:bg-orange-50"
+                >
+                  {merging ? 'Merging...' : 'Merge Duplicates'}
+                </Button>
+              </div>
               <Dialog open={newSubjectOpen} onOpenChange={setNewSubjectOpen}>
                 <DialogTrigger asChild>
                   <Button>

@@ -195,7 +195,11 @@ function QuestionBankContent() {
               <p className="text-amber-400 font-semibold mb-2">⚠️ No questions in database!</p>
               <p className="text-slate-400 text-sm mb-4">Seed the database with 60+ questions to get started.</p>
               <Button
-                onClick={() => navigate(createPageUrl('AdminSeedQuestions'))}
+                onClick={() => {
+                  const url = createPageUrl('AdminSeedQuestions');
+                  console.log('Navigating to AdminSeedQuestions:', url);
+                  navigate(url);
+                }}
                 className="bg-gradient-to-r from-amber-500 to-orange-500"
               >
                 Open AdminSeedQuestions
