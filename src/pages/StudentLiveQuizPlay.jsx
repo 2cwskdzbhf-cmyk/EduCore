@@ -5,20 +5,6 @@ import { Button } from '@/components/ui/button';
 import GlassCard from '@/components/ui/GlassCard';
 import { Loader2, Clock, CheckCircle2, Zap } from 'lucide-react';
 
-function normalizeQuestions(raw) {
-  if (!raw) return [];
-  if (Array.isArray(raw)) return raw;
-  if (typeof raw === 'string') {
-    try {
-      const parsed = JSON.parse(raw);
-      return Array.isArray(parsed) ? parsed : [];
-    } catch {
-      return [];
-    }
-  }
-  return [];
-}
-
 export default function StudentLiveQuizPlay() {
   const params = new URLSearchParams(window.location.search);
   const sessionId = params.get('sessionId');
@@ -63,19 +49,7 @@ export default function StudentLiveQuizPlay() {
   });
 
   const idx = session?.current_question_index ?? -1;
-
-  const questionsFromSession = useMemo(() => {
-    return (
-      normalizeQuestions(session?.questions) ||
-      normalizeQuestions(session?.questions_json) ||
-      normalizeQuestions(session?.quiz_questions) ||
-      normalizeQuestions(session?.items) ||
-      []
-    );
-  }, [session?.questions, session?.questions_json, session?.quiz_questions, session?.items]);
-
-  // ✅ The key: use the pushed question first
-  const currentQuestion = session?.current_question || (idx >= 0 ? questionsFromSession[idx] : null);
+  const currentQuestion = session?.current_question ?? null;
 
   useEffect(() => {
     if (!session?.question_started_at) return;
@@ -94,25 +68,15 @@ export default function StudentLiveQuizPlay() {
     const q = currentQuestion;
     if (!q) return [];
 
-    for (const k of ['options', 'answers', 'choices']) {
-      if (Array.isArray(q[k]) && q[k].length) {
-        const arr = q[k]
-          .map(v => (typeof v === 'string' ? v : (v?.text ?? v?.label ?? v?.value)))
-          .filter(v => typeof v === 'string' && v.trim().length);
-        if (arr.length) return arr;
-      }
-    }
+    if (Array.isArray(q.options) && q.options.length) return q.options;
+    if (Array.isArray(q.answers) && q.answers.length) return q.answers;
+    if (Array.isArray(q.choices) && q.choices.length) return q.choices;
 
-    const flat = [
+    return [
       q.option_a, q.option_b, q.option_c, q.option_d,
       q.answer_a, q.answer_b, q.answer_c, q.answer_d,
-      q.choice_a, q.choice_b, q.choice_c, q.choice_d,
-      q.option1, q.option2, q.option3, q.option4,
-      q.answer1, q.answer2, q.answer3, q.answer4,
       q.A, q.B, q.C, q.D
     ].filter(v => typeof v === 'string' && v.trim().length);
-
-    return flat;
   }, [currentQuestion]);
 
   const submitAnswer = useMutation({
@@ -134,11 +98,7 @@ export default function StudentLiveQuizPlay() {
         player_id: player.id,
         question_id: currentQuestion.id ?? null,
         question_index: idx,
-
-        // write both in case your schema expects one or the other
         selected_option: optionIndex,
-        selected_option_index: optionIndex,
-
         answered_at: new Date().toISOString(),
         response_time_ms: responseTimeMs
       });
