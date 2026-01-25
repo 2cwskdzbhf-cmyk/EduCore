@@ -16,8 +16,8 @@ export default function TeacherLiveQuizPlay() {
   const [timeLeft, setTimeLeft] = useState(15);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
 
-  const isTransitioningRef = useRef(false);
-  const statusRef = useRef(null);
+  // ✅ Hold last good session to prevent flashing
+  const lastSessionRef = useRef(null);
 
   const safeFilter = async (entityName, filter, order = 'order') => {
     try {
@@ -30,26 +30,25 @@ export default function TeacherLiveQuizPlay() {
     }
   };
 
-  // ✅ IMPORTANT: do NOT use isFetching to decide “loading screen”
-  const { data: session } = useQuery({
+  const { data: sessionRaw } = useQuery({
     queryKey: ['liveQuizSession', sessionId],
     queryFn: async () => {
       const s = await base44.entities.LiveQuizSession.filter({ id: sessionId });
       return s?.[0] || null;
     },
     enabled: !!sessionId,
-    refetchInterval: 1200,
+    refetchInterval: 1200, // keep updates but prevent null flashes
     staleTime: 800
   });
 
-  useEffect(() => {
-    statusRef.current = session?.status ?? null;
-  }, [session?.status]);
+  const session = useMemo(() => {
+    if (sessionRaw) lastSessionRef.current = sessionRaw;
+    return sessionRaw || lastSessionRef.current;
+  }, [sessionRaw]);
 
   useEffect(() => {
     if (!sessionId) return;
     if (session?.status === 'ended') {
-      isTransitioningRef.current = true;
       navigate(createPageUrl('TeacherDashboard'), { replace: true });
     }
   }, [session?.status, sessionId, navigate]);
@@ -141,17 +140,6 @@ export default function TeacherLiveQuizPlay() {
     queryClient.invalidateQueries();
   };
 
-  // Only end on actual tab close/refresh
-  useEffect(() => {
-    const handleBeforeUnload = () => {
-      if (isTransitioningRef.current) return;
-      if (statusRef.current === 'live') endSession('teacher_beforeunload');
-    };
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sessionId]);
-
   // Timer
   useEffect(() => {
     if (!session || session.status !== 'live' || !session.question_started_at) return;
@@ -171,41 +159,38 @@ export default function TeacherLiveQuizPlay() {
 
   const nextQuestionMutation = useMutation({
     mutationFn: async () => {
-      const nextIndex = (session?.current_question_index ?? 0) + 1;
+      if (!sessionId) return { ended: false };
 
-      if (nextIndex >= questions.length) {
-        await endSession('completed_all_questions');
-        return { ended: true };
-      }
-
-      await base44.entities.LiveQuizSession.update(sessionId, {
-        current_question_index: nextIndex,
-        question_started_at: new Date().toISOString()
+      // ✅ Use the backend function so it also pushes `current_question`
+      // If your Base44 project exposes functions differently, keep this call name
+      // exactly as your function is named in Base44.
+      const res = await fetch('/functions/updateLiveQuizSession', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId, action: 'nextQuestion' })
       });
 
-      return { ended: false };
+      const json = await res.json();
+      if (!res.ok) throw new Error(json?.error || 'Failed to advance');
+
+      return { ended: json?.session?.status === 'ended' };
     },
     onSuccess: (data) => {
       if (data.ended) {
-        isTransitioningRef.current = true;
         navigate(createPageUrl(`TeacherLiveQuizResults?sessionId=${sessionId}`));
       } else {
         setShowLeaderboard(false);
         setTimeLeft(15);
-        queryClient.invalidateQueries(['liveQuizSession']);
+        queryClient.invalidateQueries();
       }
     }
   });
 
   const endNowMutation = useMutation({
     mutationFn: async () => endSession('ended_button'),
-    onSuccess: () => {
-      isTransitioningRef.current = true;
-      navigate(createPageUrl('TeacherDashboard'));
-    }
+    onSuccess: () => navigate(createPageUrl('TeacherDashboard'))
   });
 
-  // ✅ Only show loader if session is genuinely missing
   if (!session) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -246,7 +231,7 @@ export default function TeacherLiveQuizPlay() {
   }
 
   const idx = session.current_question_index ?? 0;
-  const q = questions[idx];
+  const q = session.current_question || questions[idx];
   const prompt = q?.prompt || q?.question || q?.question_text || q?.text || 'Question';
 
   const answeredCount = answers.length;
@@ -278,7 +263,11 @@ export default function TeacherLiveQuizPlay() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <Button onClick={() => nextQuestionMutation.mutate()} className="py-6">
+            <Button
+              onClick={() => nextQuestionMutation.mutate()}
+              className="py-6"
+              disabled={nextQuestionMutation.isPending}
+            >
               <ChevronRight className="w-5 h-5 mr-2" />
               {idx + 1 < questions.length ? 'Next Question' : 'Show Final Results'}
             </Button>
