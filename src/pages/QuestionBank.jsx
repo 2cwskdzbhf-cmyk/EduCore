@@ -80,7 +80,15 @@ export default function QuestionBank() {
             </Button>
             <div>
               <h1 className="text-3xl font-bold text-white">Question Bank</h1>
-              <p className="text-slate-400">Browse and manage questions by year group</p>
+              <div className="flex items-center gap-4 mt-1">
+                <p className="text-slate-400">Browse and manage questions by year group</p>
+                <Badge className="bg-purple-500/20 text-purple-300">
+                  {questions.length} question(s)
+                </Badge>
+                <Badge className="bg-blue-500/20 text-blue-300">
+                  {topics.length} topic(s)
+                </Badge>
+              </div>
             </div>
           </div>
           <Button
@@ -173,12 +181,20 @@ export default function QuestionBank() {
         </GlassCard>
 
         <div className="grid gap-4">
-          {filteredQuestions.length === 0 ? (
-            <GlassCard className="p-12 text-center">
-              <BookOpen className="w-12 h-12 text-slate-400 mx-auto mb-4" />
-              <p className="text-slate-400">No questions found. Create your first question!</p>
+          {questions.length === 0 && (
+            <GlassCard className="p-12 text-center bg-amber-500/10 border-amber-500/30">
+              <BookOpen className="w-12 h-12 text-amber-400 mx-auto mb-4" />
+              <p className="text-amber-400 font-semibold mb-2">⚠️ No questions in database!</p>
+              <p className="text-slate-400 text-sm">Visit AdminSeedQuestions to populate the question bank.</p>
             </GlassCard>
-          ) : (
+          )}
+          
+          {questions.length > 0 && filteredQuestions.length === 0 ? (
+            <GlassCard className="p-12 text-center">
+              <Filter className="w-12 h-12 text-slate-400 mx-auto mb-4" />
+              <p className="text-slate-400">No questions match your filters.</p>
+            </GlassCard>
+          ) : filteredQuestions.length > 0 ? (
             filteredQuestions.map(q => (
               <GlassCard key={q.id} className="p-6">
                 <div className="flex items-start justify-between">
@@ -240,7 +256,7 @@ export default function QuestionBank() {
                 </div>
               </GlassCard>
             ))
-          )}
+          ) : null}
         </div>
 
         <QuestionFormDialog

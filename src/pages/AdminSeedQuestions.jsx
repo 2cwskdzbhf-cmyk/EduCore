@@ -106,6 +106,28 @@ export default function AdminSeedQuestions() {
     }
   };
 
+  const handleAutoSeed = async () => {
+    setImporting(true);
+    setResult(null);
+
+    try {
+      const response = await base44.functions.invoke('seedQuestionsDatabase', {});
+      
+      setResult({
+        success: true,
+        message: `✅ ${response.data.message}\n${response.data.inserted} inserted, ${response.data.skipped} skipped`
+      });
+
+    } catch (error) {
+      setResult({
+        success: false,
+        message: `Auto-seed failed: ${error.message}`
+      });
+    } finally {
+      setImporting(false);
+    }
+  };
+
   const handleImport = async () => {
     setImporting(true);
     setResult(null);
@@ -261,16 +283,26 @@ export default function AdminSeedQuestions() {
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2">
                   <FileJson className="w-5 h-5 text-purple-400" />
-                  <h2 className="text-lg font-bold text-white">JSON Input</h2>
+                  <h2 className="text-lg font-bold text-white">Seed Options</h2>
                 </div>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={loadSampleData}
-                  className="border-purple-500/30 text-purple-400 hover:bg-purple-500/10"
-                >
-                  Load Sample
-                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    onClick={handleAutoSeed}
+                    disabled={importing}
+                    className="bg-gradient-to-r from-green-500 to-emerald-500"
+                  >
+                    {importing ? 'Seeding...' : '⚡ Auto-Seed 60+ Questions'}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={loadSampleData}
+                    className="border-purple-500/30 text-purple-400 hover:bg-purple-500/10"
+                  >
+                    Load Sample JSON
+                  </Button>
+                </div>
               </div>
 
               <Textarea
