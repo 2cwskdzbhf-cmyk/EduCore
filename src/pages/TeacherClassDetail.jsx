@@ -680,13 +680,87 @@ export default function TeacherClassDetail() {
 
             {/* Live Quizzes Tab */}
             <TabsContent value="live" className="space-y-6">
-              <GlassCard className="p-6">
-                <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-                  <Zap className="w-5 h-5 text-amber-400" />
-                  Create Live Quiz Set
-                </h3>
+              {!createMode && (
+                <GlassCard className="p-8">
+                  <h3 className="text-xl font-bold text-white mb-6 text-center">Choose Creation Method</h3>
+                  <div className="grid md:grid-cols-2 gap-6">
+                    <motion.div
+                      whileHover={{ scale: 1.02 }}
+                      className="cursor-pointer"
+                      onClick={() => setCreateMode('manual')}
+                    >
+                      <GlassCard className="p-8 text-center hover:bg-white/10 border-2 border-white/10 hover:border-purple-500/50">
+                        <div className="w-16 h-16 mx-auto mb-4 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center">
+                          <Edit2 className="w-8 h-8 text-white" />
+                        </div>
+                        <h4 className="text-xl font-bold text-white mb-2">Manual Create</h4>
+                        <p className="text-sm text-slate-400">Build quizzes manually or add questions from the library</p>
+                      </GlassCard>
+                    </motion.div>
 
-                <div className="space-y-4">
+                    <motion.div
+                      whileHover={{ scale: 1.02 }}
+                      className="cursor-pointer"
+                      onClick={() => setCreateMode('ai')}
+                    >
+                      <GlassCard className="p-8 text-center hover:bg-white/10 border-2 border-white/10 hover:border-purple-500/50">
+                        <div className="w-16 h-16 mx-auto mb-4 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
+                          <Sparkles className="w-8 h-8 text-white" />
+                        </div>
+                        <h4 className="text-xl font-bold text-white mb-2">AI Generate</h4>
+                        <p className="text-sm text-slate-400">Let AI create quiz questions for your students</p>
+                      </GlassCard>
+                    </motion.div>
+                  </div>
+                </GlassCard>
+              )}
+
+              {createMode === 'manual' && (
+                <GlassCard className="p-6">
+                  <div className="flex items-center justify-between mb-6">
+                    <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                      <Edit2 className="w-5 h-5 text-blue-400" />
+                      Manual Create Quiz
+                    </h3>
+                    <Button variant="ghost" onClick={() => setCreateMode('')} className="text-slate-400">
+                      <X className="w-5 h-5" />
+                    </Button>
+                  </div>
+                  
+                  <div className="space-y-4">
+                    <Button
+                      onClick={() => navigate(createPageUrl(`CreateQuiz?classId=${classId}`))}
+                      className="w-full bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 shadow-lg shadow-emerald-500/30 text-white"
+                    >
+                      <Plus className="w-5 h-5 mr-2" />
+                      Create Quiz from Scratch
+                    </Button>
+
+                    <Button
+                      onClick={() => navigate(createPageUrl('QuizLibrary'))}
+                      className="w-full bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 shadow-lg shadow-blue-500/30 text-white"
+                    >
+                      <BookOpen className="w-5 h-5 mr-2" />
+                      Add Questions from Library
+                    </Button>
+                  </div>
+                </GlassCard>
+              )}
+
+              {createMode === 'ai' && (
+                <>
+                  <GlassCard className="p-6">
+                    <div className="flex items-center justify-between mb-6">
+                      <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                        <Sparkles className="w-5 h-5 text-purple-400" />
+                        AI Generate Quiz Questions
+                      </h3>
+                      <Button variant="ghost" onClick={() => setCreateMode('')} className="text-slate-400">
+                        <X className="w-5 h-5" />
+                      </Button>
+                    </div>
+
+                    <div className="space-y-4">
                   <div>
                     <Label className="text-white mb-2">Quiz Title *</Label>
                     <Input
@@ -773,12 +847,6 @@ export default function TeacherClassDetail() {
                         </>
                       )}
                     </Button>
-                    <Button
-                      onClick={() => navigate(createPageUrl(`CreateQuiz?classId=${classId}`))}
-                      className="w-full bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 shadow-lg shadow-emerald-500/30 text-white"
-                    >
-                      Create Manually
-                    </Button>
                   </div>
 
                   {generateLiveMutation.isError && (
@@ -840,7 +908,9 @@ export default function TeacherClassDetail() {
                     Live quiz set published!
                   </div>
                 )}
-              </GlassCard>
+                  </GlassCard>
+                </>
+              )}
 
               <GlassCard className="p-6">
                 <h3 className="text-lg font-bold text-white mb-4">Live Quiz Sets ({liveQuizSets.length})</h3>

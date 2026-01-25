@@ -41,9 +41,6 @@ import {
 } from 'lucide-react';
 import GlassCard from '@/components/ui/GlassCard';
 import { StatCard } from '@/components/ui/GlassCard';
-import QuizAnalytics from '@/components/teacher/QuizAnalytics';
-import QuizManagement from '@/components/teacher/QuizManagement';
-import UpcomingLiveSessions from '@/components/teacher/UpcomingLiveSessions';
 import NotificationPanel from '@/components/teacher/NotificationPanel';
 
 export default function TeacherDashboard() {
@@ -226,48 +223,6 @@ export default function TeacherDashboard() {
           </Dialog>
         </div>
 
-        {/* Stats */}
-        <div className="grid grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
-          <StatCard
-            icon={Users}
-            label="Total Students"
-            value={getTotalStudents()}
-            delay={0}
-          />
-          <StatCard
-            icon={BookOpen}
-            label="Classes"
-            value={classes.length}
-            delay={0.1}
-          />
-          <StatCard
-            icon={ClipboardList}
-            label="Assignments"
-            value={assignments.length}
-            delay={0.2}
-          />
-        </div>
-
-        {/* Notifications */}
-        {user && (
-          <div className="mb-8">
-            <NotificationPanel teacherEmail={user.email} />
-          </div>
-        )}
-
-        {/* Live Sessions & Quiz Management */}
-        <div className="grid lg:grid-cols-2 gap-6 mb-8">
-          {user && <UpcomingLiveSessions teacherEmail={user.email} />}
-          {user && <QuizManagement teacherEmail={user.email} />}
-        </div>
-
-        {/* Analytics */}
-        {classes.length > 0 && (
-          <div className="mb-8">
-            <QuizAnalytics classId={classes[0]?.id} />
-          </div>
-        )}
-
         {/* Classes */}
         <div className="mb-8">
         <h2 className="text-2xl font-bold text-white mb-6">Your Classes</h2>
@@ -328,6 +283,34 @@ export default function TeacherDashboard() {
           )}
         </div>
 
+        {/* Stats */}
+        <div className="grid grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
+          <StatCard
+            icon={Users}
+            label="Total Students"
+            value={getTotalStudents()}
+            delay={0}
+          />
+          <StatCard
+            icon={BookOpen}
+            label="Classes"
+            value={classes.length}
+            delay={0.1}
+          />
+          <StatCard
+            icon={ClipboardList}
+            label="Assignments"
+            value={assignments.length}
+            delay={0.2}
+          />
+        </div>
+
+        {/* Notifications */}
+        {user && (
+          <div className="mb-8">
+            <NotificationPanel teacherEmail={user.email} />
+          </div>
+        )}
 
       </div>
     </div>
