@@ -224,11 +224,17 @@ export default function TeacherLiveQuizLobby() {
         throw new Error('This quiz genuinely has no questions (after all lookup attempts).');
       }
 
+      const now = new Date().toISOString();
+      const firstQuestion = questions[0];
+
       await base44.entities.LiveQuizSession.update(sessionId, {
         status: 'live',
         current_question_index: 0,
-        question_started_at: new Date().toISOString(),
-        started_at: new Date().toISOString()
+        question_started_at: now,
+        started_at: now,
+        questions_json: JSON.stringify(questions),
+        current_question: firstQuestion,
+        current_question_id: firstQuestion?.id || null
       });
     },
     onSuccess: () => {

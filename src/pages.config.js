@@ -15,6 +15,7 @@ import QuizLibrary from './pages/QuizLibrary';
 import StartLiveQuiz from './pages/StartLiveQuiz';
 import StudentClassDetail from './pages/StudentClassDetail';
 import StudentDashboard from './pages/StudentDashboard';
+import StudentLiveQuizPlay from './pages/StudentLiveQuizPlay';
 import StudentStats from './pages/StudentStats';
 import Subject from './pages/Subject';
 import TakeAssignment from './pages/TakeAssignment';
@@ -22,12 +23,11 @@ import TeacherAssignmentLibrary from './pages/TeacherAssignmentLibrary';
 import TeacherClassDetail from './pages/TeacherClassDetail';
 import TeacherDashboard from './pages/TeacherDashboard';
 import TeacherLiveQuizLobby from './pages/TeacherLiveQuizLobby';
+import TeacherLiveQuizPlay from './pages/TeacherLiveQuizPlay';
 import TeacherLiveQuizResults from './pages/TeacherLiveQuizResults';
 import TeacherQuestionBuilder from './pages/TeacherQuestionBuilder';
 import TeacherQuestionGenerator from './pages/TeacherQuestionGenerator';
 import Topic from './pages/Topic';
-import TeacherLiveQuizPlay from './pages/TeacherLiveQuizPlay';
-import StudentLiveQuizPlay from './pages/StudentLiveQuizPlay';
 import __Layout from './Layout.jsx';
 
 
@@ -49,6 +49,7 @@ export const PAGES = {
     "StartLiveQuiz": StartLiveQuiz,
     "StudentClassDetail": StudentClassDetail,
     "StudentDashboard": StudentDashboard,
+    "StudentLiveQuizPlay": StudentLiveQuizPlay,
     "StudentStats": StudentStats,
     "Subject": Subject,
     "TakeAssignment": TakeAssignment,
@@ -56,12 +57,11 @@ export const PAGES = {
     "TeacherClassDetail": TeacherClassDetail,
     "TeacherDashboard": TeacherDashboard,
     "TeacherLiveQuizLobby": TeacherLiveQuizLobby,
+    "TeacherLiveQuizPlay": TeacherLiveQuizPlay,
     "TeacherLiveQuizResults": TeacherLiveQuizResults,
     "TeacherQuestionBuilder": TeacherQuestionBuilder,
     "TeacherQuestionGenerator": TeacherQuestionGenerator,
     "Topic": Topic,
-    "TeacherLiveQuizPlay": TeacherLiveQuizPlay,
-    "StudentLiveQuizPlay": StudentLiveQuizPlay,
 }
 
 export const pagesConfig = {
