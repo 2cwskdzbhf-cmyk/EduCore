@@ -63,7 +63,31 @@ export default function StudentLiveQuizPlay() {
   });
 
   const idx = session?.current_question_index ?? -1;
-  const currentQuestion = session?.current_question ?? null;
+
+  const questionsFromSession = useMemo(() => {
+    function normalizeQuestions(raw) {
+      if (!raw) return [];
+      if (Array.isArray(raw)) return raw;
+      if (typeof raw === 'string') {
+        try {
+          const parsed = JSON.parse(raw);
+          return Array.isArray(parsed) ? parsed : [];
+        } catch {
+          return [];
+        }
+      }
+      return [];
+    }
+    return (
+      normalizeQuestions(session?.questions) ||
+      normalizeQuestions(session?.questions_json) ||
+      normalizeQuestions(session?.quiz_questions) ||
+      normalizeQuestions(session?.items) ||
+      []
+    );
+  }, [session?.questions, session?.questions_json, session?.quiz_questions, session?.items]);
+
+  const currentQuestion = session?.current_question || (idx >= 0 ? questionsFromSession[idx] : null);
 
   useEffect(() => {
     if (!session?.question_started_at) return;
@@ -104,22 +128,58 @@ export default function StudentLiveQuizPlay() {
         player_id: player.id,
         question_index: idx
       });
-      if (existing?.length) return;
+      if (existing?.length) return { alreadyAnswered: true };
 
       const startedAt = session.question_started_at ? new Date(session.question_started_at).getTime() : Date.now();
       const responseTimeMs = Date.now() - startedAt;
 
+      // Determine correct answer
+      const correctIndex = currentQuestion.correct_index ?? 
+                          currentQuestion.correctIndex ?? 
+                          currentQuestion.correct_answer ?? 
+                          currentQuestion.answer ?? 
+                          0;
+      const isCorrect = optionIndex === correctIndex;
+
+      // Calculate points (base points * time multiplier)
+      const basePoints = 500;
+      const timeRemaining = Math.max(0, 15 - (responseTimeMs / 1000));
+      const timeBonus = Math.floor((timeRemaining / 15) * 500);
+      const pointsAwarded = isCorrect ? basePoints + timeBonus : 0;
+
+      // Create answer record
       await base44.entities.LiveQuizAnswer.create({
         session_id: sessionId,
         player_id: player.id,
         question_id: currentQuestion.id ?? null,
         question_index: idx,
         selected_option: optionIndex,
-        answered_at: new Date().toISOString(),
-        response_time_ms: responseTimeMs
+        selected_option_index: optionIndex,
+        is_correct: isCorrect,
+        points_awarded: pointsAwarded,
+        response_time_ms: responseTimeMs,
+        answered_at: new Date().toISOString()
       });
+
+      // Update player stats
+      const newTotalPoints = (player.total_points || 0) + pointsAwarded;
+      const newCorrectCount = (player.correct_count || 0) + (isCorrect ? 1 : 0);
+      const newQuestionsAnswered = (player.questions_answered || 0) + 1;
+
+      await base44.entities.LiveQuizPlayer.update(player.id, {
+        total_points: newTotalPoints,
+        correct_count: newCorrectCount,
+        questions_answered: newQuestionsAnswered
+      });
+
+      return { isCorrect, pointsAwarded, correctIndex };
     },
-    onSuccess: () => setSelected('done')
+    onSuccess: (result) => {
+      if (result?.alreadyAnswered) return;
+      setAnswerResult(result);
+      queryClient.invalidateQueries(['myLiveQuizPlayer']);
+      setTimeout(() => setShowScoreboard(true), 1500);
+    }
   });
 
   if (!session || !player) {
