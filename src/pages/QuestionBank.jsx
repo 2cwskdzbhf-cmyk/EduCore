@@ -12,8 +12,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import GlassCard from '@/components/ui/GlassCard';
 import { createPageUrl } from '@/utils';
+import ErrorBoundary from '@/components/ErrorBoundary';
 
-export default function QuestionBank() {
+function QuestionBankContent() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [user, setUser] = useState(null);
@@ -43,7 +44,7 @@ export default function QuestionBank() {
     }
   });
 
-  const { data: questions = [] } = useQuery({
+  const { data: questions = [], isLoading: questionsLoading } = useQuery({
     queryKey: ['questions', selectedSubject, selectedTopic, selectedYearGroup, selectedDifficulty, selectedType],
     queryFn: async () => {
       let filter = { is_active: true };
@@ -54,7 +55,9 @@ export default function QuestionBank() {
       if (selectedType !== 'all') filter.question_type = selectedType;
       return base44.entities.Question.filter(filter);
     },
-    enabled: !!user
+    enabled: !!user,
+    refetchOnWindowFocus: false,
+    staleTime: 30000
   });
 
   const filteredQuestions = questions.filter(q =>
@@ -181,20 +184,29 @@ export default function QuestionBank() {
         </GlassCard>
 
         <div className="grid gap-4">
-          {questions.length === 0 && (
+          {questionsLoading ? (
+            <GlassCard className="p-12 text-center">
+              <div className="w-12 h-12 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+              <p className="text-slate-400">Loading questions...</p>
+            </GlassCard>
+          ) : questions.length === 0 ? (
             <GlassCard className="p-12 text-center bg-amber-500/10 border-amber-500/30">
               <BookOpen className="w-12 h-12 text-amber-400 mx-auto mb-4" />
               <p className="text-amber-400 font-semibold mb-2">⚠️ No questions in database!</p>
-              <p className="text-slate-400 text-sm">Visit AdminSeedQuestions to populate the question bank.</p>
+              <p className="text-slate-400 text-sm mb-4">Seed the database with 60+ questions to get started.</p>
+              <Button
+                onClick={() => navigate(createPageUrl('AdminSeedQuestions'))}
+                className="bg-gradient-to-r from-amber-500 to-orange-500"
+              >
+                Open AdminSeedQuestions
+              </Button>
             </GlassCard>
-          )}
-          
-          {questions.length > 0 && filteredQuestions.length === 0 ? (
+          ) : filteredQuestions.length === 0 ? (
             <GlassCard className="p-12 text-center">
               <Filter className="w-12 h-12 text-slate-400 mx-auto mb-4" />
               <p className="text-slate-400">No questions match your filters.</p>
             </GlassCard>
-          ) : filteredQuestions.length > 0 ? (
+          ) : (
             filteredQuestions.map(q => (
               <GlassCard key={q.id} className="p-6">
                 <div className="flex items-start justify-between">
@@ -256,7 +268,7 @@ export default function QuestionBank() {
                 </div>
               </GlassCard>
             ))
-          ) : null}
+          )}
         </div>
 
         <QuestionFormDialog
@@ -504,5 +516,13 @@ function QuestionFormDialog({ open, onOpenChange, question, subjects, topics, te
         </div>
       </DialogContent>
     </Dialog>
+  );
+}
+
+export default function QuestionBank() {
+  return (
+    <ErrorBoundary>
+      <QuestionBankContent />
+    </ErrorBoundary>
   );
 }

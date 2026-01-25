@@ -1,5 +1,6 @@
 import AITutor from './pages/AITutor';
 import AdminPanel from './pages/AdminPanel';
+import AdminSeedQuestions from './pages/AdminSeedQuestions';
 import AssignmentBuilder from './pages/AssignmentBuilder';
 import AssignmentDue from './pages/AssignmentDue';
 import ClassDetails from './pages/ClassDetails';
@@ -11,6 +12,7 @@ import Lesson from './pages/Lesson';
 import Onboarding from './pages/Onboarding';
 import PracticeQuizPlay from './pages/PracticeQuizPlay';
 import PracticeQuizResults from './pages/PracticeQuizResults';
+import QuestionBank from './pages/QuestionBank';
 import QuizLibrary from './pages/QuizLibrary';
 import StartLiveQuiz from './pages/StartLiveQuiz';
 import StudentClassDetail from './pages/StudentClassDetail';
@@ -28,14 +30,13 @@ import TeacherLiveQuizResults from './pages/TeacherLiveQuizResults';
 import TeacherQuestionBuilder from './pages/TeacherQuestionBuilder';
 import TeacherQuestionGenerator from './pages/TeacherQuestionGenerator';
 import Topic from './pages/Topic';
-import QuestionBank from './pages/QuestionBank';
-import AdminSeedQuestions from './pages/AdminSeedQuestions';
 import __Layout from './Layout.jsx';
 
 
 export const PAGES = {
     "AITutor": AITutor,
     "AdminPanel": AdminPanel,
+    "AdminSeedQuestions": AdminSeedQuestions,
     "AssignmentBuilder": AssignmentBuilder,
     "AssignmentDue": AssignmentDue,
     "ClassDetails": ClassDetails,
@@ -47,6 +48,7 @@ export const PAGES = {
     "Onboarding": Onboarding,
     "PracticeQuizPlay": PracticeQuizPlay,
     "PracticeQuizResults": PracticeQuizResults,
+    "QuestionBank": QuestionBank,
     "QuizLibrary": QuizLibrary,
     "StartLiveQuiz": StartLiveQuiz,
     "StudentClassDetail": StudentClassDetail,
@@ -64,8 +66,6 @@ export const PAGES = {
     "TeacherQuestionBuilder": TeacherQuestionBuilder,
     "TeacherQuestionGenerator": TeacherQuestionGenerator,
     "Topic": Topic,
-    "QuestionBank": QuestionBank,
-    "AdminSeedQuestions": AdminSeedQuestions,
 }
 
 export const pagesConfig = {
