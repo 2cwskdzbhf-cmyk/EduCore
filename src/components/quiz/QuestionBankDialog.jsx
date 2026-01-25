@@ -22,19 +22,31 @@ export default function QuestionBankDialog({ open, onOpenChange, onAddQuestions,
   const [versionHistoryQuestion, setVersionHistoryQuestion] = useState(null);
 
   const { data: questions = [] } = useQuery({
-    queryKey: ['questionBank', subjectId, topicId],
+    queryKey: ['questionBank', subjectId, topicId, selectedFolder],
     queryFn: async () => {
       let filter = { is_reusable: true };
-      if (subjectId) {
-        const topics = await base44.entities.Topic.filter({ subject_id: subjectId });
-        const topicIds = topics.map(t => t.id);
-        // For simplicity, fetch all reusable questions
-        const allQuestions = await base44.entities.QuizQuestion.filter(filter);
-        return allQuestions;
+      if (selectedFolder !== 'all') {
+        filter.folder_id = selectedFolder;
       }
-      return base44.entities.QuizQuestion.filter(filter);
+      const allQuestions = await base44.entities.QuizQuestion.filter(filter);
+      // Filter by access - show owned questions, shared questions, or questions where teacher is collaborator
+      return allQuestions.filter(q => 
+        q.owner_email === teacherEmail || 
+        q.collaborator_emails?.includes(teacherEmail) ||
+        !q.owner_email // legacy questions without owner
+      );
     },
-    enabled: open
+    enabled: open && !!teacherEmail
+  });
+
+  const { data: folders = [] } = useQuery({
+    queryKey: ['questionFolders', teacherEmail],
+    queryFn: async () => {
+      const owned = await base44.entities.QuestionFolder.filter({ owner_email: teacherEmail });
+      const shared = await base44.entities.QuestionFolder.filter({ is_shared: true });
+      return [...owned, ...shared.filter(s => !owned.find(o => o.id === s.id))];
+    },
+    enabled: !!teacherEmail && open
   });
 
   const filteredQuestions = questions.filter(q => {
