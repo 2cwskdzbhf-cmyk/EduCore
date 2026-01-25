@@ -7,20 +7,6 @@ import { Button } from '@/components/ui/button';
 import GlassCard from '@/components/ui/GlassCard';
 import { ChevronRight, Trophy, Loader2, Clock, X, AlertTriangle } from 'lucide-react';
 
-function normalizeQuestions(raw) {
-  if (!raw) return [];
-  if (Array.isArray(raw)) return raw;
-  if (typeof raw === 'string') {
-    try {
-      const parsed = JSON.parse(raw);
-      return Array.isArray(parsed) ? parsed : [];
-    } catch {
-      return [];
-    }
-  }
-  return [];
-}
-
 export default function TeacherLiveQuizPlay() {
   const navigate = useNavigate();
   const params = new URLSearchParams(window.location.search);
@@ -29,7 +15,6 @@ export default function TeacherLiveQuizPlay() {
   const [timeLeft, setTimeLeft] = useState(15);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
 
-  // keep last session to avoid brief null flashes
   const lastSessionRef = useRef(null);
 
   const { data: sessionRaw } = useQuery({
@@ -54,81 +39,6 @@ export default function TeacherLiveQuizPlay() {
     }
   }, [session?.status, navigate]);
 
-  const questionsFromSession = useMemo(() => {
-    return (
-      normalizeQuestions(session?.questions) ||
-      normalizeQuestions(session?.questions_json) ||
-      normalizeQuestions(session?.quiz_questions) ||
-      normalizeQuestions(session?.items) ||
-      []
-    );
-  }, [session?.questions, session?.questions_json, session?.quiz_questions, session?.items]);
-
-  // DB fallback only (for non-manual quiz sets)
-  const quizSetId =
-    session?.quiz_set_id ||
-    session?.live_quiz_set_id ||
-    session?.quizSetId ||
-    session?.liveQuizSetId ||
-    session?.quiz_id ||
-    session?.set_id ||
-    null;
-
-  const safeFilter = async (entityName, filter, order = 'order') => {
-    try {
-      const entity = base44.entities?.[entityName];
-      if (!entity?.filter) return [];
-      const res = await entity.filter(filter, order);
-      return Array.isArray(res) ? res : [];
-    } catch {
-      return [];
-    }
-  };
-
-  const { data: questionsFromDb = [] } = useQuery({
-    queryKey: ['questionsForPlayDB', sessionId, quizSetId],
-    queryFn: async () => {
-      if (!quizSetId) return [];
-      let q = await safeFilter('QuizQuestion', { quiz_id: quizSetId }, 'order');
-      if (q.length) return q;
-
-      q = await safeFilter('QuizQuestion', { quiz_set_id: quizSetId }, 'order');
-      if (q.length) return q;
-
-      q = await safeFilter('LiveQuizQuestion', { live_quiz_set_id: quizSetId }, 'order');
-      if (q.length) return q;
-
-      q = await safeFilter('LiveQuizQuestion', { session_id: sessionId }, 'order');
-      if (q.length) return q;
-
-      return [];
-    },
-    enabled: !!sessionId && !!quizSetId,
-    staleTime: 10_000
-  });
-
-  const questions = questionsFromSession.length ? questionsFromSession : questionsFromDb;
-
-  const { data: players = [] } = useQuery({
-    queryKey: ['liveQuizPlayers', sessionId],
-    queryFn: () => base44.entities.LiveQuizPlayer.filter({ session_id: sessionId }),
-    enabled: !!sessionId,
-    refetchInterval: 1200,
-    staleTime: 800
-  });
-
-  const { data: answers = [] } = useQuery({
-    queryKey: ['liveQuizAnswers', sessionId, session?.current_question_index],
-    queryFn: () =>
-      base44.entities.LiveQuizAnswer.filter({
-        session_id: sessionId,
-        question_index: session.current_question_index
-      }),
-    enabled: !!sessionId && (session?.current_question_index ?? -1) >= 0,
-    refetchInterval: 1200,
-    staleTime: 800
-  });
-
   // timer
   useEffect(() => {
     if (!session || session.status !== 'live' || !session.question_started_at) return;
@@ -145,6 +55,28 @@ export default function TeacherLiveQuizPlay() {
     return () => clearInterval(interval);
   }, [session?.status, session?.question_started_at]);
 
+  const { data: players = [] } = useQuery({
+    queryKey: ['liveQuizPlayers', sessionId],
+    queryFn: () => base44.entities.LiveQuizPlayer.filter({ session_id: sessionId }),
+    enabled: !!sessionId,
+    refetchInterval: 1200,
+    staleTime: 800
+  });
+
+  const idx = session?.current_question_index ?? -1;
+
+  const { data: answers = [] } = useQuery({
+    queryKey: ['liveQuizAnswers', sessionId, idx],
+    queryFn: () =>
+      base44.entities.LiveQuizAnswer.filter({
+        session_id: sessionId,
+        question_index: idx
+      }),
+    enabled: !!sessionId && idx >= 0,
+    refetchInterval: 1200,
+    staleTime: 800
+  });
+
   const nextQuestionMutation = useMutation({
     mutationFn: async () => {
       const res = await fetch('/functions/updateLiveQuizSession', {
@@ -154,7 +86,7 @@ export default function TeacherLiveQuizPlay() {
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json?.error || 'Failed to advance');
-      return json?.session;
+      return json.session;
     },
     onSuccess: (s) => {
       if (s?.status === 'ended') {
@@ -171,7 +103,7 @@ export default function TeacherLiveQuizPlay() {
       await fetch('/functions/updateLiveQuizSession', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sessionId, action: 'end', data: { reason: 'ended_button' } })
+        body: JSON.stringify({ sessionId, action: 'end' })
       });
     },
     onSuccess: () => navigate(createPageUrl('TeacherDashboard'))
@@ -202,27 +134,22 @@ export default function TeacherLiveQuizPlay() {
     );
   }
 
-  if (!questions.length) {
+  const q = session.current_question;
+
+  // ✅ Don’t error. If the backend is still discovering/caching questions, show loading.
+  if (!q) {
     return (
       <div className="min-h-screen flex items-center justify-center p-6">
         <GlassCard className="p-8 text-center max-w-md">
-          <AlertTriangle className="w-10 h-10 text-red-400 mx-auto mb-3" />
-          <p className="text-white font-semibold mb-2">No questions found</p>
-          <p className="text-slate-400 text-sm">
-            For manual quizzes, make sure your lobby saves questions to <span className="font-mono">LiveQuizSession.questions</span>.
-          </p>
-          <Button onClick={() => navigate(createPageUrl(`TeacherLiveQuizLobby?sessionId=${sessionId}`))} className="mt-4">
-            Back to Lobby
-          </Button>
+          <Loader2 className="w-10 h-10 animate-spin text-purple-400 mx-auto mb-3" />
+          <p className="text-white font-semibold mb-2">Loading question…</p>
+          <p className="text-slate-400 text-sm">Syncing questions for this session.</p>
         </GlassCard>
       </div>
     );
   }
 
-  const idx = session.current_question_index ?? 0;
-  const q = session.current_question || questions[idx];
   const prompt = q?.prompt || q?.question || q?.question_text || q?.text || 'Question';
-
   const answeredCount = answers.length;
 
   const leaderboard = players
@@ -238,7 +165,7 @@ export default function TeacherLiveQuizPlay() {
             <Trophy className="w-14 h-14 text-amber-400 mx-auto mb-3" />
             <h2 className="text-3xl font-bold text-white">Leaderboard</h2>
             <p className="text-slate-400">
-              Question {idx + 1} / {questions.length}
+              Question {idx + 1}
             </p>
           </div>
 
@@ -254,7 +181,7 @@ export default function TeacherLiveQuizPlay() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <Button onClick={() => nextQuestionMutation.mutate()} className="py-6" disabled={nextQuestionMutation.isPending}>
               <ChevronRight className="w-5 h-5 mr-2" />
-              {idx + 1 < questions.length ? 'Next Question' : 'Show Final Results'}
+              Next Question
             </Button>
             <Button
               variant="outline"
@@ -275,9 +202,7 @@ export default function TeacherLiveQuizPlay() {
       <div className="max-w-6xl mx-auto">
         <div className="flex justify-between items-center mb-6 text-white">
           <div>
-            <p className="text-sm text-slate-400">
-              Question {idx + 1} / {questions.length}
-            </p>
+            <p className="text-sm text-slate-400">Question {idx + 1}</p>
             <p className="text-lg font-bold">{players.length} players</p>
           </div>
 
