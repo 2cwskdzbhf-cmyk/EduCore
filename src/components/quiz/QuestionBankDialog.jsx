@@ -5,10 +5,12 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
-import { Search, Plus, Filter, Folder, History, Users } from 'lucide-react';
+import { Search, Plus, Filter, Folder, History, Users, Upload, Star, Sparkles, TrendingUp, Calendar, User, AlertCircle } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import FolderManager from './FolderManager';
 import VersionHistoryDialog from './VersionHistoryDialog';
+import BulkImportCSVDialog from './BulkImportCSVDialog';
 
 export default function QuestionBankDialog({ open, onOpenChange, onAddQuestions, subjectId, topicId, teacherEmail }) {
   const queryClient = useQueryClient();
@@ -20,6 +22,14 @@ export default function QuestionBankDialog({ open, onOpenChange, onAddQuestions,
   const [selectedFolder, setSelectedFolder] = useState('all');
   const [showFolderManager, setShowFolderManager] = useState(false);
   const [versionHistoryQuestion, setVersionHistoryQuestion] = useState(null);
+  const [showBulkImport, setShowBulkImport] = useState(false);
+  const [sortBy, setSortBy] = useState('created_date');
+  const [sortOrder, setSortOrder] = useState('desc');
+  const [selectedTopic, setSelectedTopic] = useState('all');
+  const [selectedCreator, setSelectedCreator] = useState('all');
+  const [showAISuggestions, setShowAISuggestions] = useState(false);
+  const [aiSuggestions, setAiSuggestions] = useState(null);
+  const [loadingAI, setLoadingAI] = useState(false);
 
   const { data: questions = [] } = useQuery({
     queryKey: ['questionBank', subjectId, topicId, selectedFolder],
@@ -49,13 +59,58 @@ export default function QuestionBankDialog({ open, onOpenChange, onAddQuestions,
     enabled: !!teacherEmail && open
   });
 
-  const filteredQuestions = questions.filter(q => {
-    if (search && !q.prompt.toLowerCase().includes(search.toLowerCase())) return false;
-    if (selectedType !== 'all' && q.question_type !== selectedType) return false;
-    if (selectedDifficulty !== 'all' && q.difficulty !== selectedDifficulty) return false;
-    if (selectedTags.length > 0 && !selectedTags.some(tag => q.tags?.includes(tag))) return false;
-    return true;
+  const { data: topics = [] } = useQuery({
+    queryKey: ['topics'],
+    queryFn: () => base44.entities.Topic.list(),
+    enabled: open
   });
+
+  const { data: allCreators = [] } = useQuery({
+    queryKey: ['questionCreators'],
+    queryFn: async () => {
+      const allQuestions = await base44.entities.QuizQuestion.filter({ is_reusable: true });
+      const creators = [...new Set(allQuestions.map(q => q.owner_email).filter(Boolean))];
+      return creators;
+    },
+    enabled: open
+  });
+
+  const filteredQuestions = questions
+    .filter(q => {
+      if (search && !q.prompt.toLowerCase().includes(search.toLowerCase())) return false;
+      if (selectedType !== 'all' && q.question_type !== selectedType) return false;
+      if (selectedDifficulty !== 'all' && q.difficulty !== selectedDifficulty) return false;
+      if (selectedTags.length > 0 && !selectedTags.some(tag => q.tags?.includes(tag))) return false;
+      if (selectedTopic !== 'all' && q.topic_id !== selectedTopic) return false;
+      if (selectedCreator !== 'all' && q.owner_email !== selectedCreator) return false;
+      return true;
+    })
+    .sort((a, b) => {
+      let aVal, bVal;
+      
+      switch (sortBy) {
+        case 'created_date':
+          aVal = new Date(a.created_date || 0).getTime();
+          bVal = new Date(b.created_date || 0).getTime();
+          break;
+        case 'rating':
+          aVal = a.average_rating || 0;
+          bVal = b.average_rating || 0;
+          break;
+        case 'usage':
+          aVal = a.usage_count || 0;
+          bVal = b.usage_count || 0;
+          break;
+        case 'effectiveness':
+          aVal = a.effectiveness_score || 0;
+          bVal = b.effectiveness_score || 0;
+          break;
+        default:
+          return 0;
+      }
+      
+      return sortOrder === 'desc' ? bVal - aVal : aVal - bVal;
+    });
 
   const allTags = [...new Set(questions.flatMap(q => q.tags || []))];
 
@@ -72,6 +127,89 @@ export default function QuestionBankDialog({ open, onOpenChange, onAddQuestions,
     onOpenChange(false);
   };
 
+  const handleBulkImport = async (importedQuestions) => {
+    for (const q of importedQuestions) {
+      await base44.entities.QuizQuestion.create({
+        ...q,
+        quiz_set_id: 'bank',
+        usage_count: 0,
+        rating_count: 0
+      });
+    }
+    queryClient.invalidateQueries(['questionBank']);
+  };
+
+  const rateQuestionMutation = useMutation({
+    mutationFn: async ({ questionId, rating }) => {
+      const existing = await base44.entities.QuestionRating.filter({
+        question_id: questionId,
+        teacher_email: teacherEmail
+      });
+
+      if (existing.length > 0) {
+        await base44.entities.QuestionRating.update(existing[0].id, { rating });
+      } else {
+        await base44.entities.QuestionRating.create({
+          question_id: questionId,
+          teacher_email: teacherEmail,
+          rating
+        });
+      }
+
+      const allRatings = await base44.entities.QuestionRating.filter({ question_id: questionId });
+      const avgRating = allRatings.reduce((sum, r) => sum + r.rating, 0) / allRatings.length;
+
+      await base44.entities.QuizQuestion.update(questionId, {
+        average_rating: avgRating,
+        rating_count: allRatings.length
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries(['questionBank']);
+    }
+  });
+
+  const getSimilarQuestions = async (questionId) => {
+    setLoadingAI(true);
+    try {
+      const question = questions.find(q => q.id === questionId);
+      if (!question) return;
+
+      const response = await base44.integrations.Core.InvokeLLM({
+        prompt: `Given this question: "${question.prompt}"
+        
+Analyze this question and:
+1. Suggest 3 related questions that could be asked on the same topic
+2. Check if there might be duplicates in this question bank and list their IDs if any seem very similar
+
+Available questions in bank:
+${questions.slice(0, 50).map(q => `ID: ${q.id}, Prompt: ${q.prompt}`).join('\n')}
+
+Respond in JSON format.`,
+        response_json_schema: {
+          type: 'object',
+          properties: {
+            related_questions: {
+              type: 'array',
+              items: { type: 'string' }
+            },
+            potential_duplicates: {
+              type: 'array',
+              items: { type: 'string' }
+            }
+          }
+        }
+      });
+
+      setAiSuggestions(response);
+      setShowAISuggestions(true);
+    } catch (error) {
+      console.error('AI suggestions failed:', error);
+    } finally {
+      setLoadingAI(false);
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="bg-slate-900 border-white/10 max-w-4xl max-h-[80vh] overflow-hidden flex flex-col">
@@ -79,19 +217,49 @@ export default function QuestionBankDialog({ open, onOpenChange, onAddQuestions,
           <DialogTitle className="text-white">Question Bank</DialogTitle>
         </DialogHeader>
 
-        {/* Filters */}
-        <div className="space-y-3">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-            <Input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search questions..."
-              className="pl-10 bg-white/5 border-white/10 text-white"
-            />
-          </div>
+        <Tabs defaultValue="browse" className="space-y-4">
+          <TabsList className="bg-white/5 border border-white/10">
+            <TabsTrigger value="browse">Browse</TabsTrigger>
+            <TabsTrigger value="import">Bulk Import</TabsTrigger>
+            <TabsTrigger value="ai">AI Tools</TabsTrigger>
+          </TabsList>
 
-          <div className="grid grid-cols-3 gap-3">
+          <TabsContent value="browse" className="space-y-3">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <Input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search questions..."
+                className="pl-10 bg-white/5 border-white/10 text-white"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <Select value={sortBy} onValueChange={setSortBy}>
+                <SelectTrigger className="bg-white/5 border-white/10 text-white">
+                  <SelectValue placeholder="Sort by" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="created_date">Date Created</SelectItem>
+                  <SelectItem value="rating">Rating</SelectItem>
+                  <SelectItem value="usage">Usage Count</SelectItem>
+                  <SelectItem value="effectiveness">Effectiveness</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <Select value={sortOrder} onValueChange={setSortOrder}>
+                <SelectTrigger className="bg-white/5 border-white/10 text-white">
+                  <SelectValue placeholder="Order" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="desc">Descending</SelectItem>
+                  <SelectItem value="asc">Ascending</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid grid-cols-3 gap-3">
             <Select value={selectedFolder} onValueChange={setSelectedFolder}>
               <SelectTrigger className="bg-white/5 border-white/10 text-white">
                 <SelectValue placeholder="Folder" />
@@ -128,6 +296,30 @@ export default function QuestionBankDialog({ open, onOpenChange, onAddQuestions,
                 <SelectItem value="hard">Hard</SelectItem>
               </SelectContent>
             </Select>
+
+            <Select value={selectedTopic} onValueChange={setSelectedTopic}>
+              <SelectTrigger className="bg-white/5 border-white/10 text-white">
+                <SelectValue placeholder="Topic" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Topics</SelectItem>
+                {topics.map(t => (
+                  <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select value={selectedCreator} onValueChange={setSelectedCreator}>
+              <SelectTrigger className="bg-white/5 border-white/10 text-white">
+                <SelectValue placeholder="Creator" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Creators</SelectItem>
+                {allCreators.map(email => (
+                  <SelectItem key={email} value={email}>{email}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <Button
@@ -139,26 +331,25 @@ export default function QuestionBankDialog({ open, onOpenChange, onAddQuestions,
             Manage Folders
           </Button>
 
-          {allTags.length > 0 && (
-            <div className="flex flex-wrap gap-2">
-              {allTags.map(tag => (
-                <Badge
-                  key={tag}
-                  variant={selectedTags.includes(tag) ? 'default' : 'outline'}
-                  className="cursor-pointer"
-                  onClick={() => setSelectedTags(prev =>
-                    prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]
-                  )}
-                >
-                  {tag}
-                </Badge>
-              ))}
-            </div>
-          )}
-        </div>
+            {allTags.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {allTags.map(tag => (
+                  <Badge
+                    key={tag}
+                    variant={selectedTags.includes(tag) ? 'default' : 'outline'}
+                    className="cursor-pointer"
+                    onClick={() => setSelectedTags(prev =>
+                      prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]
+                    )}
+                  >
+                    {tag}
+                  </Badge>
+                ))}
+              </div>
+            )}
 
-        {/* Questions List */}
-        <div className="flex-1 overflow-y-auto space-y-2 pr-2">
+            {/* Questions List */}
+            <div className="flex-1 overflow-y-auto space-y-2 pr-2 max-h-96">
           {filteredQuestions.length === 0 ? (
             <div className="text-center py-8 text-slate-400">
               <Filter className="w-8 h-8 mx-auto mb-2 opacity-50" />
@@ -185,6 +376,18 @@ export default function QuestionBankDialog({ open, onOpenChange, onAddQuestions,
                       <Badge variant="outline" className="text-xs">
                         {q.difficulty}
                       </Badge>
+                      {q.average_rating && (
+                        <Badge className="text-xs bg-amber-500/20 text-amber-300 flex items-center gap-1">
+                          <Star className="w-3 h-3 fill-amber-300" />
+                          {q.average_rating.toFixed(1)}
+                        </Badge>
+                      )}
+                      {q.usage_count > 0 && (
+                        <Badge variant="outline" className="text-xs flex items-center gap-1">
+                          <TrendingUp className="w-3 h-3" />
+                          {q.usage_count}
+                        </Badge>
+                      )}
                       {q.tags?.map(tag => (
                         <Badge key={tag} className="text-xs bg-blue-500/20 text-blue-300">
                           {tag}
@@ -199,6 +402,18 @@ export default function QuestionBankDialog({ open, onOpenChange, onAddQuestions,
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        getSimilarQuestions(q.id);
+                      }}
+                      className="h-8 w-8 text-slate-400 hover:text-purple-400"
+                      title="AI Suggestions"
+                    >
+                      <Sparkles className="w-4 h-4" />
+                    </Button>
                     <Button
                       size="icon"
                       variant="ghost"
@@ -262,6 +477,15 @@ export default function QuestionBankDialog({ open, onOpenChange, onAddQuestions,
           onRevert={() => {
             queryClient.invalidateQueries(['questionBank']);
           }}
+        />
+
+        {/* Bulk Import Dialog */}
+        <BulkImportCSVDialog
+          open={showBulkImport}
+          onOpenChange={setShowBulkImport}
+          onImport={handleBulkImport}
+          teacherEmail={teacherEmail}
+          topicId={subjectId}
         />
       </DialogContent>
     </Dialog>
