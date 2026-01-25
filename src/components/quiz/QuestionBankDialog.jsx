@@ -505,21 +505,6 @@ Respond in JSON format.`,
           </TabsContent>
         </Tabs>
 
-        {/* Footer */}
-        <div className="flex justify-between items-center pt-4 border-t border-white/10">
-          <span className="text-sm text-slate-400">
-            {selectedQuestions.length} selected
-          </span>
-          <Button
-            onClick={handleAdd}
-            disabled={selectedQuestions.length === 0}
-            className="bg-gradient-to-r from-purple-500 to-blue-500"
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            Add to Quiz
-          </Button>
-        </div>
-
         {/* Folder Manager Dialog */}
         <FolderManager
           open={showFolderManager}
@@ -549,6 +534,20 @@ Respond in JSON format.`,
           teacherEmail={teacherEmail}
           topicId={subjectId}
         />
+
+        <div className="flex justify-between items-center pt-4 border-t border-white/10 mt-4">
+          <span className="text-sm text-slate-400">
+            {selectedQuestions.length} selected
+          </span>
+          <Button
+            onClick={handleAdd}
+            disabled={selectedQuestions.length === 0}
+            className="bg-gradient-to-r from-purple-500 to-blue-500"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Add to Quiz
+          </Button>
+        </div>
       </DialogContent>
     </Dialog>
   );
