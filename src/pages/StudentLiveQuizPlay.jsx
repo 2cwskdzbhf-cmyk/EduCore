@@ -5,6 +5,20 @@ import { Button } from '@/components/ui/button';
 import GlassCard from '@/components/ui/GlassCard';
 import { Loader2, Clock, CheckCircle2, Zap } from 'lucide-react';
 
+function normalizeQuestions(raw) {
+  if (!raw) return [];
+  if (Array.isArray(raw)) return raw;
+  if (typeof raw === 'string') {
+    try {
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+}
+
 export default function StudentLiveQuizPlay() {
   const params = new URLSearchParams(window.location.search);
   const sessionId = params.get('sessionId');
@@ -13,23 +27,11 @@ export default function StudentLiveQuizPlay() {
   const [selected, setSelected] = useState(null);
   const [timeLeft, setTimeLeft] = useState(15);
 
-  // ✅ Hold last good session so it never “flashes” to null
   const lastSessionRef = useRef(null);
 
   useEffect(() => {
     base44.auth.me().then(setUser);
   }, []);
-
-  const safeFilter = async (entity, filter, order = 'order') => {
-    try {
-      const e = base44.entities?.[entity];
-      if (!e?.filter) return [];
-      const r = await e.filter(filter, order);
-      return Array.isArray(r) ? r : [];
-    } catch {
-      return [];
-    }
-  };
 
   const { data: sessionRaw } = useQuery({
     queryKey: ['liveQuizSession', sessionId],
@@ -38,8 +40,8 @@ export default function StudentLiveQuizPlay() {
       return s?.[0] || null;
     },
     enabled: !!sessionId,
-    refetchInterval: 1200, // keep updates, but we prevent null flashing below
-    staleTime: 800
+    refetchInterval: 1000,
+    staleTime: 500
   });
 
   const session = useMemo(() => {
@@ -60,46 +62,23 @@ export default function StudentLiveQuizPlay() {
     staleTime: 10_000
   });
 
-  const quizSetId =
-    session?.quiz_set_id ||
-    session?.live_quiz_set_id ||
-    session?.quiz_id ||
-    session?.set_id ||
-    null;
-
-  // Keep questions fetch as fallback only (main source is session.current_question)
-  const { data: questions = [] } = useQuery({
-    queryKey: ['studentQuestions', sessionId, quizSetId],
-    queryFn: async () => {
-      if (!quizSetId) return [];
-
-      let q = await safeFilter('QuizQuestion', { quiz_id: quizSetId }, 'order');
-      if (q.length) return q;
-
-      q = await safeFilter('QuizQuestion', { quiz_set_id: quizSetId }, 'order');
-      if (q.length) return q;
-
-      q = await safeFilter('LiveQuizQuestion', { live_quiz_set_id: quizSetId }, 'order');
-      if (q.length) return q;
-
-      q = await safeFilter('LiveQuizQuestion', { session_id: sessionId }, 'order');
-      if (q.length) return q;
-
-      return [];
-    },
-    enabled: !!quizSetId,
-    staleTime: 30_000
-  });
-
   const idx = session?.current_question_index ?? -1;
 
-  // ✅ Primary: current_question pushed by backend
-  // ✅ Fallback: questions[idx]
-  const currentQuestion = session?.current_question || (idx >= 0 ? questions[idx] : null);
+  const questionsFromSession = useMemo(() => {
+    return (
+      normalizeQuestions(session?.questions) ||
+      normalizeQuestions(session?.questions_json) ||
+      normalizeQuestions(session?.quiz_questions) ||
+      normalizeQuestions(session?.items) ||
+      []
+    );
+  }, [session?.questions, session?.questions_json, session?.quiz_questions, session?.items]);
+
+  // ✅ The key: use the pushed question first
+  const currentQuestion = session?.current_question || (idx >= 0 ? questionsFromSession[idx] : null);
 
   useEffect(() => {
     if (!session?.question_started_at) return;
-
     setSelected(null);
 
     const start = new Date(session.question_started_at).getTime();
@@ -124,35 +103,6 @@ export default function StudentLiveQuizPlay() {
       }
     }
 
-    for (const k of ['options', 'answers', 'choices']) {
-      if (q[k] && typeof q[k] === 'object' && !Array.isArray(q[k])) {
-        const obj = q[k];
-        const byLetters = [obj.A, obj.B, obj.C, obj.D].filter(v => typeof v === 'string' && v.trim().length);
-        if (byLetters.length) return byLetters;
-
-        const byIndex = [obj[0], obj[1], obj[2], obj[3]].filter(v => typeof v === 'string' && v.trim().length);
-        if (byIndex.length) return byIndex;
-      }
-    }
-
-    for (const k of ['options_json', 'answers_json', 'choices_json', 'optionsJson', 'answersJson', 'choicesJson']) {
-      if (typeof q[k] === 'string') {
-        try {
-          const parsed = JSON.parse(q[k]);
-          if (Array.isArray(parsed)) {
-            const arr = parsed
-              .map(v => (typeof v === 'string' ? v : (v?.text ?? v?.label ?? v?.value)))
-              .filter(v => typeof v === 'string' && v.trim().length);
-            if (arr.length) return arr;
-          }
-          if (parsed && typeof parsed === 'object') {
-            const byLetters = [parsed.A, parsed.B, parsed.C, parsed.D].filter(v => typeof v === 'string' && v.trim().length);
-            if (byLetters.length) return byLetters;
-          }
-        } catch {}
-      }
-    }
-
     const flat = [
       q.option_a, q.option_b, q.option_c, q.option_d,
       q.answer_a, q.answer_b, q.answer_c, q.answer_d,
@@ -169,7 +119,6 @@ export default function StudentLiveQuizPlay() {
     mutationFn: async (optionIndex) => {
       if (!player || !session || !currentQuestion) return;
 
-      // prevent double submit
       const existing = await base44.entities.LiveQuizAnswer.filter({
         session_id: sessionId,
         player_id: player.id,
@@ -180,13 +129,13 @@ export default function StudentLiveQuizPlay() {
       const startedAt = session.question_started_at ? new Date(session.question_started_at).getTime() : Date.now();
       const responseTimeMs = Date.now() - startedAt;
 
-      // ✅ Write BOTH fields to survive schema mismatch
       await base44.entities.LiveQuizAnswer.create({
         session_id: sessionId,
         player_id: player.id,
         question_id: currentQuestion.id ?? null,
         question_index: idx,
 
+        // write both in case your schema expects one or the other
         selected_option: optionIndex,
         selected_option_index: optionIndex,
 
