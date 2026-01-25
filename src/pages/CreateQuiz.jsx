@@ -13,8 +13,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import GlassCard from '@/components/ui/GlassCard';
 import { 
   ChevronLeft, Plus, Trash2, GripVertical, Save, Play, 
-  BookOpen, Sparkles, Check, X, Edit2
+  BookOpen, Sparkles, Check, X, Edit2, Upload, Database, Tag
 } from 'lucide-react';
+import BulkImportDialog from '@/components/quiz/BulkImportDialog';
+import QuestionBankDialog from '@/components/quiz/QuestionBankDialog';
 
 export default function CreateQuiz() {
   const navigate = useNavigate();
@@ -33,6 +35,8 @@ export default function CreateQuiz() {
   const [questions, setQuestions] = useState([]);
   const [editingIndex, setEditingIndex] = useState(null);
   const [showImportDialog, setShowImportDialog] = useState(false);
+  const [showBulkImportDialog, setShowBulkImportDialog] = useState(false);
+  const [showQuestionBankDialog, setShowQuestionBankDialog] = useState(false);
   const [selectedLesson, setSelectedLesson] = useState(null);
   const [generateCount, setGenerateCount] = useState(5);
   const [generateDifficulty, setGenerateDifficulty] = useState('medium');
@@ -196,18 +200,57 @@ export default function CreateQuiz() {
     }
   };
 
-  const addManualQuestion = () => {
-    setQuestions([
-      ...questions,
-      {
-        prompt: '',
-        options: ['', '', '', ''],
-        correct_index: 0,
-        difficulty: 'medium',
-        explanation: ''
-      }
-    ]);
+  const addManualQuestion = (type = 'multiple_choice') => {
+    const baseQuestion = {
+      prompt: '',
+      question_type: type,
+      difficulty: 'medium',
+      explanation: '',
+      tags: []
+    };
+
+    if (type === 'multiple_choice') {
+      baseQuestion.options = ['', '', '', ''];
+      baseQuestion.correct_index = 0;
+    } else if (type === 'true_false') {
+      baseQuestion.options = ['True', 'False'];
+      baseQuestion.correct_index = 0;
+    } else if (type === 'short_answer') {
+      baseQuestion.correct_answer = '';
+      baseQuestion.answer_keywords = [];
+    } else if (type === 'written') {
+      baseQuestion.answer_keywords = [];
+      baseQuestion.require_working = false;
+    }
+
+    setQuestions([...questions, baseQuestion]);
     setEditingIndex(questions.length);
+  };
+
+  const handleBulkImport = (importedQuestions) => {
+    const normalizedQuestions = importedQuestions.map(q => ({
+      ...q,
+      question_type: q.question_type || 'multiple_choice',
+      tags: q.tags || [],
+      difficulty: q.difficulty || 'medium'
+    }));
+    setQuestions([...questions, ...normalizedQuestions]);
+  };
+
+  const handleQuestionBankAdd = (bankQuestions) => {
+    const questionsToAdd = bankQuestions.map(q => ({
+      prompt: q.prompt,
+      question_type: q.question_type,
+      options: q.options,
+      correct_index: q.correct_index,
+      correct_answer: q.correct_answer,
+      answer_keywords: q.answer_keywords,
+      difficulty: q.difficulty,
+      explanation: q.explanation,
+      tags: q.tags,
+      points: q.points
+    }));
+    setQuestions([...questions, ...questionsToAdd]);
   };
 
   const updateQuestion = (index, field, value) => {
@@ -369,17 +412,31 @@ export default function CreateQuiz() {
           <div className="lg:col-span-2">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-xl font-bold text-white">Questions</h3>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <Button
                   onClick={() => setShowImportDialog(true)}
                   disabled={!quizSet.topic_id}
                   className="bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/50"
                 >
                   <Sparkles className="w-4 h-4 mr-2" />
-                  Import from Lesson
+                  AI Generate
                 </Button>
                 <Button
-                  onClick={addManualQuestion}
+                  onClick={() => setShowBulkImportDialog(true)}
+                  className="bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500/50"
+                >
+                  <Upload className="w-4 h-4 mr-2" />
+                  Bulk Import
+                </Button>
+                <Button
+                  onClick={() => setShowQuestionBankDialog(true)}
+                  className="bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/50"
+                >
+                  <Database className="w-4 h-4 mr-2" />
+                  Question Bank
+                </Button>
+                <Button
+                  onClick={() => addManualQuestion()}
                   className="bg-gradient-to-r from-purple-500 to-blue-500"
                 >
                   <Plus className="w-4 h-4 mr-2" />
@@ -408,6 +465,31 @@ export default function CreateQuiz() {
                       <div className="flex-1">
                         {editingIndex === index ? (
                           <div className="space-y-4">
+                            <div>
+                              <Label className="text-slate-300 text-xs mb-1">Question Type</Label>
+                              <Select
+                                value={q.question_type || 'multiple_choice'}
+                                onValueChange={(v) => {
+                                  updateQuestion(index, 'question_type', v);
+                                  if (v === 'true_false') {
+                                    updateQuestion(index, 'options', ['True', 'False']);
+                                  } else if (v === 'multiple_choice' && (!q.options || q.options.length !== 4)) {
+                                    updateQuestion(index, 'options', ['', '', '', '']);
+                                  }
+                                }}
+                              >
+                                <SelectTrigger className="bg-white/5 border-white/10 text-white">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="multiple_choice">Multiple Choice</SelectItem>
+                                  <SelectItem value="true_false">True/False</SelectItem>
+                                  <SelectItem value="short_answer">Short Answer</SelectItem>
+                                  <SelectItem value="written">Written Response</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+
                             <Input
                               value={q.prompt}
                               onChange={(e) => updateQuestion(index, 'prompt', e.target.value)}
@@ -415,30 +497,42 @@ export default function CreateQuiz() {
                               className="bg-white/5 border-white/10 text-white"
                             />
                             
-                            <div className="grid grid-cols-2 gap-3">
-                              {q.options.map((opt, optIndex) => (
-                                <div key={optIndex} className="relative">
-                                  <Input
-                                    value={opt}
-                                    onChange={(e) => updateOption(index, optIndex, e.target.value)}
-                                    placeholder={`Option ${String.fromCharCode(65 + optIndex)}`}
-                                    className={`bg-white/5 border-white/10 text-white ${
-                                      q.correct_index === optIndex ? 'border-emerald-500' : ''
-                                    }`}
-                                  />
-                                  <button
-                                    onClick={() => updateQuestion(index, 'correct_index', optIndex)}
-                                    className={`absolute right-2 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full border-2 ${
-                                      q.correct_index === optIndex 
-                                        ? 'bg-emerald-500 border-emerald-500' 
-                                        : 'border-slate-400'
-                                    }`}
-                                  >
-                                    {q.correct_index === optIndex && <Check className="w-3 h-3 text-white" />}
-                                  </button>
-                                </div>
-                              ))}
-                            </div>
+                            {(q.question_type === 'multiple_choice' || q.question_type === 'true_false') && (
+                              <div className="grid grid-cols-2 gap-3">
+                                {(q.options || []).map((opt, optIndex) => (
+                                  <div key={optIndex} className="relative">
+                                    <Input
+                                      value={opt}
+                                      onChange={(e) => updateOption(index, optIndex, e.target.value)}
+                                      placeholder={`Option ${String.fromCharCode(65 + optIndex)}`}
+                                      className={`bg-white/5 border-white/10 text-white ${
+                                        q.correct_index === optIndex ? 'border-emerald-500' : ''
+                                      }`}
+                                      disabled={q.question_type === 'true_false'}
+                                    />
+                                    <button
+                                      onClick={() => updateQuestion(index, 'correct_index', optIndex)}
+                                      className={`absolute right-2 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full border-2 ${
+                                        q.correct_index === optIndex 
+                                          ? 'bg-emerald-500 border-emerald-500' 
+                                          : 'border-slate-400'
+                                      }`}
+                                    >
+                                      {q.correct_index === optIndex && <Check className="w-3 h-3 text-white" />}
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+
+                            {q.question_type === 'short_answer' && (
+                              <Input
+                                value={q.correct_answer || ''}
+                                onChange={(e) => updateQuestion(index, 'correct_answer', e.target.value)}
+                                placeholder="Correct answer"
+                                className="bg-white/5 border-white/10 text-white"
+                              />
+                            )}
 
                             <Textarea
                               value={q.explanation || ''}
@@ -447,6 +541,16 @@ export default function CreateQuiz() {
                               className="bg-white/5 border-white/10 text-white"
                               rows={2}
                             />
+
+                            <div>
+                              <Label className="text-slate-300 text-xs mb-1">Tags (comma-separated)</Label>
+                              <Input
+                                value={(q.tags || []).join(', ')}
+                                onChange={(e) => updateQuestion(index, 'tags', e.target.value.split(',').map(t => t.trim()).filter(Boolean))}
+                                placeholder="math, algebra, equations"
+                                className="bg-white/5 border-white/10 text-white"
+                              />
+                            </div>
 
                             <div className="flex gap-2">
                               <Button
@@ -460,21 +564,50 @@ export default function CreateQuiz() {
                           </div>
                         ) : (
                           <div>
-                            <p className="text-white font-medium mb-3">{q.prompt || 'Untitled question'}</p>
-                            <div className="grid grid-cols-2 gap-2 mb-2">
-                              {q.options.map((opt, optIndex) => (
-                                <div
-                                  key={optIndex}
-                                  className={`text-sm px-3 py-2 rounded-lg ${
-                                    q.correct_index === optIndex
-                                      ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/50'
-                                      : 'bg-white/5 text-slate-300'
-                                  }`}
-                                >
-                                  {String.fromCharCode(65 + optIndex)}. {opt || '(empty)'}
-                                </div>
-                              ))}
+                            <div className="flex items-center gap-2 mb-2">
+                              <Badge variant="outline" className="text-xs">
+                                {q.question_type?.replace('_', ' ') || 'multiple choice'}
+                              </Badge>
+                              <Badge variant="outline" className="text-xs">
+                                {q.difficulty}
+                              </Badge>
                             </div>
+                            <p className="text-white font-medium mb-3">{q.prompt || 'Untitled question'}</p>
+                            
+                            {(q.question_type === 'multiple_choice' || q.question_type === 'true_false') && q.options && (
+                              <div className="grid grid-cols-2 gap-2 mb-2">
+                                {q.options.map((opt, optIndex) => (
+                                  <div
+                                    key={optIndex}
+                                    className={`text-sm px-3 py-2 rounded-lg ${
+                                      q.correct_index === optIndex
+                                        ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/50'
+                                        : 'bg-white/5 text-slate-300'
+                                    }`}
+                                  >
+                                    {String.fromCharCode(65 + optIndex)}. {opt || '(empty)'}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+
+                            {q.question_type === 'short_answer' && (
+                              <div className="text-sm px-3 py-2 rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-500/50 mb-2">
+                                Answer: {q.correct_answer || '(not set)'}
+                              </div>
+                            )}
+
+                            {q.tags && q.tags.length > 0 && (
+                              <div className="flex flex-wrap gap-1 mb-2">
+                                {q.tags.map((tag, i) => (
+                                  <Badge key={i} className="text-xs bg-blue-500/20 text-blue-300">
+                                    <Tag className="w-3 h-3 mr-1" />
+                                    {tag}
+                                  </Badge>
+                                ))}
+                              </div>
+                            )}
+
                             {q.explanation && (
                               <p className="text-xs text-slate-400 mt-2">💡 {q.explanation}</p>
                             )}
@@ -573,8 +706,24 @@ export default function CreateQuiz() {
               </Button>
             </div>
           </DialogContent>
-        </Dialog>
-      </div>
-    </div>
-  );
-}
+          </Dialog>
+
+          {/* Bulk Import Dialog */}
+          <BulkImportDialog
+          open={showBulkImportDialog}
+          onOpenChange={setShowBulkImportDialog}
+          onImport={handleBulkImport}
+          />
+
+          {/* Question Bank Dialog */}
+          <QuestionBankDialog
+          open={showQuestionBankDialog}
+          onOpenChange={setShowQuestionBankDialog}
+          onAddQuestions={handleQuestionBankAdd}
+          subjectId={quizSet.subject_id}
+          topicId={quizSet.topic_id}
+          />
+          </div>
+          </div>
+          );
+          }
