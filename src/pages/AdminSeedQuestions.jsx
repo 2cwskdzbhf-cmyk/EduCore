@@ -189,15 +189,42 @@ export default function AdminSeedQuestions() {
     }
   };
 
-  const loadSampleData = async () => {
-    try {
-      const response = await fetch('/seedQuestions.sample.json');
-      const data = await response.json();
-      setJsonText(JSON.stringify(data, null, 2));
-      setResult({ success: true, message: 'Sample data loaded. Click Validate to review.' });
-    } catch (error) {
-      setResult({ success: false, message: 'Failed to load sample data' });
-    }
+  const loadSampleData = () => {
+    const sampleData = [
+      {
+        "subject": "Maths",
+        "topic": "Fractions",
+        "year_group": 7,
+        "difficulty": "easy",
+        "question_type": "multiple_choice",
+        "question_text": "What is 1/2 + 1/2?",
+        "options": ["1", "2", "1/2", "1/4"],
+        "correct_answer": "1",
+        "marks": 1
+      },
+      {
+        "subject": "Maths",
+        "topic": "Fractions",
+        "year_group": 7,
+        "difficulty": "easy",
+        "question_type": "true_false",
+        "question_text": "Is 2/4 equivalent to 1/2?",
+        "correct_answer": "True",
+        "marks": 1
+      },
+      {
+        "subject": "Maths",
+        "topic": "Algebra",
+        "year_group": 8,
+        "difficulty": "easy",
+        "question_type": "short_answer",
+        "question_text": "Simplify: 5x + 3x",
+        "correct_answer": "8x",
+        "marks": 1
+      }
+    ];
+    setJsonText(JSON.stringify(sampleData, null, 2));
+    setResult({ success: true, message: 'Sample data loaded. Click Validate to review.' });
   };
 
   if (!user) {
