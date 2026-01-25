@@ -3,17 +3,23 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
-import { Search, Plus, Filter } from 'lucide-react';
+import { Search, Plus, Filter, Folder, History, Users } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import FolderManager from './FolderManager';
+import VersionHistoryDialog from './VersionHistoryDialog';
 
-export default function QuestionBankDialog({ open, onOpenChange, onAddQuestions, subjectId, topicId }) {
+export default function QuestionBankDialog({ open, onOpenChange, onAddQuestions, subjectId, topicId, teacherEmail }) {
+  const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
   const [selectedType, setSelectedType] = useState('all');
   const [selectedDifficulty, setSelectedDifficulty] = useState('all');
   const [selectedTags, setSelectedTags] = useState([]);
   const [selectedQuestions, setSelectedQuestions] = useState([]);
+  const [selectedFolder, setSelectedFolder] = useState('all');
+  const [showFolderManager, setShowFolderManager] = useState(false);
+  const [versionHistoryQuestion, setVersionHistoryQuestion] = useState(null);
 
   const { data: questions = [] } = useQuery({
     queryKey: ['questionBank', subjectId, topicId],
@@ -73,10 +79,22 @@ export default function QuestionBankDialog({ open, onOpenChange, onAddQuestions,
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-3 gap-3">
+            <Select value={selectedFolder} onValueChange={setSelectedFolder}>
+              <SelectTrigger className="bg-white/5 border-white/10 text-white">
+                <SelectValue placeholder="Folder" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Folders</SelectItem>
+                {folders.map(f => (
+                  <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
             <Select value={selectedType} onValueChange={setSelectedType}>
               <SelectTrigger className="bg-white/5 border-white/10 text-white">
-                <SelectValue placeholder="Question Type" />
+                <SelectValue placeholder="Type" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Types</SelectItem>
@@ -99,6 +117,15 @@ export default function QuestionBankDialog({ open, onOpenChange, onAddQuestions,
               </SelectContent>
             </Select>
           </div>
+
+          <Button
+            variant="outline"
+            onClick={() => setShowFolderManager(true)}
+            className="w-full"
+          >
+            <Folder className="w-4 h-4 mr-2" />
+            Manage Folders
+          </Button>
 
           {allTags.length > 0 && (
             <div className="flex flex-wrap gap-2">
@@ -151,18 +178,37 @@ export default function QuestionBankDialog({ open, onOpenChange, onAddQuestions,
                           {tag}
                         </Badge>
                       ))}
+                      {q.collaborator_emails && q.collaborator_emails.length > 0 && (
+                        <Badge variant="outline" className="text-xs flex items-center gap-1">
+                          <Users className="w-3 h-3" />
+                          {q.collaborator_emails.length}
+                        </Badge>
+                      )}
                     </div>
                   </div>
-                  <div className={`w-5 h-5 rounded border-2 flex items-center justify-center ${
-                    selectedQuestions.includes(q.id)
-                      ? 'bg-purple-500 border-purple-500'
-                      : 'border-slate-400'
-                  }`}>
-                    {selectedQuestions.includes(q.id) && (
-                      <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                    )}
+                  <div className="flex items-center gap-2">
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setVersionHistoryQuestion(q.id);
+                      }}
+                      className="h-8 w-8 text-slate-400 hover:text-white"
+                    >
+                      <History className="w-4 h-4" />
+                    </Button>
+                    <div className={`w-5 h-5 rounded border-2 flex items-center justify-center ${
+                      selectedQuestions.includes(q.id)
+                        ? 'bg-purple-500 border-purple-500'
+                        : 'border-slate-400'
+                    }`}>
+                      {selectedQuestions.includes(q.id) && (
+                        <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -184,6 +230,27 @@ export default function QuestionBankDialog({ open, onOpenChange, onAddQuestions,
             Add to Quiz
           </Button>
         </div>
+
+        {/* Folder Manager Dialog */}
+        <FolderManager
+          open={showFolderManager}
+          onOpenChange={setShowFolderManager}
+          teacherEmail={teacherEmail}
+          onSelectFolder={(folderId) => {
+            setSelectedFolder(folderId);
+            setShowFolderManager(false);
+          }}
+        />
+
+        {/* Version History Dialog */}
+        <VersionHistoryDialog
+          open={!!versionHistoryQuestion}
+          onOpenChange={(open) => !open && setVersionHistoryQuestion(null)}
+          questionId={versionHistoryQuestion}
+          onRevert={() => {
+            queryClient.invalidateQueries(['questionBank']);
+          }}
+        />
       </DialogContent>
     </Dialog>
   );

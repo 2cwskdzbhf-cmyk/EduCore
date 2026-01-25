@@ -430,6 +430,7 @@ export default function CreateQuiz() {
                 </Button>
                 <Button
                   onClick={() => setShowQuestionBankDialog(true)}
+                  disabled={!user?.email}
                   className="bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/50"
                 >
                   <Database className="w-4 h-4 mr-2" />
@@ -717,11 +718,12 @@ export default function CreateQuiz() {
 
           {/* Question Bank Dialog */}
           <QuestionBankDialog
-          open={showQuestionBankDialog}
-          onOpenChange={setShowQuestionBankDialog}
-          onAddQuestions={handleQuestionBankAdd}
-          subjectId={quizSet.subject_id}
-          topicId={quizSet.topic_id}
+            open={showQuestionBankDialog}
+            onOpenChange={setShowQuestionBankDialog}
+            onAddQuestions={handleQuestionBankAdd}
+            subjectId={quizSet.subject_id}
+            topicId={quizSet.topic_id}
+            teacherEmail={user?.email}
           />
           </div>
           </div>
