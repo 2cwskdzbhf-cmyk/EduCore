@@ -49,6 +49,7 @@ export default function TeacherDashboard() {
   const [newClassOpen, setNewClassOpen] = useState(false);
   const [newClassName, setNewClassName] = useState('');
   const [selectedSubject, setSelectedSubject] = useState('');
+  const [selectedYearGroup, setSelectedYearGroup] = useState('');
   const [copiedCode, setCopiedCode] = useState(null);
 
   useEffect(() => {
@@ -118,6 +119,7 @@ export default function TeacherDashboard() {
         name: newClassName,
         teacher_email: user.email,
         subject_id: selectedSubject,
+        year_group: parseInt(selectedYearGroup),
         join_code: joinCode,
         student_emails: [],
         is_active: true
@@ -128,6 +130,7 @@ export default function TeacherDashboard() {
       setNewClassOpen(false);
       setNewClassName('');
       setSelectedSubject('');
+      setSelectedYearGroup('');
     }
   });
 
@@ -211,10 +214,25 @@ export default function TeacherDashboard() {
                       </SelectContent>
                     </Select>
                   </div>
+                  <div>
+                    <Label>Year Group</Label>
+                    <Select value={selectedYearGroup} onValueChange={setSelectedYearGroup}>
+                      <SelectTrigger className="mt-1">
+                        <SelectValue placeholder="Select year group" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="7">Year 7</SelectItem>
+                        <SelectItem value="8">Year 8</SelectItem>
+                        <SelectItem value="9">Year 9</SelectItem>
+                        <SelectItem value="10">Year 10</SelectItem>
+                        <SelectItem value="11">Year 11</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                   <Button
                     className="w-full"
                     onClick={() => createClassMutation.mutate()}
-                    disabled={!newClassName || !selectedSubject || createClassMutation.isPending}
+                    disabled={!newClassName || !selectedSubject || !selectedYearGroup || createClassMutation.isPending}
                   >
                     {createClassMutation.isPending ? 'Creating...' : 'Create Class'}
                   </Button>
