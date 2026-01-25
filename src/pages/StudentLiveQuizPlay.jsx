@@ -1,17 +1,21 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { base44 } from '@/api/base44Client';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import GlassCard from '@/components/ui/GlassCard';
-import { Loader2, Clock, CheckCircle2, Zap } from 'lucide-react';
+import { Loader2, Clock, CheckCircle2, Zap, XCircle, Trophy, TrendingUp } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 
 export default function StudentLiveQuizPlay() {
   const params = new URLSearchParams(window.location.search);
   const sessionId = params.get('sessionId');
+  const queryClient = useQueryClient();
 
   const [user, setUser] = useState(null);
   const [selected, setSelected] = useState(null);
   const [timeLeft, setTimeLeft] = useState(15);
+  const [answerResult, setAnswerResult] = useState(null);
+  const [showScoreboard, setShowScoreboard] = useState(false);
 
   const lastSessionRef = useRef(null);
 
@@ -45,7 +49,17 @@ export default function StudentLiveQuizPlay() {
       return p?.[0] || null;
     },
     enabled: !!sessionId && !!user?.email,
-    staleTime: 10_000
+    refetchInterval: 1000
+  });
+
+  const { data: allPlayers = [] } = useQuery({
+    queryKey: ['allLiveQuizPlayers', sessionId],
+    queryFn: async () => {
+      const players = await base44.entities.LiveQuizPlayer.filter({ session_id: sessionId });
+      return players.sort((a, b) => (b.total_points || 0) - (a.total_points || 0));
+    },
+    enabled: !!sessionId && showScoreboard,
+    refetchInterval: showScoreboard ? 1000 : false
   });
 
   const idx = session?.current_question_index ?? -1;
@@ -54,6 +68,8 @@ export default function StudentLiveQuizPlay() {
   useEffect(() => {
     if (!session?.question_started_at) return;
     setSelected(null);
+    setAnswerResult(null);
+    setShowScoreboard(false);
 
     const start = new Date(session.question_started_at).getTime();
     const i = setInterval(() => {
@@ -143,48 +159,173 @@ export default function StudentLiveQuizPlay() {
     currentQuestion.text ||
     'Question';
 
+  const myRank = allPlayers.findIndex(p => p.id === player?.id) + 1;
+  const totalQuestions = questionsFromSession.length;
+  const progressPercent = totalQuestions > 0 ? ((idx + 1) / totalQuestions) * 100 : 0;
+
   return (
-    <div className="min-h-screen p-6">
+    <div className="min-h-screen p-6 bg-gradient-to-br from-slate-900 via-purple-900/20 to-slate-900">
       <div className="max-w-4xl mx-auto">
-        <div className="flex justify-between mb-6 text-white">
-          <span className="text-xl font-bold">{player.nickname}</span>
+        {/* Header with nickname, score, and timer */}
+        <div className="flex justify-between items-center mb-4 text-white">
+          <div>
+            <span className="text-xl font-bold">{player.nickname}</span>
+            <div className="flex items-center gap-2 text-sm text-slate-300">
+              <Trophy className="w-4 h-4 text-amber-400" />
+              <span>{player.total_points || 0} pts</span>
+            </div>
+          </div>
           <div className="flex items-center gap-2">
-            <Clock />
-            <span className="text-2xl">{timeLeft}s</span>
+            <Clock className="w-6 h-6" />
+            <span className="text-3xl font-bold">{timeLeft}s</span>
           </div>
         </div>
+
+        {/* Progress bar */}
+        {totalQuestions > 0 && (
+          <div className="mb-6">
+            <div className="flex justify-between text-sm text-slate-400 mb-2">
+              <span>Question {idx + 1} of {totalQuestions}</span>
+              <span>{Math.round(progressPercent)}%</span>
+            </div>
+            <div className="h-2 bg-white/10 rounded-full overflow-hidden">
+              <motion.div
+                className="h-full bg-gradient-to-r from-purple-500 to-blue-500"
+                initial={{ width: 0 }}
+                animate={{ width: `${progressPercent}%` }}
+                transition={{ duration: 0.5 }}
+              />
+            </div>
+          </div>
+        )}
 
         <GlassCard className="p-8 mb-6 text-center">
           <h2 className="text-3xl font-bold text-white">{prompt}</h2>
         </GlassCard>
 
-        {selected === 'done' ? (
-          <GlassCard className="p-6 text-center">
-            <CheckCircle2 className="w-10 h-10 text-emerald-400 mx-auto mb-2" />
-            <p className="text-white">Answer submitted</p>
-          </GlassCard>
-        ) : options.length ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {options.map((opt, i) => (
-              <Button
-                key={i}
-                onClick={() => {
-                  setSelected(i);
-                  submitAnswer.mutate(i);
-                }}
-                disabled={selected !== null}
-                className="h-20 text-lg"
-                variant={selected === i ? 'default' : 'outline'}
-              >
-                {opt}
-              </Button>
-            ))}
-          </div>
-        ) : (
-          <GlassCard className="p-6 text-center">
-            <p className="text-white">No options available</p>
-          </GlassCard>
-        )}
+        <AnimatePresence mode="wait">
+          {showScoreboard && answerResult ? (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+            >
+              <GlassCard className="p-8 text-center mb-6">
+                <motion.div
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  transition={{ type: 'spring', stiffness: 200, damping: 15 }}
+                >
+                  {answerResult.isCorrect ? (
+                    <CheckCircle2 className="w-16 h-16 text-emerald-400 mx-auto mb-4" />
+                  ) : (
+                    <XCircle className="w-16 h-16 text-red-400 mx-auto mb-4" />
+                  )}
+                </motion.div>
+                <h3 className={`text-3xl font-bold mb-2 ${answerResult.isCorrect ? 'text-emerald-400' : 'text-red-400'}`}>
+                  {answerResult.isCorrect ? 'Correct!' : 'Incorrect'}
+                </h3>
+                {answerResult.isCorrect && (
+                  <p className="text-2xl text-white mb-4">+{answerResult.pointsAwarded} points</p>
+                )}
+                <div className="flex items-center justify-center gap-2 text-slate-300">
+                  <TrendingUp className="w-5 h-5" />
+                  <span className="text-lg">
+                    Rank: #{myRank} • Total: {player.total_points || 0} pts
+                  </span>
+                </div>
+              </GlassCard>
+
+              {allPlayers.length > 0 && (
+                <GlassCard className="p-6">
+                  <h4 className="text-white font-bold mb-4 text-center">Live Standings</h4>
+                  <div className="space-y-2">
+                    {allPlayers.slice(0, 5).map((p, i) => (
+                      <motion.div
+                        key={p.id}
+                        initial={{ x: -20, opacity: 0 }}
+                        animate={{ x: 0, opacity: 1 }}
+                        transition={{ delay: i * 0.1 }}
+                        className={`flex items-center justify-between p-3 rounded-lg ${
+                          p.id === player?.id ? 'bg-purple-500/30 border border-purple-500/50' : 'bg-white/5'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <span className="text-2xl font-bold text-slate-400">#{i + 1}</span>
+                          <span className="text-white font-medium">{p.nickname}</span>
+                        </div>
+                        <span className="text-amber-400 font-bold">{p.total_points || 0}</span>
+                      </motion.div>
+                    ))}
+                  </div>
+                </GlassCard>
+              )}
+            </motion.div>
+          ) : selected !== null ? (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+            >
+              <GlassCard className="p-6 text-center">
+                {answerResult ? (
+                  <>
+                    {answerResult.isCorrect ? (
+                      <CheckCircle2 className="w-12 h-12 text-emerald-400 mx-auto mb-3" />
+                    ) : (
+                      <XCircle className="w-12 h-12 text-red-400 mx-auto mb-3" />
+                    )}
+                    <p className={`text-xl font-bold ${answerResult.isCorrect ? 'text-emerald-400' : 'text-red-400'}`}>
+                      {answerResult.isCorrect ? 'Correct!' : 'Incorrect'}
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <Loader2 className="w-12 h-12 animate-spin text-purple-400 mx-auto mb-3" />
+                    <p className="text-white">Submitting answer...</p>
+                  </>
+                )}
+              </GlassCard>
+            </motion.div>
+          ) : options.length ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {options.map((opt, i) => {
+                const isSelected = selected === i;
+                const isCorrect = answerResult?.correctIndex === i;
+                const showCorrect = answerResult && isCorrect;
+                const showIncorrect = answerResult && isSelected && !isCorrect;
+
+                return (
+                  <motion.div
+                    key={i}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: i * 0.1 }}
+                  >
+                    <Button
+                      onClick={() => {
+                        setSelected(i);
+                        submitAnswer.mutate(i);
+                      }}
+                      disabled={selected !== null}
+                      className={`h-20 text-lg w-full transition-all ${
+                        showCorrect ? 'bg-emerald-500 hover:bg-emerald-600 border-2 border-emerald-400' :
+                        showIncorrect ? 'bg-red-500 hover:bg-red-600 border-2 border-red-400' :
+                        isSelected ? 'bg-purple-500 hover:bg-purple-600' : ''
+                      }`}
+                      variant={isSelected || showCorrect || showIncorrect ? 'default' : 'outline'}
+                    >
+                      {opt}
+                    </Button>
+                  </motion.div>
+                );
+              })}
+            </div>
+          ) : (
+            <GlassCard className="p-6 text-center">
+              <p className="text-white">No options available</p>
+            </GlassCard>
+          )}
+        </AnimatePresence>
       </div>
     </div>
   );
