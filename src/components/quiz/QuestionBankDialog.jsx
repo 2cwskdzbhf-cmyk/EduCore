@@ -441,7 +441,69 @@ Respond in JSON format.`,
               </div>
             ))
           )}
-        </div>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="import">
+            <div className="p-6 text-center">
+              <Upload className="w-12 h-12 text-slate-400 mx-auto mb-4" />
+              <h3 className="text-lg font-bold text-white mb-2">Bulk Import Questions</h3>
+              <p className="text-sm text-slate-400 mb-6">Import multiple questions at once from a CSV file</p>
+              <Button
+                onClick={() => setShowBulkImport(true)}
+                className="bg-gradient-to-r from-purple-500 to-blue-500"
+              >
+                <Upload className="w-4 h-4 mr-2" />
+                Import from CSV
+              </Button>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="ai">
+            <div className="p-6 space-y-4">
+              <div className="text-center">
+                <Sparkles className="w-12 h-12 text-purple-400 mx-auto mb-4" />
+                <h3 className="text-lg font-bold text-white mb-2">AI-Powered Tools</h3>
+                <p className="text-sm text-slate-400 mb-6">Use AI to find duplicates, get suggestions, and improve questions</p>
+              </div>
+
+              {showAISuggestions && aiSuggestions && (
+                <div className="space-y-4">
+                  {aiSuggestions.potential_duplicates?.length > 0 && (
+                    <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-lg">
+                      <div className="flex items-center gap-2 mb-2">
+                        <AlertCircle className="w-5 h-5 text-amber-400" />
+                        <h4 className="font-semibold text-amber-400">Potential Duplicates Found</h4>
+                      </div>
+                      <p className="text-sm text-slate-300">
+                        {aiSuggestions.potential_duplicates.length} similar question(s) detected
+                      </p>
+                    </div>
+                  )}
+
+                  {aiSuggestions.related_questions?.length > 0 && (
+                    <div className="p-4 bg-blue-500/10 border border-blue-500/30 rounded-lg">
+                      <h4 className="font-semibold text-blue-400 mb-3">Related Question Suggestions</h4>
+                      <div className="space-y-2">
+                        {aiSuggestions.related_questions.map((suggestion, idx) => (
+                          <div key={idx} className="text-sm text-slate-300 p-2 bg-white/5 rounded">
+                            {suggestion}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {!showAISuggestions && (
+                <p className="text-sm text-slate-400 text-center">
+                  Click the <Sparkles className="w-4 h-4 inline" /> icon on any question to get AI-powered suggestions
+                </p>
+              )}
+            </div>
+          </TabsContent>
+        </Tabs>
 
         {/* Footer */}
         <div className="flex justify-between items-center pt-4 border-t border-white/10">
