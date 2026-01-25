@@ -41,6 +41,10 @@ import {
 } from 'lucide-react';
 import GlassCard from '@/components/ui/GlassCard';
 import { StatCard } from '@/components/ui/GlassCard';
+import QuizAnalytics from '@/components/teacher/QuizAnalytics';
+import QuizManagement from '@/components/teacher/QuizManagement';
+import UpcomingLiveSessions from '@/components/teacher/UpcomingLiveSessions';
+import NotificationPanel from '@/components/teacher/NotificationPanel';
 
 export default function TeacherDashboard() {
   const queryClient = useQueryClient();
@@ -244,10 +248,30 @@ export default function TeacherDashboard() {
           />
         </div>
 
+        {/* Notifications */}
+        {user && (
+          <div className="mb-8">
+            <NotificationPanel teacherEmail={user.email} />
+          </div>
+        )}
+
+        {/* Live Sessions & Quiz Management */}
+        <div className="grid lg:grid-cols-2 gap-6 mb-8">
+          {user && <UpcomingLiveSessions teacherEmail={user.email} />}
+          {user && <QuizManagement teacherEmail={user.email} />}
+        </div>
+
+        {/* Analytics */}
+        {classes.length > 0 && (
+          <div className="mb-8">
+            <QuizAnalytics classId={classes[0]?.id} />
+          </div>
+        )}
+
         {/* Classes */}
         <div className="mb-8">
-          <h2 className="text-2xl font-bold text-white mb-6">Your Classes</h2>
-          <p className="text-slate-400 mb-6">Click a class to manage assignments, quizzes, and live sessions</p>
+        <h2 className="text-2xl font-bold text-white mb-6">Your Classes</h2>
+        <p className="text-slate-400 mb-6">Click a class to manage assignments, quizzes, and live sessions</p>
           
           {loadingClasses ? (
             <div className="grid md:grid-cols-2 gap-6">
