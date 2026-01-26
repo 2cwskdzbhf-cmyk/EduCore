@@ -31,22 +31,31 @@ export default function QuestionBankDialog({ open, onOpenChange, onAddQuestions,
   const [aiSuggestions, setAiSuggestions] = useState(null);
   const [loadingAI, setLoadingAI] = useState(false);
 
-  const { data: questions = [] } = useQuery({
-    queryKey: ['questionBank', subjectId, topicId, selectedFolder],
+  const { data: allQuestions = [] } = useQuery({
+    queryKey: ['questionBankAll'],
     queryFn: async () => {
-      let filter = { is_reusable: true };
-      if (selectedFolder !== 'all') {
-        filter.folder_id = selectedFolder;
-      }
-      const allQuestions = await base44.entities.QuizQuestion.filter(filter);
+      console.log('🔍 Fetching questions from entity: QuizQuestion');
+      const questions = await base44.entities.QuizQuestion.list('-created_date', 5000);
+      console.log(`✅ Loaded ${questions.length} QuizQuestion records from database`);
+      
       // Filter by access - show owned questions, shared questions, or questions where teacher is collaborator
-      return allQuestions.filter(q => 
+      const accessibleQuestions = questions.filter(q => 
         q.owner_email === teacherEmail || 
         q.collaborator_emails?.includes(teacherEmail) ||
         !q.owner_email // legacy questions without owner
       );
+      
+      console.log(`✅ ${accessibleQuestions.length} questions accessible to teacher`);
+      return accessibleQuestions;
     },
     enabled: open && !!teacherEmail
+  });
+
+  // Apply filters client-side
+  const questions = allQuestions.filter(q => {
+    // Folder filter
+    if (selectedFolder !== 'all' && q.folder_id !== selectedFolder) return false;
+    return true;
   });
 
   const { data: folders = [] } = useQuery({
@@ -75,9 +84,12 @@ export default function QuestionBankDialog({ open, onOpenChange, onAddQuestions,
     enabled: open
   });
 
+  console.log(`📊 Fetched ${allQuestions.length} questions before filters`);
+  console.log(`📊 ${questions.length} after folder filter`);
+
   const filteredQuestions = questions
     .filter(q => {
-      if (search && !q.prompt.toLowerCase().includes(search.toLowerCase())) return false;
+      if (search && !q.prompt?.toLowerCase().includes(search.toLowerCase())) return false;
       if (selectedType !== 'all' && q.question_type !== selectedType) return false;
       if (selectedDifficulty !== 'all' && q.difficulty !== selectedDifficulty) return false;
       if (selectedTags.length > 0 && !selectedTags.some(tag => q.tags?.includes(tag))) return false;
@@ -111,6 +123,8 @@ export default function QuestionBankDialog({ open, onOpenChange, onAddQuestions,
       
       return sortOrder === 'desc' ? bVal - aVal : aVal - bVal;
     });
+
+  console.log(`📊 Showing ${filteredQuestions.length} after all filters`);
 
   const allTags = [...new Set(questions.flatMap(q => q.tags || []))];
 
@@ -165,7 +179,7 @@ export default function QuestionBankDialog({ open, onOpenChange, onAddQuestions,
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries(['questionBank']);
+      queryClient.invalidateQueries(['questionBankAll']);
     }
   });
 
@@ -350,10 +364,23 @@ Respond in JSON format.`,
 
             {/* Questions List */}
             <div className="flex-1 overflow-y-auto space-y-2 pr-2 max-h-96">
+              <div className="mb-3 p-2 bg-purple-500/10 border border-purple-500/30 rounded text-xs text-purple-300">
+                Loaded: {allQuestions.length} questions | After filters: {filteredQuestions.length}
+              </div>
           {filteredQuestions.length === 0 ? (
-            <div className="text-center py-8 text-slate-400">
-              <Filter className="w-8 h-8 mx-auto mb-2 opacity-50" />
-              <p>No questions found</p>
+            <div className="text-center py-8">
+              <Filter className="w-8 h-8 mx-auto mb-2 text-slate-400 opacity-50" />
+              {allQuestions.length === 0 ? (
+                <>
+                  <p className="text-amber-400 font-semibold">No questions in the Question Bank yet</p>
+                  <p className="text-slate-400 text-sm mt-1">Create reusable questions to see them here</p>
+                </>
+              ) : (
+                <>
+                  <p className="text-blue-400 font-semibold">No questions match the current filters</p>
+                  <p className="text-slate-400 text-sm mt-1">{allQuestions.length} questions available - adjust filters to see them</p>
+                </>
+              )}
             </div>
           ) : (
             filteredQuestions.map(q => (
