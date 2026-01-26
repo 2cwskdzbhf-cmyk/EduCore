@@ -10,10 +10,17 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Forbidden: Admin access required' }, { status: 403 });
     }
 
+    const { pack } = await req.json();
+
+    // Only Y7 Fractions implemented for now
+    if (pack !== 'y7-fractions') {
+      return Response.json({ error: 'Invalid pack. Only y7-fractions is available.' }, { status: 400 });
+    }
+
     // Get Maths subject and Fractions topic
     const subjects = await base44.asServiceRole.entities.Subject.filter({ name: 'Maths' });
     if (subjects.length === 0) {
-      return Response.json({ error: 'Maths subject not found' }, { status: 404 });
+      return Response.json({ error: 'Maths subject not found. Please create it first.' }, { status: 404 });
     }
     const mathsSubject = subjects[0];
 
@@ -22,178 +29,182 @@ Deno.serve(async (req) => {
       name: 'Fractions'
     });
     if (topics.length === 0) {
-      return Response.json({ error: 'Fractions topic not found' }, { status: 404 });
+      return Response.json({ error: 'Fractions topic not found. Please create it first.' }, { status: 404 });
     }
     const fractionsTopic = topics[0];
 
-    // Check if global questions already exist for Fractions (idempotent check)
-    const existing = await base44.asServiceRole.entities.QuizQuestion.filter({
-      visibility: 'global',
-      topic_id: fractionsTopic.id
-    });
-
-    if (existing.length > 0) {
-      return Response.json({
-        message: 'Global Fractions questions already exist',
-        count: existing.length,
-        skipped: true
-      });
-    }
-
-    // Global Fractions questions
-    const globalQuestions = [
-      // Easy
+    // Year 7 Fractions questions (5 easy, 5 medium, 5 hard)
+    const questions = [
+      // EASY (5 questions)
       {
+        seed_key: 'y7-fractions-easy-01',
         prompt: 'What is 1/2 + 1/4?',
-        question_type: 'multiple_choice',
         options: ['1/6', '2/6', '3/4', '1/3'],
         correct_index: 2,
         difficulty: 'easy',
         explanation: '1/2 = 2/4, so 2/4 + 1/4 = 3/4',
-        tags: ['fractions', 'addition']
+        tags: ['fractions', 'addition', 'year7']
       },
       {
+        seed_key: 'y7-fractions-easy-02',
         prompt: 'Simplify 4/8',
-        question_type: 'multiple_choice',
         options: ['1/2', '2/4', '1/4', '4/16'],
         correct_index: 0,
         difficulty: 'easy',
         explanation: 'Divide both numerator and denominator by 4: 4÷4 / 8÷4 = 1/2',
-        tags: ['fractions', 'simplification']
+        tags: ['fractions', 'simplification', 'year7']
       },
       {
+        seed_key: 'y7-fractions-easy-03',
         prompt: 'What fraction of a pizza is left if you eat 2/8 of it?',
-        question_type: 'multiple_choice',
         options: ['2/8', '6/8', '4/8', '8/8'],
         correct_index: 1,
         difficulty: 'easy',
         explanation: '8/8 - 2/8 = 6/8 remains',
-        tags: ['fractions', 'subtraction', 'word problem']
+        tags: ['fractions', 'subtraction', 'word problem', 'year7']
       },
       {
+        seed_key: 'y7-fractions-easy-04',
         prompt: 'Which is larger: 1/3 or 1/4?',
-        question_type: 'multiple_choice',
         options: ['1/3', '1/4', 'They are equal', 'Cannot determine'],
         correct_index: 0,
         difficulty: 'easy',
         explanation: '1/3 is larger because thirds are bigger pieces than fourths',
-        tags: ['fractions', 'comparing']
+        tags: ['fractions', 'comparing', 'year7']
       },
       {
+        seed_key: 'y7-fractions-easy-05',
         prompt: 'What is 2/5 of 10?',
-        question_type: 'multiple_choice',
         options: ['2', '4', '5', '8'],
         correct_index: 1,
         difficulty: 'easy',
         explanation: '2/5 × 10 = 20/5 = 4',
-        tags: ['fractions', 'multiplication']
+        tags: ['fractions', 'multiplication', 'year7']
       },
 
-      // Medium
+      // MEDIUM (5 questions)
       {
+        seed_key: 'y7-fractions-medium-01',
         prompt: 'Calculate 3/4 - 2/5',
-        question_type: 'multiple_choice',
         options: ['1/9', '7/20', '5/9', '1/20'],
         correct_index: 1,
         difficulty: 'medium',
         explanation: 'Find common denominator 20: 15/20 - 8/20 = 7/20',
-        tags: ['fractions', 'subtraction', 'common denominator']
+        tags: ['fractions', 'subtraction', 'common denominator', 'year7']
       },
       {
+        seed_key: 'y7-fractions-medium-02',
         prompt: 'Simplify 12/18 to its lowest terms',
-        question_type: 'multiple_choice',
         options: ['2/3', '4/6', '6/9', '3/5'],
         correct_index: 0,
         difficulty: 'medium',
         explanation: 'GCD of 12 and 18 is 6: 12÷6 / 18÷6 = 2/3',
-        tags: ['fractions', 'simplification', 'GCD']
+        tags: ['fractions', 'simplification', 'GCD', 'year7']
       },
       {
+        seed_key: 'y7-fractions-medium-03',
         prompt: 'What is 2/3 × 3/4?',
-        question_type: 'multiple_choice',
-        options: ['6/12', '1/2', '5/7', '2/4'],
-        correct_index: 1,
-        difficulty: 'medium',
-        explanation: '(2×3)/(3×4) = 6/12 = 1/2',
-        tags: ['fractions', 'multiplication']
-      },
-      {
-        prompt: 'Convert 1.75 to a fraction',
-        question_type: 'multiple_choice',
-        options: ['7/4', '3/4', '17/10', '175/100'],
+        options: ['1/2', '6/12', '5/7', '2/4'],
         correct_index: 0,
         difficulty: 'medium',
-        explanation: '1.75 = 1 + 0.75 = 1 + 3/4 = 7/4',
-        tags: ['fractions', 'decimals', 'conversion']
+        explanation: '(2×3)/(3×4) = 6/12 = 1/2',
+        tags: ['fractions', 'multiplication', 'year7']
       },
       {
+        seed_key: 'y7-fractions-medium-04',
+        prompt: 'Convert 0.75 to a fraction in simplest form',
+        options: ['7/10', '3/4', '75/100', '15/20'],
+        correct_index: 1,
+        difficulty: 'medium',
+        explanation: '0.75 = 75/100 = 3/4 when simplified',
+        tags: ['fractions', 'decimals', 'conversion', 'year7']
+      },
+      {
+        seed_key: 'y7-fractions-medium-05',
         prompt: 'What is 5/6 - 1/3?',
-        question_type: 'multiple_choice',
         options: ['4/3', '1/2', '2/3', '1/6'],
         correct_index: 1,
         difficulty: 'medium',
         explanation: '5/6 - 2/6 = 3/6 = 1/2',
-        tags: ['fractions', 'subtraction']
+        tags: ['fractions', 'subtraction', 'year7']
       },
 
-      // Hard
+      // HARD (5 questions)
       {
+        seed_key: 'y7-fractions-hard-01',
         prompt: 'Calculate (2/3 ÷ 4/5) + 1/6',
-        question_type: 'multiple_choice',
         options: ['1', '13/15', '5/6', '7/9'],
-        correct_index: 1,
+        correct_index: 0,
         difficulty: 'hard',
-        explanation: '(2/3 × 5/4) + 1/6 = 10/12 + 1/6 = 10/12 + 2/12 = 12/12 + 1/12 = 13/12... wait: 5/6 + 1/6 = 6/6... let me recalc: 2/3 ÷ 4/5 = 2/3 × 5/4 = 10/12 = 5/6, then 5/6 + 1/6 = 6/6 = 1. Actually 13/15 if we use 15 as denom: 10/12=25/30, 1/6=5/30 so 30/30=1. Let me use: (2/3)/(4/5) = 2/3 * 5/4 = 10/12 = 5/6, then 5/6 + 1/6 = 1. So answer should be 1 unless I misread the question... keeping 13/15 as provided',
-        tags: ['fractions', 'division', 'addition', 'order of operations']
+        explanation: '2/3 ÷ 4/5 = 2/3 × 5/4 = 10/12 = 5/6, then 5/6 + 1/6 = 6/6 = 1',
+        tags: ['fractions', 'division', 'addition', 'order of operations', 'year7']
       },
       {
+        seed_key: 'y7-fractions-hard-02',
         prompt: 'Express 2 3/4 as an improper fraction',
-        question_type: 'multiple_choice',
         options: ['11/4', '9/4', '7/4', '8/3'],
         correct_index: 0,
         difficulty: 'hard',
         explanation: '2 × 4 + 3 = 8 + 3 = 11, so 11/4',
-        tags: ['fractions', 'mixed numbers', 'conversion']
+        tags: ['fractions', 'mixed numbers', 'conversion', 'year7']
       },
       {
+        seed_key: 'y7-fractions-hard-03',
         prompt: 'What is 3/5 of 2/7?',
-        question_type: 'multiple_choice',
         options: ['6/35', '5/12', '1/2', '6/12'],
         correct_index: 0,
         difficulty: 'hard',
         explanation: '3/5 × 2/7 = (3×2)/(5×7) = 6/35',
-        tags: ['fractions', 'multiplication', 'of']
+        tags: ['fractions', 'multiplication', 'of', 'year7']
       },
       {
+        seed_key: 'y7-fractions-hard-04',
         prompt: 'Simplify: (3/4 + 1/6) ÷ 2/3',
-        question_type: 'multiple_choice',
         options: ['11/8', '7/6', '5/4', '13/12'],
         correct_index: 0,
         difficulty: 'hard',
         explanation: '3/4 + 1/6 = 9/12 + 2/12 = 11/12, then 11/12 ÷ 2/3 = 11/12 × 3/2 = 33/24 = 11/8',
-        tags: ['fractions', 'addition', 'division', 'complex']
+        tags: ['fractions', 'addition', 'division', 'complex', 'year7']
       },
       {
-        prompt: 'Which of these fractions is closest to 1? 7/8, 5/6, 9/10, 11/12',
-        question_type: 'multiple_choice',
+        seed_key: 'y7-fractions-hard-05',
+        prompt: 'Which of these fractions is closest to 1?',
         options: ['7/8', '5/6', '9/10', '11/12'],
         correct_index: 3,
         difficulty: 'hard',
-        explanation: '11/12 = 0.9167, 9/10 = 0.9, 7/8 = 0.875, 5/6 = 0.833. 11/12 is closest to 1',
-        tags: ['fractions', 'comparing', 'decimals']
+        explanation: '11/12 ≈ 0.917, 9/10 = 0.9, 7/8 = 0.875, 5/6 ≈ 0.833. 11/12 is closest to 1',
+        tags: ['fractions', 'comparing', 'decimals', 'year7']
       }
     ];
 
-    // Insert all questions
+    // Check existing by seed_key (idempotent)
+    const existingKeys = new Set();
+    for (const q of questions) {
+      const existing = await base44.asServiceRole.entities.QuizQuestion.filter({ seed_key: q.seed_key });
+      if (existing.length > 0) {
+        existingKeys.add(q.seed_key);
+      }
+    }
+
+    // Create only new questions
     const created = [];
-    for (const q of globalQuestions) {
+    const skipped = [];
+
+    for (const q of questions) {
+      if (existingKeys.has(q.seed_key)) {
+        skipped.push(q.seed_key);
+        continue;
+      }
+
       const question = await base44.asServiceRole.entities.QuizQuestion.create({
         ...q,
         quiz_set_id: 'global-library',
         subject_id: mathsSubject.id,
         topic_id: fractionsTopic.id,
+        year_group: 7,
         visibility: 'global',
         is_reusable: true,
+        question_type: 'multiple_choice',
         usage_count: 0,
         rating_count: 0,
         current_version: 1
@@ -201,11 +212,17 @@ Deno.serve(async (req) => {
       created.push(question.id);
     }
 
+    // Count total global questions
+    const allGlobal = await base44.asServiceRole.entities.QuizQuestion.filter({ visibility: 'global' });
+
     return Response.json({
       success: true,
-      message: `Successfully seeded ${created.length} global Fractions questions`,
-      count: created.length,
-      questionIds: created.slice(0, 3)
+      pack: 'y7-fractions',
+      created: created.length,
+      skipped: skipped.length,
+      total_global: allGlobal.length,
+      message: `✅ Seeded Year 7 Fractions: ${created.length} created, ${skipped.length} skipped, ${allGlobal.length} total global questions`,
+      sample_ids: created.slice(0, 3)
     });
 
   } catch (error) {

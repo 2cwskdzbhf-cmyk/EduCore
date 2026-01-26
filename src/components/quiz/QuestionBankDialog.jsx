@@ -27,6 +27,7 @@ export default function QuestionBankDialog({ open, onOpenChange, onAddQuestions,
   const [sortOrder, setSortOrder] = useState('desc');
   const [selectedTopic, setSelectedTopic] = useState('all');
   const [selectedCreator, setSelectedCreator] = useState('all');
+  const [selectedYearGroup, setSelectedYearGroup] = useState('all');
   const [showAISuggestions, setShowAISuggestions] = useState(false);
   const [aiSuggestions, setAiSuggestions] = useState(null);
   const [loadingAI, setLoadingAI] = useState(false);
@@ -89,6 +90,7 @@ export default function QuestionBankDialog({ open, onOpenChange, onAddQuestions,
       if (search && !q.prompt?.toLowerCase().includes(search.toLowerCase())) return false;
       if (selectedType !== 'all' && q.question_type !== selectedType) return false;
       if (selectedDifficulty !== 'all' && q.difficulty !== selectedDifficulty) return false;
+      if (selectedYearGroup !== 'all' && q.year_group !== parseInt(selectedYearGroup)) return false;
       if (selectedTags.length > 0 && !selectedTags.some(tag => q.tags?.includes(tag))) return false;
       if (selectedTopic !== 'all' && q.topic_id !== selectedTopic) return false;
       if (selectedCreator !== 'all' && q.owner_email !== selectedCreator) return false;
@@ -271,28 +273,17 @@ Respond in JSON format.`,
             </div>
 
             <div className="grid grid-cols-3 gap-3">
-            <Select value={selectedFolder} onValueChange={setSelectedFolder}>
+            <Select value={selectedYearGroup} onValueChange={setSelectedYearGroup}>
               <SelectTrigger className="bg-white/5 border-white/10 text-white">
-                <SelectValue placeholder="Folder" />
+                <SelectValue placeholder="Year Group" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Folders</SelectItem>
-                {folders.map(f => (
-                  <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <Select value={selectedType} onValueChange={setSelectedType}>
-              <SelectTrigger className="bg-white/5 border-white/10 text-white">
-                <SelectValue placeholder="Type" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Types</SelectItem>
-                <SelectItem value="multiple_choice">Multiple Choice</SelectItem>
-                <SelectItem value="true_false">True/False</SelectItem>
-                <SelectItem value="short_answer">Short Answer</SelectItem>
-                <SelectItem value="written">Written</SelectItem>
+                <SelectItem value="all">All Year Groups</SelectItem>
+                <SelectItem value="7">Year 7</SelectItem>
+                <SelectItem value="8">Year 8</SelectItem>
+                <SelectItem value="9">Year 9</SelectItem>
+                <SelectItem value="10">Year 10</SelectItem>
+                <SelectItem value="11">Year 11</SelectItem>
               </SelectContent>
             </Select>
 
@@ -320,15 +311,16 @@ Respond in JSON format.`,
               </SelectContent>
             </Select>
 
-            <Select value={selectedCreator} onValueChange={setSelectedCreator}>
+            <Select value={selectedType} onValueChange={setSelectedType}>
               <SelectTrigger className="bg-white/5 border-white/10 text-white">
-                <SelectValue placeholder="Creator" />
+                <SelectValue placeholder="Type" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Creators</SelectItem>
-                {allCreators.map(email => (
-                  <SelectItem key={email} value={email}>{email}</SelectItem>
-                ))}
+                <SelectItem value="all">All Types</SelectItem>
+                <SelectItem value="multiple_choice">Multiple Choice</SelectItem>
+                <SelectItem value="true_false">True/False</SelectItem>
+                <SelectItem value="short_answer">Short Answer</SelectItem>
+                <SelectItem value="written">Written</SelectItem>
               </SelectContent>
             </Select>
           </div>

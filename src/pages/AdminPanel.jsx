@@ -127,11 +127,11 @@ export default function AdminPanel() {
     }
   };
 
-  const handleSeedGlobalQuestions = async () => {
+  const handleSeedGlobalQuestions = async (pack) => {
     setSeeding(true);
     setSeedResult(null);
     try {
-      const response = await base44.functions.invoke('seedGlobalQuestions', {});
+      const response = await base44.functions.invoke('seedGlobalQuestions', { pack });
       setSeedResult({ success: true, data: response.data });
       queryClient.invalidateQueries(['questionBankGlobal']);
     } catch (error) {
@@ -495,52 +495,66 @@ export default function AdminPanel() {
             <div className="flex justify-between items-center mb-4">
               <div>
                 <h2 className="text-xl font-bold text-slate-900">Global Question Library</h2>
-                <p className="text-sm text-slate-500">Seed shared questions for all teachers</p>
+                <p className="text-sm text-slate-500">Seed shared questions for all teachers by year group and topic</p>
               </div>
             </div>
 
             {seedResult && (
               <div className={`mb-4 p-4 rounded-lg ${seedResult.success ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
-                <p className={seedResult.success ? 'text-green-800' : 'text-red-800'}>
+                <p className={seedResult.success ? 'text-green-800 font-semibold' : 'text-red-800'}>
                   {seedResult.success ? seedResult.data.message : seedResult.message}
                 </p>
-                {seedResult.success && seedResult.data.skipped && (
-                  <p className="text-sm text-green-700 mt-1">
-                    Already seeded: {seedResult.data.count} questions exist
-                  </p>
-                )}
-                {seedResult.success && !seedResult.data.skipped && (
-                  <div className="text-sm text-green-700 mt-2">
-                    <p>• Questions created: {seedResult.data.count}</p>
-                    <p>• Sample IDs: {seedResult.data.questionIds?.join(', ')}</p>
+                {seedResult.success && (
+                  <div className="text-sm text-green-700 mt-2 space-y-1">
+                    <p>✅ Created: {seedResult.data.created}</p>
+                    <p>⏭️  Skipped: {seedResult.data.skipped}</p>
+                    <p>📊 Total global questions: {seedResult.data.total_global}</p>
+                    {seedResult.data.sample_ids && seedResult.data.sample_ids.length > 0 && (
+                      <p>🆔 Sample IDs: {seedResult.data.sample_ids.join(', ')}</p>
+                    )}
                   </div>
                 )}
               </div>
             )}
 
-            <div className="bg-white rounded-2xl border border-slate-100 p-6">
-              <div className="flex items-start gap-4">
-                <div className="w-12 h-12 rounded-xl bg-blue-100 flex items-center justify-center flex-shrink-0">
-                  <Database className="w-6 h-6 text-blue-600" />
+            <div className="space-y-4">
+              <div className="bg-white rounded-2xl border border-slate-100 p-6">
+                <div className="flex items-start gap-4">
+                  <div className="w-12 h-12 rounded-xl bg-blue-100 flex items-center justify-center flex-shrink-0">
+                    <Database className="w-6 h-6 text-blue-600" />
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-2">
+                      <h3 className="font-semibold text-slate-900">Year 7 - Fractions</h3>
+                      <span className="text-xs px-2 py-1 rounded-full bg-blue-100 text-blue-700">15 questions</span>
+                    </div>
+                    <p className="text-sm text-slate-600 mb-3">
+                      5 easy, 5 medium, 5 hard questions covering basic fractions, simplification, addition, subtraction, multiplication, and division.
+                    </p>
+                    <Button
+                      onClick={() => handleSeedGlobalQuestions('y7-fractions')}
+                      disabled={seeding}
+                      className="bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600"
+                    >
+                      {seeding ? (
+                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />
+                      ) : (
+                        <Database className="w-4 h-4 mr-2" />
+                      )}
+                      {seeding ? 'Seeding...' : 'Seed Y7 Fractions (E/M/H)'}
+                    </Button>
+                  </div>
                 </div>
-                <div className="flex-1">
-                  <h3 className="font-semibold text-slate-900 mb-2">Seed Fractions Questions</h3>
-                  <p className="text-sm text-slate-600 mb-4">
-                    Adds 15 high-quality global Fractions questions (easy, medium, hard) to the shared library.
-                    Safe to run multiple times - will skip if already seeded.
-                  </p>
-                  <Button
-                    onClick={handleSeedGlobalQuestions}
-                    disabled={seeding}
-                    className="bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600"
-                  >
-                    {seeding ? (
-                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />
-                    ) : (
-                      <Database className="w-4 h-4 mr-2" />
-                    )}
-                    {seeding ? 'Seeding...' : 'Seed Global Library (Fractions)'}
-                  </Button>
+              </div>
+
+              <div className="bg-slate-50 rounded-2xl border border-slate-200 p-6">
+                <h4 className="font-medium text-slate-700 mb-2">Coming Soon</h4>
+                <div className="space-y-2 text-sm text-slate-500">
+                  <p>• Year 7 - Algebra</p>
+                  <p>• Year 8 - Fractions (Advanced)</p>
+                  <p>• Year 8 - Percentages</p>
+                  <p>• Year 9 - Equations</p>
+                  <p>• More packs will be added here...</p>
                 </div>
               </div>
             </div>
