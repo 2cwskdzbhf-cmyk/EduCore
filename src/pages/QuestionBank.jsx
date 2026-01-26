@@ -47,10 +47,10 @@ function QuestionBankContent() {
   const { data: allQuestions = [], isLoading: questionsLoading } = useQuery({
     queryKey: ['allQuestions'],
     queryFn: async () => {
-      console.log('🔍 Fetching from entity: Question');
-      const results = await base44.entities.Question.list('-created_date', 5000);
-      console.log(`✅ Loaded ${results.length} questions from database`);
-      return results;
+      console.log('🔍 Fetching questions from entity: Question');
+      const questions = await base44.entities.Question.list('-created_date', 5000);
+      console.log(`✅ Loaded ${questions.length} questions from database`);
+      return questions;
     },
     enabled: !!user,
     refetchOnWindowFocus: false,
@@ -59,7 +59,6 @@ function QuestionBankContent() {
 
   // Apply filters client-side
   const questions = allQuestions.filter(q => {
-    if (!q.is_active) return false;
     if (selectedSubject !== 'all' && q.subject_id !== selectedSubject) return false;
     if (selectedTopic !== 'all' && q.topic_id !== selectedTopic) return false;
     if (selectedYearGroup !== 'all' && q.year_group !== parseInt(selectedYearGroup)) return false;
@@ -73,8 +72,8 @@ function QuestionBankContent() {
   );
 
   const deleteQuestionMutation = useMutation({
-    mutationFn: (id) => base44.entities.Question.update(id, { is_active: false }),
-    onSuccess: () => queryClient.invalidateQueries(['questions'])
+    mutationFn: (id) => base44.entities.Question.delete(id),
+    onSuccess: () => queryClient.invalidateQueries(['allQuestions'])
   });
 
   return (
@@ -93,7 +92,7 @@ function QuestionBankContent() {
               <h1 className="text-3xl font-bold text-white">Question Bank</h1>
               <div className="flex items-center gap-4 mt-1">
                 <p className="text-slate-400">Browse and manage questions by year group</p>
-                <Badge className="bg-green-500/20 text-green-300 font-mono">
+                <Badge className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
                   Loaded: {allQuestions.length} questions
                 </Badge>
                 <Badge className="bg-purple-500/20 text-purple-300">
@@ -216,37 +215,38 @@ function QuestionBankContent() {
                 Open AdminSeedQuestions
               </Button>
             </GlassCard>
-          ) : questions.length === 0 ? (
+          ) : filteredQuestions.length === 0 ? (
             <GlassCard className="p-12 text-center bg-blue-500/10 border-blue-500/30">
               <Filter className="w-12 h-12 text-blue-400 mx-auto mb-4" />
               <p className="text-blue-400 font-semibold mb-2">
-                {allQuestions.length} questions in database, but none match your filters
+                {allQuestions.length} questions exist, but none match your filters
               </p>
               <p className="text-slate-400 text-sm">Try adjusting your filters to see more results.</p>
             </GlassCard>
-          ) : filteredQuestions.length === 0 ? (
-            <GlassCard className="p-12 text-center">
-              <Filter className="w-12 h-12 text-slate-400 mx-auto mb-4" />
-              <p className="text-slate-400">No questions match your filters.</p>
-            </GlassCard>
           ) : (
-            filteredQuestions.map(q => (
-              <GlassCard key={q.id} className="p-6">
-                <div className="flex items-start justify-between">
-                 <div className="flex-1">
-                   <div className="flex items-center gap-2 mb-3">
-                     <Badge className="bg-blue-500/20 text-blue-300">Year {q.year_group || '?'}</Badge>
-                     <Badge variant="outline">{q.difficulty || 'unknown'}</Badge>
-                     <Badge variant="outline">{q.question_type?.replace('_', ' ') || 'unknown'}</Badge>
-                     <Badge className="bg-green-500/20 text-green-300">{q.marks || 1} mark(s)</Badge>
-                     <Badge className="bg-slate-500/20 text-slate-300 text-xs">
-                       {subjects.find(s => s.id === q.subject_id)?.name || 'No subject'}
-                     </Badge>
-                     <Badge className="bg-slate-500/20 text-slate-300 text-xs">
-                       {topics.find(t => t.id === q.topic_id)?.name || 'No topic'}
-                     </Badge>
-                   </div>
-                   <p className="text-white text-lg font-medium mb-3">{q.question_text || q.text || q.prompt || 'No text'}</p>
+            filteredQuestions.map(q => {
+              const subject = subjects.find(s => s.id === q.subject_id);
+              const topic = topics.find(t => t.id === q.topic_id);
+              
+              return (
+                <GlassCard key={q.id} className="p-6">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-3">
+                        <Badge className="bg-blue-500/20 text-blue-300">
+                          Year {q.year_group || '?'}
+                        </Badge>
+                        <Badge variant="outline">{q.difficulty || 'Unknown'}</Badge>
+                        <Badge variant="outline">{q.question_type?.replace('_', ' ') || 'Unknown type'}</Badge>
+                        <Badge className="bg-green-500/20 text-green-300">{q.marks || 1} mark(s)</Badge>
+                        <Badge className={subject ? "bg-purple-500/20 text-purple-300" : "bg-amber-500/20 text-amber-300"}>
+                          {subject ? subject.name : '⚠️ Unlinked subject'}
+                        </Badge>
+                        <Badge className={topic ? "bg-cyan-500/20 text-cyan-300" : "bg-amber-500/20 text-amber-300"}>
+                          {topic ? topic.name : '⚠️ Unlinked topic'}
+                        </Badge>
+                      </div>
+                      <p className="text-white text-lg font-medium mb-3">{q.question_text || 'No question text'}</p>
                     {q.options && q.options.length > 0 && (
                       <div className="space-y-1 mb-3">
                         {q.options.map((opt, idx) => (
@@ -296,7 +296,8 @@ function QuestionBankContent() {
                   </div>
                 </div>
               </GlassCard>
-            ))
+              );
+            })
           )}
         </div>
 
@@ -361,7 +362,7 @@ function QuestionFormDialog({ open, onOpenChange, question, subjects, topics, te
       return base44.entities.Question.create(payload);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries(['questions']);
+      queryClient.invalidateQueries(['allQuestions']);
       onOpenChange(false);
     }
   });
