@@ -150,7 +150,7 @@ export default function QuestionBankDialog({ open, onOpenChange, onAddQuestions,
         rating_count: 0
       });
     }
-    queryClient.invalidateQueries(['questionBank']);
+    queryClient.invalidateQueries(['questionBankAll']);
   };
 
   const rateQuestionMutation = useMutation({
