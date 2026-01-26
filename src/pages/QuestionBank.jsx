@@ -44,20 +44,28 @@ function QuestionBankContent() {
     }
   });
 
-  const { data: questions = [], isLoading: questionsLoading } = useQuery({
-    queryKey: ['questions', selectedSubject, selectedTopic, selectedYearGroup, selectedDifficulty, selectedType],
+  const { data: allQuestions = [], isLoading: questionsLoading } = useQuery({
+    queryKey: ['allQuestions'],
     queryFn: async () => {
-      let filter = { is_active: true };
-      if (selectedSubject !== 'all') filter.subject_id = selectedSubject;
-      if (selectedTopic !== 'all') filter.topic_id = selectedTopic;
-      if (selectedYearGroup !== 'all') filter.year_group = parseInt(selectedYearGroup);
-      if (selectedDifficulty !== 'all') filter.difficulty = selectedDifficulty;
-      if (selectedType !== 'all') filter.question_type = selectedType;
-      return base44.entities.Question.filter(filter);
+      console.log('🔍 Fetching from entity: Question');
+      const results = await base44.entities.Question.list('-created_date', 5000);
+      console.log(`✅ Loaded ${results.length} questions from database`);
+      return results;
     },
     enabled: !!user,
     refetchOnWindowFocus: false,
     staleTime: 30000
+  });
+
+  // Apply filters client-side
+  const questions = allQuestions.filter(q => {
+    if (!q.is_active) return false;
+    if (selectedSubject !== 'all' && q.subject_id !== selectedSubject) return false;
+    if (selectedTopic !== 'all' && q.topic_id !== selectedTopic) return false;
+    if (selectedYearGroup !== 'all' && q.year_group !== parseInt(selectedYearGroup)) return false;
+    if (selectedDifficulty !== 'all' && q.difficulty !== selectedDifficulty) return false;
+    if (selectedType !== 'all' && q.question_type !== selectedType) return false;
+    return true;
   });
 
   const filteredQuestions = questions.filter(q =>
@@ -85,8 +93,11 @@ function QuestionBankContent() {
               <h1 className="text-3xl font-bold text-white">Question Bank</h1>
               <div className="flex items-center gap-4 mt-1">
                 <p className="text-slate-400">Browse and manage questions by year group</p>
+                <Badge className="bg-green-500/20 text-green-300 font-mono">
+                  Loaded: {allQuestions.length} questions
+                </Badge>
                 <Badge className="bg-purple-500/20 text-purple-300">
-                  {questions.length} question(s)
+                  Filtered: {questions.length}
                 </Badge>
                 <Badge className="bg-blue-500/20 text-blue-300">
                   {topics.length} topic(s)
@@ -189,7 +200,7 @@ function QuestionBankContent() {
               <div className="w-12 h-12 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
               <p className="text-slate-400">Loading questions...</p>
             </GlassCard>
-          ) : questions.length === 0 ? (
+          ) : allQuestions.length === 0 ? (
             <GlassCard className="p-12 text-center bg-amber-500/10 border-amber-500/30">
               <BookOpen className="w-12 h-12 text-amber-400 mx-auto mb-4" />
               <p className="text-amber-400 font-semibold mb-2">⚠️ No questions in database!</p>
@@ -205,6 +216,14 @@ function QuestionBankContent() {
                 Open AdminSeedQuestions
               </Button>
             </GlassCard>
+          ) : questions.length === 0 ? (
+            <GlassCard className="p-12 text-center bg-blue-500/10 border-blue-500/30">
+              <Filter className="w-12 h-12 text-blue-400 mx-auto mb-4" />
+              <p className="text-blue-400 font-semibold mb-2">
+                {allQuestions.length} questions in database, but none match your filters
+              </p>
+              <p className="text-slate-400 text-sm">Try adjusting your filters to see more results.</p>
+            </GlassCard>
           ) : filteredQuestions.length === 0 ? (
             <GlassCard className="p-12 text-center">
               <Filter className="w-12 h-12 text-slate-400 mx-auto mb-4" />
@@ -214,14 +233,20 @@ function QuestionBankContent() {
             filteredQuestions.map(q => (
               <GlassCard key={q.id} className="p-6">
                 <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-3">
-                      <Badge className="bg-blue-500/20 text-blue-300">Year {q.year_group}</Badge>
-                      <Badge variant="outline">{q.difficulty}</Badge>
-                      <Badge variant="outline">{q.question_type?.replace('_', ' ')}</Badge>
-                      <Badge className="bg-green-500/20 text-green-300">{q.marks} mark(s)</Badge>
-                    </div>
-                    <p className="text-white text-lg font-medium mb-3">{q.question_text}</p>
+                 <div className="flex-1">
+                   <div className="flex items-center gap-2 mb-3">
+                     <Badge className="bg-blue-500/20 text-blue-300">Year {q.year_group || '?'}</Badge>
+                     <Badge variant="outline">{q.difficulty || 'unknown'}</Badge>
+                     <Badge variant="outline">{q.question_type?.replace('_', ' ') || 'unknown'}</Badge>
+                     <Badge className="bg-green-500/20 text-green-300">{q.marks || 1} mark(s)</Badge>
+                     <Badge className="bg-slate-500/20 text-slate-300 text-xs">
+                       {subjects.find(s => s.id === q.subject_id)?.name || 'No subject'}
+                     </Badge>
+                     <Badge className="bg-slate-500/20 text-slate-300 text-xs">
+                       {topics.find(t => t.id === q.topic_id)?.name || 'No topic'}
+                     </Badge>
+                   </div>
+                   <p className="text-white text-lg font-medium mb-3">{q.question_text || q.text || q.prompt || 'No text'}</p>
                     {q.options && q.options.length > 0 && (
                       <div className="space-y-1 mb-3">
                         {q.options.map((opt, idx) => (
