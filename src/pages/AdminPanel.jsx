@@ -30,7 +30,8 @@ import {
   Settings,
   Trash2,
   Edit,
-  Shield
+  Shield,
+  Database
 } from 'lucide-react';
 
 export default function AdminPanel() {
@@ -41,6 +42,8 @@ export default function AdminPanel() {
   const [newTopic, setNewTopic] = useState({ name: '', description: '', subject_id: '', difficulty_level: 'beginner', xp_reward: 50 });
   const [merging, setMerging] = useState(false);
   const [mergeResult, setMergeResult] = useState(null);
+  const [seeding, setSeeding] = useState(false);
+  const [seedResult, setSeedResult] = useState(null);
 
   const { data: users = [] } = useQuery({
     queryKey: ['users'],
@@ -124,6 +127,20 @@ export default function AdminPanel() {
     }
   };
 
+  const handleSeedGlobalQuestions = async () => {
+    setSeeding(true);
+    setSeedResult(null);
+    try {
+      const response = await base44.functions.invoke('seedGlobalQuestions', {});
+      setSeedResult({ success: true, data: response.data });
+      queryClient.invalidateQueries(['questionBankGlobal']);
+    } catch (error) {
+      setSeedResult({ success: false, message: error.message });
+    } finally {
+      setSeeding(false);
+    }
+  };
+
   const colors = ['indigo', 'blue', 'green', 'purple', 'orange', 'pink'];
 
   return (
@@ -196,6 +213,7 @@ export default function AdminPanel() {
             <TabsTrigger value="subjects">Subjects</TabsTrigger>
             <TabsTrigger value="topics">Topics</TabsTrigger>
             <TabsTrigger value="users">Users</TabsTrigger>
+            <TabsTrigger value="library">Global Library</TabsTrigger>
           </TabsList>
 
           <TabsContent value="subjects">
@@ -470,6 +488,61 @@ export default function AdminPanel() {
                   No users registered yet.
                 </div>
               )}
+            </div>
+          </TabsContent>
+
+          <TabsContent value="library">
+            <div className="flex justify-between items-center mb-4">
+              <div>
+                <h2 className="text-xl font-bold text-slate-900">Global Question Library</h2>
+                <p className="text-sm text-slate-500">Seed shared questions for all teachers</p>
+              </div>
+            </div>
+
+            {seedResult && (
+              <div className={`mb-4 p-4 rounded-lg ${seedResult.success ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
+                <p className={seedResult.success ? 'text-green-800' : 'text-red-800'}>
+                  {seedResult.success ? seedResult.data.message : seedResult.message}
+                </p>
+                {seedResult.success && seedResult.data.skipped && (
+                  <p className="text-sm text-green-700 mt-1">
+                    Already seeded: {seedResult.data.count} questions exist
+                  </p>
+                )}
+                {seedResult.success && !seedResult.data.skipped && (
+                  <div className="text-sm text-green-700 mt-2">
+                    <p>• Questions created: {seedResult.data.count}</p>
+                    <p>• Sample IDs: {seedResult.data.questionIds?.join(', ')}</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="bg-white rounded-2xl border border-slate-100 p-6">
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 rounded-xl bg-blue-100 flex items-center justify-center flex-shrink-0">
+                  <Database className="w-6 h-6 text-blue-600" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="font-semibold text-slate-900 mb-2">Seed Fractions Questions</h3>
+                  <p className="text-sm text-slate-600 mb-4">
+                    Adds 15 high-quality global Fractions questions (easy, medium, hard) to the shared library.
+                    Safe to run multiple times - will skip if already seeded.
+                  </p>
+                  <Button
+                    onClick={handleSeedGlobalQuestions}
+                    disabled={seeding}
+                    className="bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600"
+                  >
+                    {seeding ? (
+                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />
+                    ) : (
+                      <Database className="w-4 h-4 mr-2" />
+                    )}
+                    {seeding ? 'Seeding...' : 'Seed Global Library (Fractions)'}
+                  </Button>
+                </div>
+              </div>
             </div>
           </TabsContent>
         </Tabs>
