@@ -43,6 +43,8 @@ export default function GlobalQuestionBankDialog({ open, onClose, onAddQuestions
   const addQuestionsMutation = useMutation({
     mutationFn: async (questions) => {
       // Copy each global question to QuizQuestion entity
+      // This creates a COPY that can be edited independently
+      // The source_global_id tracks the origin but changes won't affect GlobalQuestion
       const order = await base44.entities.QuizQuestion.filter({ quiz_set_id: quizSetId }).then(qs => qs.length);
       
       for (let i = 0; i < questions.length; i++) {
@@ -58,7 +60,9 @@ export default function GlobalQuestionBankDialog({ open, onClose, onAddQuestions
           explanation: gq.explanation,
           difficulty: gq.difficulty,
           year_group: gq.year_group,
-          source_global_id: gq.id
+          source_global_id: gq.id,
+          is_reusable: false,
+          visibility: 'private'
         });
       }
     },
