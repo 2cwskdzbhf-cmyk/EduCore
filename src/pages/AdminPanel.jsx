@@ -638,11 +638,11 @@ export default function AdminPanel() {
                     </div>
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
-                        <h4 className="font-semibold text-slate-900">Maths Year 7 - Fractions</h4>
-                        <span className="text-xs px-2 py-1 rounded-full bg-blue-100 text-blue-700">15 questions</span>
+                         <h4 className="font-semibold text-slate-900">Maths Year 7 - Fractions</h4>
+                        <span className="text-xs px-2 py-1 rounded-full bg-blue-100 text-blue-700">5 questions</span>
                       </div>
                       <p className="text-sm text-slate-600 mb-3">
-                        Basic fractions, simplification, addition, subtraction, multiplication, division. (5 easy, 5 medium, 5 hard)
+                        Basic fractions, simplification, addition, subtraction, multiplication. (2 easy, 2 medium, 1 hard)
                       </p>
                       <Button
                         onClick={() => handleSeedGlobalQuestions('y7-maths-fractions')}
@@ -665,10 +665,10 @@ export default function AdminPanel() {
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
                         <h4 className="font-semibold text-slate-900">Maths Year 8 - Algebra</h4>
-                        <span className="text-xs px-2 py-1 rounded-full bg-indigo-100 text-indigo-700">15 questions</span>
+                        <span className="text-xs px-2 py-1 rounded-full bg-indigo-100 text-indigo-700">5 questions</span>
                       </div>
                       <p className="text-sm text-slate-600 mb-3">
-                        Solving equations, simplifying expressions, expanding brackets, substitution. (5 easy, 5 medium, 5 hard)
+                        Solving equations, simplifying expressions. (2 easy, 2 medium, 1 hard)
                       </p>
                       <Button
                         onClick={() => handleSeedGlobalQuestions('y8-maths-algebra')}
@@ -691,10 +691,10 @@ export default function AdminPanel() {
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
                         <h4 className="font-semibold text-slate-900">Science Year 7 - Biology</h4>
-                        <span className="text-xs px-2 py-1 rounded-full bg-green-100 text-green-700">15 questions</span>
+                        <span className="text-xs px-2 py-1 rounded-full bg-green-100 text-green-700">5 questions</span>
                       </div>
                       <p className="text-sm text-slate-600 mb-3">
-                        Cells, photosynthesis, human body systems, organs, microorganisms. (5 easy, 5 medium, 5 hard)
+                        Cells, photosynthesis, blood vessels, organelles. (2 easy, 2 medium, 1 hard)
                       </p>
                       <Button
                         onClick={() => handleSeedGlobalQuestions('y7-science-biology')}
