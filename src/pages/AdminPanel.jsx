@@ -44,6 +44,7 @@ export default function AdminPanel() {
   const [mergeResult, setMergeResult] = useState(null);
   const [seeding, setSeeding] = useState(false);
   const [seedResult, setSeedResult] = useState(null);
+  const [dbDebug, setDbDebug] = useState(null);
   const [selectedYearGroup, setSelectedYearGroup] = useState('7');
   const [selectedSubject, setSelectedSubject] = useState('Maths');
 
@@ -133,17 +134,31 @@ export default function AdminPanel() {
     setSeeding(true);
     setSeedResult(null);
     try {
-      // Call the seed function
+      // Call the seed function and AWAIT it
       const response = await base44.functions.invoke('seedGlobalQuestions', { pack });
       
-      // Verify the seeding worked
-      const allQuestions = await base44.entities.QuizQuestion.list('-created_date', 100);
-      const globalQuestions = allQuestions.filter(q => q.visibility === 'global');
+      // Verify the seeding worked - fetch fresh data
+      const allQuestions = await base44.entities.QuizQuestion.list('-created_date', 5000);
+      const globalQuestions = allQuestions.filter(q => 
+        (q.visibility || q.Visibility) === 'global'
+      );
       
       console.log('🔍 Verification after seeding:');
       console.log(`   Total questions: ${allQuestions.length}`);
       console.log(`   Global questions: ${globalQuestions.length}`);
       console.log(`   First 3 global IDs:`, globalQuestions.slice(0, 3).map(q => q.id));
+      
+      // Update debug panel
+      setDbDebug({
+        total: allQuestions.length,
+        global: globalQuestions.length,
+        sampleIds: globalQuestions.slice(0, 3).map(q => q.id),
+        sampleQuestions: globalQuestions.slice(0, 3).map(q => ({
+          id: q.id,
+          prompt: q.prompt?.substring(0, 40),
+          visibility: q.visibility
+        }))
+      });
       
       setSeedResult({ 
         success: true, 
@@ -154,11 +169,29 @@ export default function AdminPanel() {
           sample_global_ids: globalQuestions.slice(0, 3).map(q => q.id)
         }
       });
+      
+      // Show success toast
+      toast.success(`✅ Seeded ${response.data.created}, Skipped ${response.data.skipped}`, {
+        duration: 5000,
+        style: {
+          background: '#10b981',
+          color: '#fff',
+        }
+      });
+      
+      // Invalidate queries to trigger refetch
       queryClient.invalidateQueries(['questionBankGlobal']);
       queryClient.invalidateQueries(['questions']);
     } catch (error) {
       console.error('Seeding error:', error);
       setSeedResult({ success: false, message: error.message });
+      toast.error(`❌ Seeding failed: ${error.message}`, {
+        duration: 5000,
+        style: {
+          background: '#ef4444',
+          color: '#fff',
+        }
+      });
     } finally {
       setSeeding(false);
     }

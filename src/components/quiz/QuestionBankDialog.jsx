@@ -31,27 +31,36 @@ export default function QuestionBankDialog({ open, onOpenChange, onAddQuestions,
   const [showAISuggestions, setShowAISuggestions] = useState(false);
   const [aiSuggestions, setAiSuggestions] = useState(null);
   const [loadingAI, setLoadingAI] = useState(false);
+  const [dbDebug, setDbDebug] = useState(null);
 
   const { data: allQuestions = [], isLoading: questionsLoading } = useQuery({
     queryKey: ['questionBankGlobal'],
     queryFn: async () => {
       console.log('🔍 Fetching GLOBAL questions from entity: QuizQuestion');
       
-      // Fetch all questions without filter (Base44 filter syntax may vary)
-      const questions = await base44.entities.QuizQuestion.list('-created_date', 5000);
-      console.log(`✅ Loaded ${questions.length} total QuizQuestion records from database`);
+      // Fetch ALL questions without any filter
+      const allRecords = await base44.entities.QuizQuestion.list('-created_date', 5000);
+      console.log(`✅ Loaded ${allRecords.length} TOTAL QuizQuestion records from database`);
       
       // Client-side filter for GLOBAL questions only
-      const globalQuestions = questions.filter(q => q.visibility === 'global');
+      const globalQuestions = allRecords.filter(q => 
+        (q.visibility || q.Visibility) === 'global'
+      );
       
       console.log(`✅ ${globalQuestions.length} GLOBAL questions found (filtered client-side)`);
-      console.log('🔍 First 3 global question IDs:', globalQuestions.slice(0, 3).map(q => q.id));
-      console.log('🔍 First 3 global questions:', globalQuestions.slice(0, 3).map(q => ({
-        id: q.id, 
-        prompt: q.prompt?.substring(0, 50),
-        visibility: q.visibility,
-        year_group: q.year_group
-      })));
+      console.log('🔍 First 3 global IDs:', globalQuestions.slice(0, 3).map(q => q.id));
+      
+      // Set debug info
+      setDbDebug({
+        total: allRecords.length,
+        global: globalQuestions.length,
+        sampleIds: globalQuestions.slice(0, 3).map(q => q.id),
+        sampleQuestions: globalQuestions.slice(0, 3).map(q => ({
+          id: q.id,
+          prompt: q.prompt?.substring(0, 40) + '...',
+          visibility: q.visibility
+        }))
+      });
       
       return globalQuestions;
     },
@@ -238,8 +247,28 @@ Respond in JSON format.`,
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="bg-slate-900 border-white/10 max-w-4xl max-h-[80vh] overflow-hidden flex flex-col">
         <DialogHeader>
-          <DialogTitle className="text-white">Question Bank</DialogTitle>
+          <DialogTitle className="text-white">Question Bank - Global Library</DialogTitle>
         </DialogHeader>
+
+        {/* DEBUG PANEL */}
+        {dbDebug && (
+          <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg text-xs space-y-1">
+            <p className="font-bold text-amber-300">🔍 DB DEBUG PANEL (Live Quiz Question Bank Modal)</p>
+            <p className="text-white">📊 TOTAL QuizQuestion records in DB: <span className="font-bold">{dbDebug.total}</span></p>
+            <p className="text-white">🌍 GLOBAL QuizQuestion records: <span className="font-bold text-green-400">{dbDebug.global}</span> (where visibility === "global")</p>
+            {dbDebug.sampleIds.length > 0 && (
+              <p className="text-white">🆔 Sample GLOBAL IDs: [{dbDebug.sampleIds.join(', ')}]</p>
+            )}
+            {dbDebug.sampleQuestions.length > 0 && (
+              <div className="mt-2 space-y-1">
+                <p className="text-slate-300 font-semibold">Sample Global Questions:</p>
+                {dbDebug.sampleQuestions.map((q, idx) => (
+                  <p key={idx} className="text-slate-300 pl-2">• {q.prompt} (vis: {q.visibility})</p>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         <Tabs defaultValue="browse" className="space-y-4">
           <TabsList className="bg-white/5 border border-white/10">
