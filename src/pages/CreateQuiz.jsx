@@ -17,7 +17,7 @@ import {
   BookOpen, Sparkles, Check, X, Edit2, Upload, Database, Tag
 } from 'lucide-react';
 import BulkImportDialog from '@/components/quiz/BulkImportDialog';
-import QuestionBankDialog from '@/components/quiz/QuestionBankDialog';
+import GlobalQuestionBankDialog from '@/components/quiz/GlobalQuestionBankDialog';
 
 export default function CreateQuiz() {
   const navigate = useNavigate();
@@ -37,8 +37,9 @@ export default function CreateQuiz() {
   const [editingIndex, setEditingIndex] = useState(null);
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [showBulkImportDialog, setShowBulkImportDialog] = useState(false);
-  const [showQuestionBankDialog, setShowQuestionBankDialog] = useState(false);
+  const [showGlobalQuestionBankDialog, setShowGlobalQuestionBankDialog] = useState(false);
   const [selectedLesson, setSelectedLesson] = useState(null);
+  const [quizSetId, setQuizSetId] = useState(null);
   const [generateCount, setGenerateCount] = useState(5);
   const [generateDifficulty, setGenerateDifficulty] = useState('medium');
 
@@ -238,20 +239,12 @@ export default function CreateQuiz() {
     setQuestions([...questions, ...normalizedQuestions]);
   };
 
-  const handleQuestionBankAdd = (bankQuestions) => {
-    const questionsToAdd = bankQuestions.map(q => ({
-      prompt: q.prompt,
-      question_type: q.question_type,
-      options: q.options,
-      correct_index: q.correct_index,
-      correct_answer: q.correct_answer,
-      answer_keywords: q.answer_keywords,
-      difficulty: q.difficulty,
-      explanation: q.explanation,
-      tags: q.tags,
-      points: q.points
-    }));
-    setQuestions([...questions, ...questionsToAdd]);
+  const handleGlobalQuestionBankAdd = (count) => {
+    // Questions are added directly via mutation in the dialog
+    // Just refresh the questions list
+    if (quizSetId) {
+      queryClient.invalidateQueries(['quizQuestions', quizSetId]);
+    }
   };
 
   const updateQuestion = (index, field, value) => {
@@ -430,12 +423,12 @@ export default function CreateQuiz() {
                   Bulk Import
                 </Button>
                 <Button
-                  onClick={() => setShowQuestionBankDialog(true)}
+                  onClick={() => setShowGlobalQuestionBankDialog(true)}
                   disabled={!user?.email}
                   className="bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/50"
                 >
                   <Database className="w-4 h-4 mr-2" />
-                  Question Bank
+                  Global Bank
                 </Button>
                 <Button
                   onClick={() => addManualQuestion()}
@@ -717,14 +710,12 @@ export default function CreateQuiz() {
           onImport={handleBulkImport}
           />
 
-          {/* Question Bank Dialog */}
-          <QuestionBankDialog
-            open={showQuestionBankDialog}
-            onOpenChange={setShowQuestionBankDialog}
-            onAddQuestions={handleQuestionBankAdd}
-            subjectId={quizSet.subject_id}
-            topicId={quizSet.topic_id}
-            teacherEmail={user?.email}
+          {/* Global Question Bank Dialog */}
+          <GlobalQuestionBankDialog
+            open={showGlobalQuestionBankDialog}
+            onClose={() => setShowGlobalQuestionBankDialog(false)}
+            onAddQuestions={handleGlobalQuestionBankAdd}
+            quizSetId={quizSetId}
           />
           </div>
           </div>
