@@ -13,7 +13,8 @@ import {
   LogOut,
   Users,
   ClipboardList,
-  Shield
+  Shield,
+  BarChart3
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -117,6 +118,7 @@ export default function Layout({ children, currentPageName }) {
     { name: 'Classes', icon: Users, page: 'TeacherDashboard' },
     { name: 'Question Bank', icon: BookOpen, page: 'QuestionBank' },
     { name: 'Library', icon: ClipboardList, page: 'TeacherAssignmentLibrary' },
+    { name: 'Analytics', icon: BarChart3, page: 'Analytics' },
   ];
 
   const adminNav = [
