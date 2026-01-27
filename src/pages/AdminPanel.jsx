@@ -44,6 +44,8 @@ export default function AdminPanel() {
   const [mergeResult, setMergeResult] = useState(null);
   const [seeding, setSeeding] = useState(false);
   const [seedResult, setSeedResult] = useState(null);
+  const [selectedYearGroup, setSelectedYearGroup] = useState('7');
+  const [selectedSubject, setSelectedSubject] = useState('Maths');
 
   const { data: users = [] } = useQuery({
     queryKey: ['users'],
@@ -492,11 +494,9 @@ export default function AdminPanel() {
           </TabsContent>
 
           <TabsContent value="library">
-            <div className="flex justify-between items-center mb-4">
-              <div>
-                <h2 className="text-xl font-bold text-slate-900">Global Question Library</h2>
-                <p className="text-sm text-slate-500">Seed shared questions for all teachers by year group and topic</p>
-              </div>
+            <div className="mb-6">
+              <h2 className="text-xl font-bold text-slate-900 mb-1">Global Question Library</h2>
+              <p className="text-sm text-slate-500">Seed shared questions for all teachers by year group, subject, and topic</p>
             </div>
 
             {seedResult && (
@@ -517,45 +517,121 @@ export default function AdminPanel() {
               </div>
             )}
 
-            <div className="space-y-4">
-              <div className="bg-white rounded-2xl border border-slate-100 p-6">
-                <div className="flex items-start gap-4">
-                  <div className="w-12 h-12 rounded-xl bg-blue-100 flex items-center justify-center flex-shrink-0">
-                    <Database className="w-6 h-6 text-blue-600" />
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-2">
-                      <h3 className="font-semibold text-slate-900">Year 7 - Fractions</h3>
-                      <span className="text-xs px-2 py-1 rounded-full bg-blue-100 text-blue-700">15 questions</span>
-                    </div>
-                    <p className="text-sm text-slate-600 mb-3">
-                      5 easy, 5 medium, 5 hard questions covering basic fractions, simplification, addition, subtraction, multiplication, and division.
-                    </p>
-                    <Button
-                      onClick={() => handleSeedGlobalQuestions('y7-fractions')}
-                      disabled={seeding}
-                      className="bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600"
-                    >
-                      {seeding ? (
-                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />
-                      ) : (
-                        <Database className="w-4 h-4 mr-2" />
-                      )}
-                      {seeding ? 'Seeding...' : 'Seed Y7 Fractions (E/M/H)'}
-                    </Button>
-                  </div>
+            <div className="bg-gradient-to-r from-purple-50 to-blue-50 rounded-2xl border border-purple-200 p-6 mb-6">
+              <h3 className="font-semibold text-slate-900 mb-4">Quick Filters</h3>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-slate-700 mb-2 block">Year Group</Label>
+                  <Select value={selectedYearGroup} onValueChange={setSelectedYearGroup}>
+                    <SelectTrigger className="bg-white">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="7">Year 7</SelectItem>
+                      <SelectItem value="8">Year 8</SelectItem>
+                      <SelectItem value="9">Year 9</SelectItem>
+                      <SelectItem value="10">Year 10</SelectItem>
+                      <SelectItem value="11">Year 11</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-slate-700 mb-2 block">Subject</Label>
+                  <Select value={selectedSubject} onValueChange={setSelectedSubject}>
+                    <SelectTrigger className="bg-white">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Maths">Maths</SelectItem>
+                      <SelectItem value="Science">Science</SelectItem>
+                      <SelectItem value="English">English</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
+            </div>
 
-              <div className="bg-slate-50 rounded-2xl border border-slate-200 p-6">
-                <h4 className="font-medium text-slate-700 mb-2">Coming Soon</h4>
-                <div className="space-y-2 text-sm text-slate-500">
-                  <p>• Year 7 - Algebra</p>
-                  <p>• Year 8 - Fractions (Advanced)</p>
-                  <p>• Year 8 - Percentages</p>
-                  <p>• Year 9 - Equations</p>
-                  <p>• More packs will be added here...</p>
-                </div>
+            <div className="space-y-4">
+              <h3 className="font-semibold text-slate-900">Available Seed Packs</h3>
+              
+              <div className="grid gap-4">
+                <Card className="p-5 hover:shadow-lg transition-shadow">
+                  <div className="flex items-start gap-4">
+                    <div className="w-12 h-12 rounded-xl bg-blue-100 flex items-center justify-center flex-shrink-0">
+                      <Database className="w-6 h-6 text-blue-600" />
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <h4 className="font-semibold text-slate-900">Maths Year 7 - Fractions</h4>
+                        <span className="text-xs px-2 py-1 rounded-full bg-blue-100 text-blue-700">15 questions</span>
+                      </div>
+                      <p className="text-sm text-slate-600 mb-3">
+                        Basic fractions, simplification, addition, subtraction, multiplication, division. (5 easy, 5 medium, 5 hard)
+                      </p>
+                      <Button
+                        onClick={() => handleSeedGlobalQuestions('y7-maths-fractions')}
+                        disabled={seeding}
+                        size="sm"
+                        className="bg-blue-600 hover:bg-blue-700"
+                      >
+                        {seeding ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" /> : <Database className="w-4 h-4 mr-2" />}
+                        Seed Pack
+                      </Button>
+                    </div>
+                  </div>
+                </Card>
+
+                <Card className="p-5 hover:shadow-lg transition-shadow">
+                  <div className="flex items-start gap-4">
+                    <div className="w-12 h-12 rounded-xl bg-indigo-100 flex items-center justify-center flex-shrink-0">
+                      <Database className="w-6 h-6 text-indigo-600" />
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <h4 className="font-semibold text-slate-900">Maths Year 8 - Algebra</h4>
+                        <span className="text-xs px-2 py-1 rounded-full bg-indigo-100 text-indigo-700">15 questions</span>
+                      </div>
+                      <p className="text-sm text-slate-600 mb-3">
+                        Solving equations, simplifying expressions, expanding brackets, substitution. (5 easy, 5 medium, 5 hard)
+                      </p>
+                      <Button
+                        onClick={() => handleSeedGlobalQuestions('y8-maths-algebra')}
+                        disabled={seeding}
+                        size="sm"
+                        className="bg-indigo-600 hover:bg-indigo-700"
+                      >
+                        {seeding ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" /> : <Database className="w-4 h-4 mr-2" />}
+                        Seed Pack
+                      </Button>
+                    </div>
+                  </div>
+                </Card>
+
+                <Card className="p-5 hover:shadow-lg transition-shadow">
+                  <div className="flex items-start gap-4">
+                    <div className="w-12 h-12 rounded-xl bg-green-100 flex items-center justify-center flex-shrink-0">
+                      <Database className="w-6 h-6 text-green-600" />
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <h4 className="font-semibold text-slate-900">Science Year 7 - Biology</h4>
+                        <span className="text-xs px-2 py-1 rounded-full bg-green-100 text-green-700">15 questions</span>
+                      </div>
+                      <p className="text-sm text-slate-600 mb-3">
+                        Cells, photosynthesis, human body systems, organs, microorganisms. (5 easy, 5 medium, 5 hard)
+                      </p>
+                      <Button
+                        onClick={() => handleSeedGlobalQuestions('y7-science-biology')}
+                        disabled={seeding}
+                        size="sm"
+                        className="bg-green-600 hover:bg-green-700"
+                      >
+                        {seeding ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" /> : <Database className="w-4 h-4 mr-2" />}
+                        Seed Pack
+                      </Button>
+                    </div>
+                  </div>
+                </Card>
               </div>
             </div>
           </TabsContent>
