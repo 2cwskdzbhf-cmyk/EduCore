@@ -33,6 +33,7 @@ import {
   Shield,
   Database
 } from 'lucide-react';
+import toast, { Toaster } from 'react-hot-toast';
 
 export default function AdminPanel() {
   const queryClient = useQueryClient();
@@ -191,6 +192,111 @@ export default function AdminPanel() {
           color: '#fff',
           border: '1px solid #ef4444'
         }
+      });
+    } finally {
+      setSeeding(false);
+    }
+  };
+
+  const handleForceCreateQuestions = async () => {
+    setSeeding(true);
+    try {
+      const questions = [
+        {
+          subject_name: "Maths",
+          topic_name: "Fractions",
+          year_group: 7,
+          difficulty: "easy",
+          question_type: "mcq",
+          question_text: "What is 1/2 + 1/4?",
+          choices: ["1/4", "1/2", "3/4", "1"],
+          correct_answer: "3/4",
+          seed_key: "force-y7-fractions-easy-01"
+        },
+        {
+          subject_name: "Maths",
+          topic_name: "Fractions",
+          year_group: 7,
+          difficulty: "easy",
+          question_type: "mcq",
+          question_text: "Which fraction is equivalent to 1/2?",
+          choices: ["1/4", "2/4", "1/3", "3/5"],
+          correct_answer: "2/4",
+          seed_key: "force-y7-fractions-easy-02"
+        },
+        {
+          subject_name: "Maths",
+          topic_name: "Fractions",
+          year_group: 7,
+          difficulty: "medium",
+          question_type: "mcq",
+          question_text: "What is 2/3 × 3/4?",
+          choices: ["1/2", "5/7", "6/12", "2/4"],
+          correct_answer: "1/2",
+          seed_key: "force-y7-fractions-medium-01"
+        },
+        {
+          subject_name: "Maths",
+          topic_name: "Fractions",
+          year_group: 7,
+          difficulty: "medium",
+          question_type: "mcq",
+          question_text: "What is 3/4 - 1/8?",
+          choices: ["2/4", "5/8", "1/2", "7/8"],
+          correct_answer: "5/8",
+          seed_key: "force-y7-fractions-medium-02"
+        },
+        {
+          subject_name: "Maths",
+          topic_name: "Fractions",
+          year_group: 7,
+          difficulty: "hard",
+          question_type: "mcq",
+          question_text: "What is (2/3 + 1/6) ÷ 1/2?",
+          choices: ["5/3", "1", "5/6", "3/2"],
+          correct_answer: "5/3",
+          seed_key: "force-y7-fractions-hard-01"
+        },
+        {
+          subject_name: "Maths",
+          topic_name: "Fractions",
+          year_group: 7,
+          difficulty: "hard",
+          question_type: "mcq",
+          question_text: "Convert 7/4 to a mixed number",
+          choices: ["1 3/4", "2 1/4", "1 1/2", "3/4"],
+          correct_answer: "1 3/4",
+          seed_key: "force-y7-fractions-hard-02"
+        }
+      ];
+
+      for (const q of questions) {
+        await base44.entities.GlobalQuestion.create(q);
+      }
+
+      const allQuestions = await base44.entities.GlobalQuestion.list('-created_date', 50);
+      
+      setSeedResult({ 
+        success: true, 
+        data: { 
+          created: questions.length, 
+          total: allQuestions.length,
+          sample_questions: allQuestions.slice(0, 3).map(q => q.question_text)
+        } 
+      });
+
+      await queryClient.invalidateQueries({ queryKey: ['globalQuestions'] });
+      await queryClient.invalidateQueries({ queryKey: ['globalQuestionCount'] });
+
+      toast.success(`Created ${questions.length} questions! Total: ${allQuestions.length}`, {
+        duration: 5000,
+        style: { background: '#1e293b', color: '#fff', border: '1px solid #334155' }
+      });
+    } catch (error) {
+      console.error('Error creating questions:', error);
+      toast.error(`Failed: ${error.message}`, {
+        duration: 4000,
+        style: { background: '#1e293b', color: '#fff', border: '1px solid #334155' }
       });
     } finally {
       setSeeding(false);
