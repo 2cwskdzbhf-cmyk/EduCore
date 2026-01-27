@@ -460,6 +460,14 @@ export default function CreateQuiz() {
                       <div className="flex-1">
                         {editingIndex === index ? (
                           <div className="space-y-4">
+                            {q.source_global_id && (
+                              <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3 mb-2">
+                                <div className="flex items-center gap-2 text-blue-300 text-xs">
+                                  <Database className="w-4 h-4" />
+                                  <span>Copied from Global Library • Edits apply to this quiz only</span>
+                                </div>
+                              </div>
+                            )}
                             <div>
                               <Label className="text-slate-300 text-xs mb-1">Question Type</Label>
                               <Select
@@ -566,6 +574,12 @@ export default function CreateQuiz() {
                               <Badge variant="outline" className="text-xs">
                                 {q.difficulty}
                               </Badge>
+                              {q.source_global_id && (
+                                <Badge className="text-xs bg-blue-500/20 text-blue-300 border-blue-500/50">
+                                  <Database className="w-3 h-3 mr-1" />
+                                  Global
+                                </Badge>
+                              )}
                             </div>
                             <p className="text-white font-medium mb-3">{q.prompt || 'Untitled question'}</p>
                             
