@@ -33,6 +33,7 @@ import {
   Shield,
   Database
 } from 'lucide-react';
+import toast, { Toaster } from 'react-hot-toast';
 
 export default function AdminPanel() {
   const queryClient = useQueryClient();
@@ -201,6 +202,7 @@ export default function AdminPanel() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50 p-6">
+      <Toaster position="top-right" />
       <div className="max-w-7xl mx-auto">
         <motion.div
           className="flex items-center gap-4 mb-8"
@@ -552,6 +554,26 @@ export default function AdminPanel() {
               <h2 className="text-xl font-bold text-slate-900 mb-1">Global Question Library</h2>
               <p className="text-sm text-slate-500">Seed shared questions for all teachers by year group, subject, and topic</p>
             </div>
+
+            {/* DEBUG PANEL */}
+            {dbDebug && (
+              <div className="mb-6 p-4 bg-blue-50 border-2 border-blue-300 rounded-lg space-y-2 text-sm">
+                <p className="font-bold text-blue-900 text-base">🔍 DB DEBUG PANEL (AdminPanel Global Library)</p>
+                <p className="text-gray-800">📊 TOTAL QuizQuestion records in DB: <span className="font-bold text-lg">{dbDebug.total}</span></p>
+                <p className="text-gray-800">🌍 GLOBAL QuizQuestion records: <span className="font-bold text-lg text-green-600">{dbDebug.global}</span> (where visibility === "global")</p>
+                {dbDebug.sampleIds.length > 0 && (
+                  <p className="text-gray-800">🆔 Sample GLOBAL IDs: <span className="font-mono text-xs">[{dbDebug.sampleIds.join(', ')}]</span></p>
+                )}
+                {dbDebug.sampleQuestions.length > 0 && (
+                  <div className="mt-2 space-y-1 bg-white p-2 rounded border border-blue-200">
+                    <p className="text-gray-700 font-semibold">Sample Global Questions:</p>
+                    {dbDebug.sampleQuestions.map((q, idx) => (
+                      <p key={idx} className="text-gray-600 text-xs pl-2">• {q.prompt} (vis: {q.visibility})</p>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
 
             {seedResult && (
               <div className={`mb-4 p-4 rounded-lg ${seedResult.success ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
