@@ -27,6 +27,8 @@ export default function GlobalQuestionBankDialog({ open, onClose, onAddQuestions
   const [selectedType, setSelectedType] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedQuestions, setSelectedQuestions] = useState([]);
+  const [testResult, setTestResult] = useState(null);
+  const [creating, setCreating] = useState(false);
 
   const { data: subjects = [] } = useQuery({
     queryKey: ['subjects'],
@@ -80,7 +82,12 @@ export default function GlobalQuestionBankDialog({ open, onClose, onAddQuestions
     return str ? Number(str) : null;
   };
 
-  // Step-by-step filtering for debug visibility
+  // TEMPORARILY SHOW ALL QUESTIONS (no filters) for testing
+  const filteredQuestions = globalQuestions.filter(q => 
+    !searchQuery || q.question_text.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  // Step-by-step filtering for debug visibility (kept for debug panel)
   const afterSubjectFilter = globalQuestions;
   const afterYearFilter = afterSubjectFilter.filter(q => {
     if (selectedYearGroup === 'all') return true;
@@ -93,9 +100,6 @@ export default function GlobalQuestionBankDialog({ open, onClose, onAddQuestions
   );
   const afterTypeFilter = afterDifficultyFilter.filter(q => 
     selectedType === 'all' || q.question_type === selectedType
-  );
-  const filteredQuestions = afterTypeFilter.filter(q => 
-    !searchQuery || q.question_text.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const handleClose = () => {
@@ -128,6 +132,55 @@ export default function GlobalQuestionBankDialog({ open, onClose, onAddQuestions
 
   const handleAddToQuiz = () => {
     addQuestionsMutation.mutate(selectedQuestions);
+  };
+
+  const handleCreateTestQuestions = async () => {
+    setCreating(true);
+    setTestResult(null);
+    const created = [];
+    const errors = [];
+
+    try {
+      for (let i = 0; i < 3; i++) {
+        try {
+          const record = await base44.entities.GlobalQuestion.create({
+            subject_name: "Maths",
+            topic_name: "Fractions",
+            year_group: 7,
+            difficulty: "easy",
+            question_type: "mcq",
+            question_text: `TEST ${i + 1}: 1/2 + 1/4 = ?`,
+            choices: ["1/4", "1/2", "3/4", "1"],
+            correct_answer: "3/4"
+          });
+          created.push({ id: record.id, question_text: record.question_text });
+        } catch (err) {
+          errors.push(`Record ${i + 1}: ${err.message || err.toString()}`);
+        }
+      }
+
+      // Immediate read-back
+      const verify = await base44.entities.GlobalQuestion.list('-created_date', 50);
+
+      setTestResult({
+        success: true,
+        createdIds: created.map(c => c.id),
+        createdTexts: created.map(c => c.question_text),
+        errors: errors,
+        verifyTotal: verify.length,
+        verifyFirst3: verify.slice(0, 3).map(q => q.question_text)
+      });
+
+      // Refresh the list
+      queryClient.invalidateQueries(['globalQuestions']);
+    } catch (err) {
+      setTestResult({
+        success: false,
+        error: err.message || err.toString()
+      });
+    } finally {
+      setCreating(false);
+    }
   };
 
   return (
@@ -278,13 +331,53 @@ export default function GlobalQuestionBankDialog({ open, onClose, onAddQuestions
             <div>
               {/* DEBUG PANEL */}
               <div className="mb-6 p-4 bg-blue-900/30 border border-blue-500/50 rounded-lg space-y-2 text-xs font-mono">
-                <p className="font-bold text-blue-300 text-sm">🔍 DEBUG PANEL</p>
+                <div className="flex items-center justify-between mb-3">
+                  <p className="font-bold text-blue-300 text-sm">🔍 DEBUG PANEL</p>
+                  <Button
+                    onClick={handleCreateTestQuestions}
+                    disabled={creating}
+                    size="sm"
+                    className="bg-green-600 hover:bg-green-700 text-white text-xs"
+                  >
+                    {creating ? 'Creating...' : 'CREATE 3 TEST GLOBAL QUESTIONS'}
+                  </Button>
+                </div>
+
+                {testResult && (
+                  <div className={`p-3 rounded ${testResult.success ? 'bg-green-900/30 border border-green-500/50' : 'bg-red-900/30 border border-red-500/50'} mb-3`}>
+                    {testResult.success ? (
+                      <div className="space-y-1 text-white">
+                        <p className="font-bold text-green-300">✅ Test Successful</p>
+                        <p>Created IDs: <strong className="text-green-200">{testResult.createdIds.join(', ')}</strong></p>
+                        <p>Created questions: {testResult.createdTexts.join(' | ')}</p>
+                        {testResult.errors.length > 0 && (
+                          <div className="mt-2 text-yellow-300">
+                            <p className="font-bold">⚠️ Errors during creation:</p>
+                            {testResult.errors.map((err, i) => <p key={i} className="text-xs">• {err}</p>)}
+                          </div>
+                        )}
+                        <p className="mt-2">Verify total now: <strong className="text-green-200">{testResult.verifyTotal}</strong></p>
+                        <p>First 3 question_texts:</p>
+                        {testResult.verifyFirst3.map((txt, i) => (
+                          <p key={i} className="text-xs ml-2">• {txt}</p>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-white">
+                        <p className="font-bold text-red-300">❌ Test Failed</p>
+                        <p className="mt-1 text-red-200">{testResult.error}</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <p className="text-yellow-300 text-xs mb-2">⚠️ FILTERS DISABLED - SHOWING ALL RECORDS</p>
                 <p className="text-white">Total GlobalQuestion records fetched: <strong>{globalQuestions.length}</strong></p>
                 <p className="text-white">After subject filter: <strong>{afterSubjectFilter.length}</strong></p>
                 <p className="text-white">After year filter (Year {selectedYearGroup}): <strong>{afterYearFilter.length}</strong></p>
                 <p className="text-white">After difficulty filter ({selectedDifficulty}): <strong>{afterDifficultyFilter.length}</strong></p>
                 <p className="text-white">After type filter ({selectedType}): <strong>{afterTypeFilter.length}</strong></p>
-                <p className="text-white">After search: <strong>{filteredQuestions.length}</strong></p>
+                <p className="text-white">Currently displaying: <strong>{filteredQuestions.length}</strong></p>
                 {globalQuestions.slice(0, 3).length > 0 && (
                   <details className="mt-2">
                     <summary className="cursor-pointer text-blue-300 hover:text-blue-200">Show first 3 records</summary>
