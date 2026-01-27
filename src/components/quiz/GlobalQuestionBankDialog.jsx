@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -13,16 +13,18 @@ import {
   Check,
   X,
   ArrowLeft,
-  Database
+  Database,
+  FolderOpen
 } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
+import { toast } from 'sonner';
 
 export default function GlobalQuestionBankDialog({ open, onClose, onAddQuestions, quizSetId }) {
   const queryClient = useQueryClient();
-  const [screen, setScreen] = useState('subjects'); // 'subjects' | 'filters' | 'questions'
-  const [selectedSubject, setSelectedSubject] = useState(null);
-  const [selectedYearGroup, setSelectedYearGroup] = useState('7');
+  const [screen, setScreen] = useState('filters'); // 'filters' | 'topics' | 'topic-questions'
+  const [activeTopic, setActiveTopic] = useState(null);
+  const [selectedYearGroup, setSelectedYearGroup] = useState('all');
   const [selectedDifficulty, setSelectedDifficulty] = useState('all');
   const [selectedType, setSelectedType] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -30,48 +32,67 @@ export default function GlobalQuestionBankDialog({ open, onClose, onAddQuestions
   const [testResult, setTestResult] = useState(null);
   const [creating, setCreating] = useState(false);
 
-  const { data: subjects = [] } = useQuery({
-    queryKey: ['subjects'],
-    queryFn: () => base44.entities.Subject.list(),
-    enabled: open
-  });
-
-  const { data: globalQuestions = [] } = useQuery({
+  const { data: globalQuestions = [], isLoading } = useQuery({
     queryKey: ['globalQuestions'],
     queryFn: () => base44.entities.GlobalQuestion.list('-created_date', 5000),
-    enabled: open && screen === 'questions'
+    enabled: open
   });
 
   const addQuestionsMutation = useMutation({
     mutationFn: async (questions) => {
+      if (!quizSetId) {
+        throw new Error('Quiz set ID is required');
+      }
+
+      // Get current max order
+      const existingQuestions = await base44.entities.QuizQuestion.filter({ quiz_set_id: quizSetId });
+      let maxOrder = existingQuestions.length > 0 
+        ? Math.max(...existingQuestions.map(q => q.order || 0))
+        : -1;
+
       // Copy each global question to QuizQuestion entity
       // This creates a COPY that can be edited independently
       // The source_global_id tracks the origin but changes won't affect GlobalQuestion
-      const order = await base44.entities.QuizQuestion.filter({ quiz_set_id: quizSetId }).then(qs => qs.length);
+      const createdQuestions = [];
       
-      for (let i = 0; i < questions.length; i++) {
-        const gq = questions[i];
-        await base44.entities.QuizQuestion.create({
-          quiz_set_id: quizSetId,
-          order: order + i,
-          prompt: gq.question_text,
-          question_type: gq.question_type === 'mcq' ? 'multiple_choice' : 'short_answer',
-          options: gq.choices || [],
-          correct_index: gq.choices ? gq.choices.indexOf(gq.correct_answer) : undefined,
-          correct_answer: gq.correct_answer,
-          explanation: gq.explanation,
-          difficulty: gq.difficulty,
-          year_group: gq.year_group,
-          source_global_id: gq.id,
-          is_reusable: false,
-          visibility: 'private'
-        });
+      for (const gq of questions) {
+        maxOrder++;
+        try {
+          const created = await base44.entities.QuizQuestion.create({
+            quiz_set_id: quizSetId,
+            order: maxOrder,
+            prompt: gq.question_text,
+            question_type: gq.question_type === 'mcq' ? 'multiple_choice' : 'short_answer',
+            options: gq.choices || [],
+            correct_index: gq.choices ? gq.choices.indexOf(gq.correct_answer) : undefined,
+            correct_answer: gq.correct_answer,
+            explanation: gq.explanation || '',
+            difficulty: gq.difficulty,
+            year_group: gq.year_group,
+            subject_id: gq.subject_id,
+            topic_id: gq.topic_id,
+            source_global_id: gq.id,
+            is_reusable: false,
+            visibility: 'private'
+          });
+          createdQuestions.push(created);
+        } catch (err) {
+          console.error('Failed to create QuizQuestion:', err);
+          throw new Error(`Failed to add question: ${err.message || err}`);
+        }
       }
+
+      return { count: createdQuestions.length };
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      toast.success(`${data.count} questions added to quiz`);
       queryClient.invalidateQueries(['quizQuestions']);
-      onAddQuestions?.(selectedQuestions.length);
+      onAddQuestions?.(data.count);
       handleClose();
+    },
+    onError: (error) => {
+      console.error('Add questions error:', error);
+      toast.error(`Failed to add questions: ${error.message || error}`);
     }
   });
 
@@ -82,30 +103,59 @@ export default function GlobalQuestionBankDialog({ open, onClose, onAddQuestions
     return str ? Number(str) : null;
   };
 
-  // TEMPORARILY SHOW ALL QUESTIONS (no filters) for testing
-  const filteredQuestions = globalQuestions.filter(q => 
-    !searchQuery || q.question_text.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // Apply filters BEFORE grouping by topics
+  const filteredByFilters = useMemo(() => {
+    return globalQuestions.filter(q => {
+      // Year filter
+      if (selectedYearGroup !== 'all') {
+        const recordYear = normalizeYearGroup(q.year_group);
+        const selectedYear = normalizeYearGroup(selectedYearGroup);
+        if (recordYear !== selectedYear) return false;
+      }
+      // Difficulty filter
+      if (selectedDifficulty !== 'all' && q.difficulty !== selectedDifficulty) return false;
+      // Type filter
+      if (selectedType !== 'all' && q.question_type !== selectedType) return false;
+      return true;
+    });
+  }, [globalQuestions, selectedYearGroup, selectedDifficulty, selectedType]);
 
-  // Step-by-step filtering for debug visibility (kept for debug panel)
-  const afterSubjectFilter = globalQuestions;
-  const afterYearFilter = afterSubjectFilter.filter(q => {
-    if (selectedYearGroup === 'all') return true;
-    const recordYear = normalizeYearGroup(q.year_group);
-    const selectedYear = normalizeYearGroup(selectedYearGroup);
-    return recordYear === selectedYear;
-  });
-  const afterDifficultyFilter = afterYearFilter.filter(q => 
-    selectedDifficulty === 'all' || q.difficulty === selectedDifficulty
-  );
-  const afterTypeFilter = afterDifficultyFilter.filter(q => 
-    selectedType === 'all' || q.question_type === selectedType
-  );
+  // Group questions by topic
+  const questionsByTopic = useMemo(() => {
+    const groups = {};
+    
+    filteredByFilters.forEach(q => {
+      const topicName = q.topic_name || 'Uncategorised';
+      if (!groups[topicName]) {
+        groups[topicName] = [];
+      }
+      groups[topicName].push(q);
+    });
+
+    return groups;
+  }, [filteredByFilters]);
+
+  // Get topics sorted by count
+  const topics = useMemo(() => {
+    return Object.entries(questionsByTopic)
+      .map(([name, questions]) => ({ name, count: questions.length }))
+      .sort((a, b) => b.count - a.count);
+  }, [questionsByTopic]);
+
+  // Filter questions within active topic by search query
+  const topicQuestions = useMemo(() => {
+    if (!activeTopic) return [];
+    const questions = questionsByTopic[activeTopic] || [];
+    if (!searchQuery) return questions;
+    return questions.filter(q => 
+      q.question_text.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  }, [activeTopic, questionsByTopic, searchQuery]);
 
   const handleClose = () => {
-    setScreen('subjects');
-    setSelectedSubject(null);
-    setSelectedYearGroup('7');
+    setScreen('filters');
+    setActiveTopic(null);
+    setSelectedYearGroup('all');
     setSelectedDifficulty('all');
     setSelectedType('all');
     setSearchQuery('');
@@ -113,13 +163,22 @@ export default function GlobalQuestionBankDialog({ open, onClose, onAddQuestions
     onClose();
   };
 
-  const handleSelectSubject = (subject) => {
-    setSelectedSubject(subject);
-    setScreen('filters');
+  const handleApplyFilters = () => {
+    setScreen('topics');
   };
 
-  const handleApplyFilters = () => {
-    setScreen('questions');
+  const handleSelectTopic = (topicName) => {
+    setActiveTopic(topicName);
+    setScreen('topic-questions');
+    setSearchQuery('');
+    setSelectedQuestions([]);
+  };
+
+  const handleBackToTopics = () => {
+    setScreen('topics');
+    setActiveTopic(null);
+    setSearchQuery('');
+    setSelectedQuestions([]);
   };
 
   const toggleQuestion = (question) => {
@@ -130,7 +189,19 @@ export default function GlobalQuestionBankDialog({ open, onClose, onAddQuestions
     );
   };
 
+  const handleSelectAll = () => {
+    setSelectedQuestions(topicQuestions);
+  };
+
+  const handleClearSelection = () => {
+    setSelectedQuestions([]);
+  };
+
   const handleAddToQuiz = () => {
+    if (selectedQuestions.length === 0) {
+      toast.error('Please select at least one question');
+      return;
+    }
     addQuestionsMutation.mutate(selectedQuestions);
   };
 
@@ -190,11 +261,12 @@ export default function GlobalQuestionBankDialog({ open, onClose, onAddQuestions
         <DialogHeader className="border-b border-white/10 px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              {screen !== 'subjects' && (
+              {screen !== 'filters' && (
                 <Button
                   variant="ghost"
                   size="icon"
-                  onClick={() => setScreen(screen === 'questions' ? 'filters' : 'subjects')}
+                  onClick={screen === 'topic-questions' ? handleBackToTopics : () => setScreen('filters')}
+                  className="text-slate-400 hover:text-white"
                 >
                   <ArrowLeft className="w-5 h-5" />
                 </Button>
@@ -202,13 +274,13 @@ export default function GlobalQuestionBankDialog({ open, onClose, onAddQuestions
               <div className="flex items-center gap-2">
                 <Database className="w-6 h-6 text-purple-400" />
                 <DialogTitle className="text-xl text-white">
-                  {screen === 'subjects' && 'Global Question Bank'}
-                  {screen === 'filters' && `${selectedSubject?.name} - Filters`}
-                  {screen === 'questions' && `${selectedSubject?.name} - Questions`}
+                  {screen === 'filters' && 'Global Question Bank - Filters'}
+                  {screen === 'topics' && 'Select a Topic'}
+                  {screen === 'topic-questions' && activeTopic}
                 </DialogTitle>
               </div>
             </div>
-            {screen === 'questions' && (
+            {screen === 'topic-questions' && (
               <div className="flex items-center gap-3">
                 <Badge variant="outline" className="text-sm text-purple-300 border-purple-400">
                   {selectedQuestions.length} selected
@@ -230,40 +302,12 @@ export default function GlobalQuestionBankDialog({ open, onClose, onAddQuestions
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-6">
-          {/* Subjects Screen */}
-          {screen === 'subjects' && (
-            <div>
-              <p className="text-slate-400 mb-6">
-                Select a subject to browse global questions. Total questions: <strong className="text-white">{globalQuestions.length}</strong>
-              </p>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {subjects.map(subject => (
-                  <Card
-                    key={subject.id}
-                    className="p-6 bg-white/5 border-white/10 hover:bg-white/10 transition-all cursor-pointer"
-                    onClick={() => handleSelectSubject(subject)}
-                  >
-                    <div className="flex items-center gap-4">
-                      <div className={`w-14 h-14 rounded-xl bg-${subject.color}-500/20 flex items-center justify-center`}>
-                        <BookOpen className={`w-7 h-7 text-${subject.color}-400`} />
-                      </div>
-                      <div>
-                        <h3 className="font-semibold text-lg text-white">{subject.name}</h3>
-                        <p className="text-sm text-slate-400">{subject.description || 'Browse questions'}</p>
-                      </div>
-                    </div>
-                  </Card>
-                ))}
-              </div>
-            </div>
-          )}
-
           {/* Filters Screen */}
           {screen === 'filters' && (
             <div className="max-w-2xl mx-auto">
               <div className="mb-6">
                 <h3 className="text-lg font-semibold text-white mb-2">Filter Questions</h3>
-                <p className="text-sm text-slate-400">Narrow down questions by year, difficulty, and type</p>
+                <p className="text-sm text-slate-400">Filters apply before grouping questions by topic. Total questions: <strong className="text-white">{globalQuestions.length}</strong></p>
               </div>
 
               <div className="space-y-6 bg-white/5 border border-white/10 rounded-xl p-6">
@@ -326,99 +370,87 @@ export default function GlobalQuestionBankDialog({ open, onClose, onAddQuestions
             </div>
           )}
 
-          {/* Questions Screen */}
-          {screen === 'questions' && (
+          {/* Topics Screen */}
+          {screen === 'topics' && (
             <div>
-              {/* DEBUG PANEL */}
-              <div className="mb-6 p-4 bg-blue-900/30 border border-blue-500/50 rounded-lg space-y-2 text-xs font-mono">
-                <div className="flex items-center justify-between mb-3">
-                  <p className="font-bold text-blue-300 text-sm">🔍 DEBUG PANEL</p>
-                  <Button
-                    onClick={handleCreateTestQuestions}
-                    disabled={creating}
-                    size="sm"
-                    className="bg-green-600 hover:bg-green-700 text-white text-xs"
-                  >
-                    {creating ? 'Creating...' : 'CREATE 3 TEST GLOBAL QUESTIONS'}
-                  </Button>
-                </div>
-
-                {testResult && (
-                  <div className={`p-3 rounded ${testResult.success ? 'bg-green-900/30 border border-green-500/50' : 'bg-red-900/30 border border-red-500/50'} mb-3`}>
-                    {testResult.success ? (
-                      <div className="space-y-1 text-white">
-                        <p className="font-bold text-green-300">✅ Test Successful</p>
-                        <p>Created IDs: <strong className="text-green-200">{testResult.createdIds.join(', ')}</strong></p>
-                        <p>Created questions: {testResult.createdTexts.join(' | ')}</p>
-                        {testResult.errors.length > 0 && (
-                          <div className="mt-2 text-yellow-300">
-                            <p className="font-bold">⚠️ Errors during creation:</p>
-                            {testResult.errors.map((err, i) => <p key={i} className="text-xs">• {err}</p>)}
-                          </div>
-                        )}
-                        <p className="mt-2">Verify total now: <strong className="text-green-200">{testResult.verifyTotal}</strong></p>
-                        <p>First 3 question_texts:</p>
-                        {testResult.verifyFirst3.map((txt, i) => (
-                          <p key={i} className="text-xs ml-2">• {txt}</p>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="text-white">
-                        <p className="font-bold text-red-300">❌ Test Failed</p>
-                        <p className="mt-1 text-red-200">{testResult.error}</p>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                <p className="text-yellow-300 text-xs mb-2">⚠️ FILTERS DISABLED - SHOWING ALL RECORDS</p>
-                <p className="text-white">Total GlobalQuestion records fetched: <strong>{globalQuestions.length}</strong></p>
-                <p className="text-white">After subject filter: <strong>{afterSubjectFilter.length}</strong></p>
-                <p className="text-white">After year filter (Year {selectedYearGroup}): <strong>{afterYearFilter.length}</strong></p>
-                <p className="text-white">After difficulty filter ({selectedDifficulty}): <strong>{afterDifficultyFilter.length}</strong></p>
-                <p className="text-white">After type filter ({selectedType}): <strong>{afterTypeFilter.length}</strong></p>
-                <p className="text-white">Currently displaying: <strong>{filteredQuestions.length}</strong></p>
-                {globalQuestions.slice(0, 3).length > 0 && (
-                  <details className="mt-2">
-                    <summary className="cursor-pointer text-blue-300 hover:text-blue-200">Show first 3 records</summary>
-                    <pre className="mt-2 text-xs bg-slate-900/50 p-2 rounded overflow-x-auto">
-                      {JSON.stringify(
-                        globalQuestions.slice(0, 3).map(q => ({
-                          id: q.id,
-                          year_group: q.year_group,
-                          difficulty: q.difficulty,
-                          question_type: q.question_type,
-                          subject_id: q.subject_id,
-                          topic_id: q.topic_id
-                        })),
-                        null,
-                        2
-                      )}
-                    </pre>
-                  </details>
-                )}
+              <div className="mb-6">
+                <p className="text-slate-400">
+                  {filteredByFilters.length} questions found after filters. Click a topic to browse questions.
+                </p>
               </div>
 
+              {topics.length === 0 ? (
+                <div className="text-center py-12">
+                  <FolderOpen className="w-16 h-16 text-slate-600 mx-auto mb-4" />
+                  <p className="text-slate-400">No topics found with the selected filters</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {topics.map(topic => (
+                    <Card
+                      key={topic.name}
+                      className="p-6 bg-white/5 border-white/10 hover:bg-white/10 transition-all cursor-pointer"
+                      onClick={() => handleSelectTopic(topic.name)}
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className="w-14 h-14 rounded-xl bg-purple-500/20 flex items-center justify-center">
+                          <FolderOpen className="w-7 h-7 text-purple-400" />
+                        </div>
+                        <div>
+                          <h3 className="font-semibold text-lg text-white">{topic.name}</h3>
+                          <p className="text-sm text-slate-400">{topic.count} question{topic.count !== 1 ? 's' : ''}</p>
+                        </div>
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Topic Questions Screen */}
+          {screen === 'topic-questions' && (
+            <div>
+              {/* Search and Actions */}
               <div className="mb-6">
-                <div className="relative">
+                <div className="relative mb-4">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
                   <Input
-                    placeholder="Search questions..."
+                    placeholder="Search questions in this topic..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="pl-10 bg-white/5 border-white/10 text-white"
                   />
                 </div>
-                <div className="flex gap-2 mt-4">
-                  <Badge variant="outline" className="text-slate-300 border-slate-600">Year {selectedYearGroup}</Badge>
-                  {selectedDifficulty !== 'all' && <Badge variant="outline" className="text-slate-300 border-slate-600">{selectedDifficulty}</Badge>}
-                  {selectedType !== 'all' && <Badge variant="outline" className="text-slate-300 border-slate-600">{selectedType}</Badge>}
-                  <Badge className="ml-auto bg-purple-500/20 text-purple-300">{filteredQuestions.length} questions found</Badge>
+                <div className="flex items-center justify-between">
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleSelectAll}
+                      className="bg-white/5 border-white/10 text-slate-300 hover:bg-white/10"
+                    >
+                      Select All ({topicQuestions.length})
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleClearSelection}
+                      disabled={selectedQuestions.length === 0}
+                      className="bg-white/5 border-white/10 text-slate-300 hover:bg-white/10"
+                    >
+                      Clear
+                    </Button>
+                  </div>
+                  <Badge className="bg-purple-500/20 text-purple-300">
+                    {topicQuestions.length} questions
+                  </Badge>
                 </div>
               </div>
 
+              {/* Questions List */}
               <div className="space-y-3">
-                {filteredQuestions.map((question, idx) => {
+                {topicQuestions.map((question, idx) => {
                   const isSelected = selectedQuestions.find(q => q.id === question.id);
                   return (
                     <Card
@@ -461,11 +493,11 @@ export default function GlobalQuestionBankDialog({ open, onClose, onAddQuestions
                             }`}>
                               {question.difficulty}
                             </Badge>
-                            <Badge variant="outline" className="text-xs">
+                            <Badge variant="outline" className="text-xs text-slate-300">
                               {question.question_type === 'mcq' ? 'Multiple Choice' :
                                question.question_type === 'numeric' ? 'Numeric' : 'Short Answer'}
                             </Badge>
-                            <Badge variant="outline" className="text-xs">Year {question.year_group}</Badge>
+                            <Badge variant="outline" className="text-xs text-slate-300">Year {question.year_group}</Badge>
                           </div>
                         </div>
                       </div>
@@ -473,10 +505,12 @@ export default function GlobalQuestionBankDialog({ open, onClose, onAddQuestions
                   );
                 })}
 
-                {filteredQuestions.length === 0 && (
+                {topicQuestions.length === 0 && (
                   <div className="text-center py-12">
                     <Database className="w-16 h-16 text-slate-600 mx-auto mb-4" />
-                    <p className="text-slate-400">No questions found with the selected filters</p>
+                    <p className="text-slate-400">
+                      {searchQuery ? 'No questions match your search' : 'No questions in this topic'}
+                    </p>
                   </div>
                 )}
               </div>
