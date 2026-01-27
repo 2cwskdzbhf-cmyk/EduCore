@@ -11,12 +11,23 @@ Deno.serve(async (req) => {
 
     const { pack } = await req.json();
 
+    // Fetch subjects and topics to get IDs
+    const subjects = await base44.asServiceRole.entities.Subject.list();
+    const topics = await base44.asServiceRole.entities.Topic.list();
+
+    const mathsSubject = subjects.find(s => s.name === 'Maths' || s.name === 'Mathematics');
+    const scienceSubject = subjects.find(s => s.name === 'Science');
+    
+    const fractionsTopic = topics.find(t => t.name.toLowerCase().includes('fraction'));
+    const algebraTopic = topics.find(t => t.name.toLowerCase().includes('algebra'));
+    const biologyTopic = topics.find(t => t.name.toLowerCase().includes('biolog'));
+
     const seedPacks = {
       'y7-maths-fractions': [
         {
           seed_key: 'y7-maths-fractions-easy-01',
-          subject_id: null,
-          topic_id: null,
+          subject_id: mathsSubject?.id,
+          topic_id: fractionsTopic?.id,
           year_group: 7,
           difficulty: 'easy',
           question_type: 'mcq',
@@ -27,8 +38,8 @@ Deno.serve(async (req) => {
         },
         {
           seed_key: 'y7-maths-fractions-easy-02',
-          subject_id: null,
-          topic_id: null,
+          subject_id: mathsSubject?.id,
+          topic_id: fractionsTopic?.id,
           year_group: 7,
           difficulty: 'easy',
           question_type: 'mcq',
@@ -39,8 +50,8 @@ Deno.serve(async (req) => {
         },
         {
           seed_key: 'y7-maths-fractions-medium-01',
-          subject_id: null,
-          topic_id: null,
+          subject_id: mathsSubject?.id,
+          topic_id: fractionsTopic?.id,
           year_group: 7,
           difficulty: 'medium',
           question_type: 'mcq',
@@ -51,8 +62,8 @@ Deno.serve(async (req) => {
         },
         {
           seed_key: 'y7-maths-fractions-medium-02',
-          subject_id: null,
-          topic_id: null,
+          subject_id: mathsSubject?.id,
+          topic_id: fractionsTopic?.id,
           year_group: 7,
           difficulty: 'medium',
           question_type: 'mcq',
@@ -63,8 +74,8 @@ Deno.serve(async (req) => {
         },
         {
           seed_key: 'y7-maths-fractions-hard-01',
-          subject_id: null,
-          topic_id: null,
+          subject_id: mathsSubject?.id,
+          topic_id: fractionsTopic?.id,
           year_group: 7,
           difficulty: 'hard',
           question_type: 'mcq',
@@ -77,8 +88,8 @@ Deno.serve(async (req) => {
       'y8-maths-algebra': [
         {
           seed_key: 'y8-maths-algebra-easy-01',
-          subject_id: null,
-          topic_id: null,
+          subject_id: mathsSubject?.id,
+          topic_id: algebraTopic?.id,
           year_group: 8,
           difficulty: 'easy',
           question_type: 'mcq',
@@ -89,8 +100,8 @@ Deno.serve(async (req) => {
         },
         {
           seed_key: 'y8-maths-algebra-easy-02',
-          subject_id: null,
-          topic_id: null,
+          subject_id: mathsSubject?.id,
+          topic_id: algebraTopic?.id,
           year_group: 8,
           difficulty: 'easy',
           question_type: 'mcq',
@@ -101,8 +112,8 @@ Deno.serve(async (req) => {
         },
         {
           seed_key: 'y8-maths-algebra-medium-01',
-          subject_id: null,
-          topic_id: null,
+          subject_id: mathsSubject?.id,
+          topic_id: algebraTopic?.id,
           year_group: 8,
           difficulty: 'medium',
           question_type: 'mcq',
@@ -113,8 +124,8 @@ Deno.serve(async (req) => {
         },
         {
           seed_key: 'y8-maths-algebra-medium-02',
-          subject_id: null,
-          topic_id: null,
+          subject_id: mathsSubject?.id,
+          topic_id: algebraTopic?.id,
           year_group: 8,
           difficulty: 'medium',
           question_type: 'mcq',
@@ -125,8 +136,8 @@ Deno.serve(async (req) => {
         },
         {
           seed_key: 'y8-maths-algebra-hard-01',
-          subject_id: null,
-          topic_id: null,
+          subject_id: mathsSubject?.id,
+          topic_id: algebraTopic?.id,
           year_group: 8,
           difficulty: 'hard',
           question_type: 'mcq',
@@ -139,8 +150,8 @@ Deno.serve(async (req) => {
       'y7-science-biology': [
         {
           seed_key: 'y7-science-biology-easy-01',
-          subject_id: null,
-          topic_id: null,
+          subject_id: scienceSubject?.id,
+          topic_id: biologyTopic?.id,
           year_group: 7,
           difficulty: 'easy',
           question_type: 'mcq',
@@ -151,8 +162,8 @@ Deno.serve(async (req) => {
         },
         {
           seed_key: 'y7-science-biology-easy-02',
-          subject_id: null,
-          topic_id: null,
+          subject_id: scienceSubject?.id,
+          topic_id: biologyTopic?.id,
           year_group: 7,
           difficulty: 'easy',
           question_type: 'mcq',
@@ -163,8 +174,8 @@ Deno.serve(async (req) => {
         },
         {
           seed_key: 'y7-science-biology-medium-01',
-          subject_id: null,
-          topic_id: null,
+          subject_id: scienceSubject?.id,
+          topic_id: biologyTopic?.id,
           year_group: 7,
           difficulty: 'medium',
           question_type: 'mcq',
@@ -175,8 +186,8 @@ Deno.serve(async (req) => {
         },
         {
           seed_key: 'y7-science-biology-medium-02',
-          subject_id: null,
-          topic_id: null,
+          subject_id: scienceSubject?.id,
+          topic_id: biologyTopic?.id,
           year_group: 7,
           difficulty: 'medium',
           question_type: 'mcq',
@@ -187,8 +198,8 @@ Deno.serve(async (req) => {
         },
         {
           seed_key: 'y7-science-biology-hard-01',
-          subject_id: null,
-          topic_id: null,
+          subject_id: scienceSubject?.id,
+          topic_id: biologyTopic?.id,
           year_group: 7,
           difficulty: 'hard',
           question_type: 'mcq',

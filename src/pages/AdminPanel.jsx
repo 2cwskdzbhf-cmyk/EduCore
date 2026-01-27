@@ -638,7 +638,7 @@ export default function AdminPanel() {
                         <span className="text-xs px-2 py-1 rounded-full bg-blue-100 text-blue-700">5 questions</span>
                       </div>
                       <p className="text-sm text-slate-600 mb-3">
-                        Basic fractions, simplification, addition, subtraction, multiplication. (2 easy, 2 medium, 1 hard)
+                        Basic fractions, simplification, addition, subtraction, multiplication. (5 questions: 2 easy, 2 medium, 1 hard)
                       </p>
                       <Button
                         onClick={() => handleSeedGlobalQuestions('y7-maths-fractions')}
@@ -647,7 +647,7 @@ export default function AdminPanel() {
                         className="bg-blue-600 hover:bg-blue-700"
                       >
                         {seeding ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" /> : <Database className="w-4 h-4 mr-2" />}
-                        Seed Pack
+                        Seed Y7 Fractions
                       </Button>
                     </div>
                   </div>

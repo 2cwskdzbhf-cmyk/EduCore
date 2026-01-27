@@ -111,9 +111,9 @@ export default function GlobalQuestionBankDialog({ open, onClose, onAddQuestions
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-[95vw] max-h-[95vh] h-[95vh] p-0 gap-0">
+      <DialogContent className="max-w-[95vw] max-h-[95vh] h-[95vh] p-0 gap-0 bg-gradient-to-br from-slate-900 via-purple-900/20 to-slate-900 border-white/10">
         {/* Header */}
-        <DialogHeader className="border-b border-slate-200 px-6 py-4">
+        <DialogHeader className="border-b border-white/10 px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               {screen !== 'subjects' && (
@@ -126,8 +126,8 @@ export default function GlobalQuestionBankDialog({ open, onClose, onAddQuestions
                 </Button>
               )}
               <div className="flex items-center gap-2">
-                <Database className="w-6 h-6 text-blue-600" />
-                <DialogTitle className="text-xl">
+                <Database className="w-6 h-6 text-purple-400" />
+                <DialogTitle className="text-xl text-white">
                   {screen === 'subjects' && 'Global Question Bank'}
                   {screen === 'filters' && `${selectedSubject?.name} - Filters`}
                   {screen === 'questions' && `${selectedSubject?.name} - Questions`}
@@ -136,19 +136,19 @@ export default function GlobalQuestionBankDialog({ open, onClose, onAddQuestions
             </div>
             {screen === 'questions' && (
               <div className="flex items-center gap-3">
-                <Badge variant="outline" className="text-sm">
+                <Badge variant="outline" className="text-sm text-purple-300 border-purple-400">
                   {selectedQuestions.length} selected
                 </Badge>
                 <Button
                   onClick={handleAddToQuiz}
                   disabled={selectedQuestions.length === 0 || addQuestionsMutation.isPending}
-                  className="bg-blue-600 hover:bg-blue-700"
+                  className="bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600"
                 >
                   {addQuestionsMutation.isPending ? 'Adding...' : `Add ${selectedQuestions.length} to Quiz`}
                 </Button>
               </div>
             )}
-            <Button variant="ghost" size="icon" onClick={handleClose}>
+            <Button variant="ghost" size="icon" onClick={handleClose} className="text-slate-400 hover:text-white">
               <X className="w-5 h-5" />
             </Button>
           </div>
@@ -159,23 +159,23 @@ export default function GlobalQuestionBankDialog({ open, onClose, onAddQuestions
           {/* Subjects Screen */}
           {screen === 'subjects' && (
             <div>
-              <p className="text-slate-600 mb-6">
-                Select a subject to browse global questions. Total questions: <strong>{globalQuestions.length}</strong>
+              <p className="text-slate-400 mb-6">
+                Select a subject to browse global questions. Total questions: <strong className="text-white">{globalQuestions.length}</strong>
               </p>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {subjects.map(subject => (
                   <Card
                     key={subject.id}
-                    className="p-6 hover:shadow-lg transition-all cursor-pointer"
+                    className="p-6 bg-white/5 border-white/10 hover:bg-white/10 transition-all cursor-pointer"
                     onClick={() => handleSelectSubject(subject)}
                   >
                     <div className="flex items-center gap-4">
-                      <div className={`w-14 h-14 rounded-xl bg-${subject.color}-100 flex items-center justify-center`}>
-                        <BookOpen className={`w-7 h-7 text-${subject.color}-600`} />
+                      <div className={`w-14 h-14 rounded-xl bg-${subject.color}-500/20 flex items-center justify-center`}>
+                        <BookOpen className={`w-7 h-7 text-${subject.color}-400`} />
                       </div>
                       <div>
-                        <h3 className="font-semibold text-lg text-slate-900">{subject.name}</h3>
-                        <p className="text-sm text-slate-500">{subject.description || 'Browse questions'}</p>
+                        <h3 className="font-semibold text-lg text-white">{subject.name}</h3>
+                        <p className="text-sm text-slate-400">{subject.description || 'Browse questions'}</p>
                       </div>
                     </div>
                   </Card>
@@ -188,15 +188,15 @@ export default function GlobalQuestionBankDialog({ open, onClose, onAddQuestions
           {screen === 'filters' && (
             <div className="max-w-2xl mx-auto">
               <div className="mb-6">
-                <h3 className="text-lg font-semibold text-slate-900 mb-2">Filter Questions</h3>
-                <p className="text-sm text-slate-600">Narrow down questions by year, difficulty, and type</p>
+                <h3 className="text-lg font-semibold text-white mb-2">Filter Questions</h3>
+                <p className="text-sm text-slate-400">Narrow down questions by year, difficulty, and type</p>
               </div>
 
-              <div className="space-y-6 bg-slate-50 rounded-xl p-6">
+              <div className="space-y-6 bg-white/5 border border-white/10 rounded-xl p-6">
                 <div>
-                  <Label className="mb-2">Year Group</Label>
+                  <Label className="mb-2 text-slate-300">Year Group</Label>
                   <Select value={selectedYearGroup} onValueChange={setSelectedYearGroup}>
-                    <SelectTrigger>
+                    <SelectTrigger className="bg-white/5 border-white/10 text-white">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -211,9 +211,9 @@ export default function GlobalQuestionBankDialog({ open, onClose, onAddQuestions
                 </div>
 
                 <div>
-                  <Label className="mb-2">Difficulty</Label>
+                  <Label className="mb-2 text-slate-300">Difficulty</Label>
                   <Select value={selectedDifficulty} onValueChange={setSelectedDifficulty}>
-                    <SelectTrigger>
+                    <SelectTrigger className="bg-white/5 border-white/10 text-white">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -226,9 +226,9 @@ export default function GlobalQuestionBankDialog({ open, onClose, onAddQuestions
                 </div>
 
                 <div>
-                  <Label className="mb-2">Question Type</Label>
+                  <Label className="mb-2 text-slate-300">Question Type</Label>
                   <Select value={selectedType} onValueChange={setSelectedType}>
-                    <SelectTrigger>
+                    <SelectTrigger className="bg-white/5 border-white/10 text-white">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -242,7 +242,7 @@ export default function GlobalQuestionBankDialog({ open, onClose, onAddQuestions
 
                 <Button
                   onClick={handleApplyFilters}
-                  className="w-full bg-blue-600 hover:bg-blue-700"
+                  className="w-full bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600"
                   size="lg"
                 >
                   <Filter className="w-5 h-5 mr-2" />
@@ -262,14 +262,14 @@ export default function GlobalQuestionBankDialog({ open, onClose, onAddQuestions
                     placeholder="Search questions..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-10"
+                    className="pl-10 bg-white/5 border-white/10 text-white"
                   />
                 </div>
                 <div className="flex gap-2 mt-4">
-                  <Badge variant="outline">Year {selectedYearGroup}</Badge>
-                  {selectedDifficulty !== 'all' && <Badge variant="outline">{selectedDifficulty}</Badge>}
-                  {selectedType !== 'all' && <Badge variant="outline">{selectedType}</Badge>}
-                  <Badge className="ml-auto">{filteredQuestions.length} questions found</Badge>
+                  <Badge variant="outline" className="text-slate-300 border-slate-600">Year {selectedYearGroup}</Badge>
+                  {selectedDifficulty !== 'all' && <Badge variant="outline" className="text-slate-300 border-slate-600">{selectedDifficulty}</Badge>}
+                  {selectedType !== 'all' && <Badge variant="outline" className="text-slate-300 border-slate-600">{selectedType}</Badge>}
+                  <Badge className="ml-auto bg-purple-500/20 text-purple-300">{filteredQuestions.length} questions found</Badge>
                 </div>
               </div>
 
@@ -280,29 +280,29 @@ export default function GlobalQuestionBankDialog({ open, onClose, onAddQuestions
                     <Card
                       key={question.id}
                       className={`p-4 cursor-pointer transition-all ${
-                        isSelected ? 'ring-2 ring-blue-500 bg-blue-50' : 'hover:shadow-md'
+                        isSelected ? 'ring-2 ring-purple-500 bg-purple-500/20 border-purple-400' : 'bg-white/5 border-white/10 hover:bg-white/10'
                       }`}
                       onClick={() => toggleQuestion(question)}
                     >
                       <div className="flex items-start gap-4">
                         <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                          isSelected ? 'bg-blue-600' : 'bg-slate-100'
+                          isSelected ? 'bg-gradient-to-r from-purple-500 to-blue-500' : 'bg-white/10'
                         }`}>
                           {isSelected ? (
                             <Check className="w-5 h-5 text-white" />
                           ) : (
-                            <span className="text-sm font-medium text-slate-600">{idx + 1}</span>
+                            <span className="text-sm font-medium text-slate-300">{idx + 1}</span>
                           )}
                         </div>
                         <div className="flex-1">
-                          <p className="text-slate-900 font-medium mb-2">{question.question_text}</p>
+                          <p className="text-white font-medium mb-2">{question.question_text}</p>
                           {question.choices && question.choices.length > 0 && (
                             <div className="space-y-1 mb-3">
                               {question.choices.map((choice, i) => (
                                 <div key={i} className={`text-sm px-3 py-1.5 rounded ${
                                   choice === question.correct_answer
-                                    ? 'bg-green-50 text-green-700 border border-green-200'
-                                    : 'bg-slate-50 text-slate-600'
+                                    ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/50'
+                                    : 'bg-white/5 text-slate-300 border border-white/10'
                                 }`}>
                                   {String.fromCharCode(65 + i)}. {choice}
                                 </div>
@@ -331,8 +331,8 @@ export default function GlobalQuestionBankDialog({ open, onClose, onAddQuestions
 
                 {filteredQuestions.length === 0 && (
                   <div className="text-center py-12">
-                    <Database className="w-16 h-16 text-slate-300 mx-auto mb-4" />
-                    <p className="text-slate-500">No questions found with the selected filters</p>
+                    <Database className="w-16 h-16 text-slate-600 mx-auto mb-4" />
+                    <p className="text-slate-400">No questions found with the selected filters</p>
                   </div>
                 )}
               </div>
