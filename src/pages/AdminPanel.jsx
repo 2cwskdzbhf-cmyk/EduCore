@@ -143,17 +143,15 @@ export default function AdminPanel() {
       console.log('✅ Seed function response:', response.data);
       
       // Verify the seeding worked - fetch from DB
-      const all = await base44.entities.QuizQuestion.list('-created_date', 5000);
-      const globals = all.filter(q => q.visibility === 'global');
+      const all = await base44.entities.GlobalQuestion.list('-created_date', 5000);
       
       const debugInfo = {
         totalCount: all.length,
-        globalCount: globals.length,
-        sampleGlobalIds: globals.slice(0, 3).map(q => q.id),
-        sampleGlobalRecords: globals.slice(0, 3).map(q => ({
+        sampleGlobalIds: all.slice(0, 3).map(q => q.id),
+        sampleGlobalRecords: all.slice(0, 3).map(q => ({
           id: q.id,
-          prompt: q.prompt?.substring(0, 40),
-          visibility: q.visibility,
+          question_text: q.question_text?.substring(0, 40),
+          difficulty: q.difficulty,
           year_group: q.year_group
         }))
       };
@@ -177,8 +175,7 @@ export default function AdminPanel() {
       });
       
       // Invalidate queries to refresh
-      queryClient.invalidateQueries(['questionBankGlobal']);
-      queryClient.invalidateQueries(['questions']);
+      queryClient.invalidateQueries(['globalQuestions']);
       
     } catch (error) {
       console.error('❌ Seeding error:', error);
@@ -558,12 +555,11 @@ export default function AdminPanel() {
               <Card className="bg-blue-50 border-blue-200 p-4 mb-4">
                 <div className="flex items-center gap-2 mb-3">
                   <Database className="w-5 h-5 text-blue-600" />
-                  <h4 className="font-semibold text-blue-900">DB Verification (QuizQuestion entity)</h4>
+                  <h4 className="font-semibold text-blue-900">DB Verification (GlobalQuestion entity)</h4>
                 </div>
                 <div className="space-y-1 text-sm text-slate-700">
-                  <p>📊 TOTAL QuizQuestion records in DB: <strong className="text-slate-900">{dbDebug.totalCount}</strong></p>
-                  <p>🌍 GLOBAL QuizQuestion records: <strong className="text-green-700">{dbDebug.globalCount}</strong></p>
-                  <p>🆔 Sample GLOBAL IDs: <span className="text-purple-700 font-mono text-xs">{dbDebug.sampleGlobalIds.join(', ')}</span></p>
+                  <p>📊 TOTAL GlobalQuestion records in DB: <strong className="text-slate-900">{dbDebug.totalCount}</strong></p>
+                  <p>🆔 Sample IDs: <span className="text-purple-700 font-mono text-xs">{dbDebug.sampleGlobalIds.join(', ')}</span></p>
                   <details className="mt-2">
                     <summary className="cursor-pointer text-blue-700 hover:text-blue-900 font-medium">Show sample records</summary>
                     <pre className="mt-2 text-xs bg-white p-3 rounded border border-blue-200 overflow-x-auto">

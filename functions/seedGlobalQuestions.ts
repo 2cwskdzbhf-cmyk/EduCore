@@ -5,243 +5,235 @@ Deno.serve(async (req) => {
     const base44 = createClientFromRequest(req);
     const user = await base44.auth.me();
 
-    if (!user || user.role !== 'admin') {
-      return Response.json({ error: 'Unauthorized' }, { status: 403 });
+    if (user?.role !== 'admin') {
+      return Response.json({ error: 'Forbidden: Admin access required' }, { status: 403 });
     }
 
     const { pack } = await req.json();
 
-    // Define seed packs
     const seedPacks = {
-      'y7-maths-fractions': {
-        year_group: 7,
-        subject_id: 'maths',
-        topic_id: 'fractions',
-        difficulty: 'easy',
-        count: 5,
-        questions: [
-          {
-            seed_key: 'y7-fractions-easy-01',
-            prompt: 'What is 1/4 + 1/4?',
-            question_type: 'multiple_choice',
-            options: ['1/2', '1/8', '2/4', '1/16'],
-            correct_index: 0,
-            difficulty: 'easy',
-            explanation: '1/4 + 1/4 = 2/4 = 1/2'
-          },
-          {
-            seed_key: 'y7-fractions-easy-02',
-            prompt: 'Simplify 4/8',
-            question_type: 'multiple_choice',
-            options: ['1/2', '2/4', '1/4', '4/8'],
-            correct_index: 0,
-            difficulty: 'easy',
-            explanation: '4/8 = 1/2 when simplified'
-          },
-          {
-            seed_key: 'y7-fractions-medium-01',
-            prompt: 'What is 2/3 + 1/6?',
-            question_type: 'multiple_choice',
-            options: ['5/6', '3/9', '1/2', '2/6'],
-            correct_index: 0,
-            difficulty: 'medium',
-            explanation: '2/3 = 4/6, so 4/6 + 1/6 = 5/6'
-          },
-          {
-            seed_key: 'y7-fractions-medium-02',
-            prompt: 'What is 3/5 - 1/10?',
-            question_type: 'multiple_choice',
-            options: ['1/2', '2/5', '1/5', '3/10'],
-            correct_index: 0,
-            difficulty: 'medium',
-            explanation: '3/5 = 6/10, so 6/10 - 1/10 = 5/10 = 1/2'
-          },
-          {
-            seed_key: 'y7-fractions-hard-01',
-            prompt: 'What is 2/3 × 3/4?',
-            question_type: 'multiple_choice',
-            options: ['1/2', '5/7', '6/12', '2/4'],
-            correct_index: 0,
-            difficulty: 'hard',
-            explanation: '2/3 × 3/4 = 6/12 = 1/2'
-          }
-        ]
-      },
-      'y8-maths-algebra': {
-        year_group: 8,
-        subject_id: 'maths',
-        topic_id: 'algebra',
-        difficulty: 'medium',
-        count: 5,
-        questions: [
-          {
-            seed_key: 'y8-algebra-easy-01',
-            prompt: 'Solve for x: x + 5 = 12',
-            question_type: 'multiple_choice',
-            options: ['7', '17', '5', '12'],
-            correct_index: 0,
-            difficulty: 'easy',
-            explanation: 'x = 12 - 5 = 7'
-          },
-          {
-            seed_key: 'y8-algebra-easy-02',
-            prompt: 'Solve for x: 2x = 10',
-            question_type: 'multiple_choice',
-            options: ['5', '10', '20', '2'],
-            correct_index: 0,
-            difficulty: 'easy',
-            explanation: 'x = 10 ÷ 2 = 5'
-          },
-          {
-            seed_key: 'y8-algebra-medium-01',
-            prompt: 'Solve for x: 3x + 4 = 19',
-            question_type: 'multiple_choice',
-            options: ['5', '15', '7', '23'],
-            correct_index: 0,
-            difficulty: 'medium',
-            explanation: '3x = 19 - 4 = 15, so x = 5'
-          },
-          {
-            seed_key: 'y8-algebra-medium-02',
-            prompt: 'Simplify: 4x + 3x',
-            question_type: 'multiple_choice',
-            options: ['7x', '12x', '7', 'x'],
-            correct_index: 0,
-            difficulty: 'medium',
-            explanation: '4x + 3x = 7x'
-          },
-          {
-            seed_key: 'y8-algebra-hard-01',
-            prompt: 'Solve for x: 2(x + 3) = 14',
-            question_type: 'multiple_choice',
-            options: ['4', '7', '5', '11'],
-            correct_index: 0,
-            difficulty: 'hard',
-            explanation: '2x + 6 = 14, so 2x = 8, x = 4'
-          }
-        ]
-      },
-      'y7-science-biology': {
-        year_group: 7,
-        subject_id: 'science',
-        topic_id: 'biology',
-        difficulty: 'easy',
-        count: 5,
-        questions: [
-          {
-            seed_key: 'y7-biology-easy-01',
-            prompt: 'What is the basic unit of life?',
-            question_type: 'multiple_choice',
-            options: ['Cell', 'Atom', 'Molecule', 'Organ'],
-            correct_index: 0,
-            difficulty: 'easy',
-            explanation: 'The cell is the basic unit of life'
-          },
-          {
-            seed_key: 'y7-biology-easy-02',
-            prompt: 'Which process do plants use to make food?',
-            question_type: 'multiple_choice',
-            options: ['Photosynthesis', 'Respiration', 'Digestion', 'Absorption'],
-            correct_index: 0,
-            difficulty: 'easy',
-            explanation: 'Plants use photosynthesis to convert sunlight into food'
-          },
-          {
-            seed_key: 'y7-biology-medium-01',
-            prompt: 'What are the three types of blood vessels?',
-            question_type: 'multiple_choice',
-            options: ['Arteries, veins, capillaries', 'Nerves, muscles, bones', 'Heart, lungs, liver', 'Red, white, platelets'],
-            correct_index: 0,
-            difficulty: 'medium',
-            explanation: 'The circulatory system has arteries, veins, and capillaries'
-          },
-          {
-            seed_key: 'y7-biology-medium-02',
-            prompt: 'What is the function of red blood cells?',
-            question_type: 'multiple_choice',
-            options: ['Carry oxygen', 'Fight infection', 'Clot blood', 'Digest food'],
-            correct_index: 0,
-            difficulty: 'medium',
-            explanation: 'Red blood cells carry oxygen around the body'
-          },
-          {
-            seed_key: 'y7-biology-hard-01',
-            prompt: 'Which organelle is responsible for energy production in cells?',
-            question_type: 'multiple_choice',
-            options: ['Mitochondria', 'Nucleus', 'Chloroplast', 'Ribosome'],
-            correct_index: 0,
-            difficulty: 'hard',
-            explanation: 'Mitochondria are the powerhouse of the cell'
-          }
-        ]
-      }
+      'y7-maths-fractions': [
+        {
+          seed_key: 'y7-maths-fractions-easy-01',
+          subject_id: null,
+          topic_id: null,
+          year_group: 7,
+          difficulty: 'easy',
+          question_type: 'mcq',
+          question_text: 'What is 1/2 + 1/4?',
+          choices: ['1/6', '3/4', '2/6', '1/3'],
+          correct_answer: '3/4',
+          explanation: '1/2 = 2/4, so 2/4 + 1/4 = 3/4'
+        },
+        {
+          seed_key: 'y7-maths-fractions-easy-02',
+          subject_id: null,
+          topic_id: null,
+          year_group: 7,
+          difficulty: 'easy',
+          question_type: 'mcq',
+          question_text: 'Simplify 4/8',
+          choices: ['1/2', '2/4', '4/8', '8/16'],
+          correct_answer: '1/2',
+          explanation: 'Divide both numerator and denominator by 4'
+        },
+        {
+          seed_key: 'y7-maths-fractions-medium-01',
+          subject_id: null,
+          topic_id: null,
+          year_group: 7,
+          difficulty: 'medium',
+          question_type: 'mcq',
+          question_text: 'What is 2/3 × 3/4?',
+          choices: ['1/2', '5/12', '6/12', '5/7'],
+          correct_answer: '1/2',
+          explanation: '(2×3)/(3×4) = 6/12 = 1/2'
+        },
+        {
+          seed_key: 'y7-maths-fractions-medium-02',
+          subject_id: null,
+          topic_id: null,
+          year_group: 7,
+          difficulty: 'medium',
+          question_type: 'mcq',
+          question_text: 'What is 3/5 - 1/5?',
+          choices: ['2/5', '4/10', '2/10', '3/10'],
+          correct_answer: '2/5',
+          explanation: 'Same denominator, so just subtract numerators: 3 - 1 = 2'
+        },
+        {
+          seed_key: 'y7-maths-fractions-hard-01',
+          subject_id: null,
+          topic_id: null,
+          year_group: 7,
+          difficulty: 'hard',
+          question_type: 'mcq',
+          question_text: 'What is 2/3 ÷ 1/6?',
+          choices: ['2', '3', '4', '5'],
+          correct_answer: '4',
+          explanation: '2/3 ÷ 1/6 = 2/3 × 6/1 = 12/3 = 4'
+        }
+      ],
+      'y8-maths-algebra': [
+        {
+          seed_key: 'y8-maths-algebra-easy-01',
+          subject_id: null,
+          topic_id: null,
+          year_group: 8,
+          difficulty: 'easy',
+          question_type: 'mcq',
+          question_text: 'Solve: x + 5 = 12',
+          choices: ['x = 5', 'x = 7', 'x = 12', 'x = 17'],
+          correct_answer: 'x = 7',
+          explanation: 'Subtract 5 from both sides: x = 12 - 5 = 7'
+        },
+        {
+          seed_key: 'y8-maths-algebra-easy-02',
+          subject_id: null,
+          topic_id: null,
+          year_group: 8,
+          difficulty: 'easy',
+          question_type: 'mcq',
+          question_text: 'Simplify: 3x + 2x',
+          choices: ['5x', '6x', '5x²', '3x²'],
+          correct_answer: '5x',
+          explanation: 'Add the coefficients: 3 + 2 = 5'
+        },
+        {
+          seed_key: 'y8-maths-algebra-medium-01',
+          subject_id: null,
+          topic_id: null,
+          year_group: 8,
+          difficulty: 'medium',
+          question_type: 'mcq',
+          question_text: 'Solve: 2x - 3 = 11',
+          choices: ['x = 4', 'x = 5', 'x = 7', 'x = 8'],
+          correct_answer: 'x = 7',
+          explanation: 'Add 3: 2x = 14, then divide by 2: x = 7'
+        },
+        {
+          seed_key: 'y8-maths-algebra-medium-02',
+          subject_id: null,
+          topic_id: null,
+          year_group: 8,
+          difficulty: 'medium',
+          question_type: 'mcq',
+          question_text: 'Expand: 3(x + 2)',
+          choices: ['3x + 2', '3x + 5', '3x + 6', 'x + 6'],
+          correct_answer: '3x + 6',
+          explanation: 'Multiply both terms: 3×x + 3×2 = 3x + 6'
+        },
+        {
+          seed_key: 'y8-maths-algebra-hard-01',
+          subject_id: null,
+          topic_id: null,
+          year_group: 8,
+          difficulty: 'hard',
+          question_type: 'mcq',
+          question_text: 'Solve: 3(x - 2) = 15',
+          choices: ['x = 5', 'x = 7', 'x = 9', 'x = 11'],
+          correct_answer: 'x = 7',
+          explanation: 'Expand: 3x - 6 = 15, add 6: 3x = 21, divide by 3: x = 7'
+        }
+      ],
+      'y7-science-biology': [
+        {
+          seed_key: 'y7-science-biology-easy-01',
+          subject_id: null,
+          topic_id: null,
+          year_group: 7,
+          difficulty: 'easy',
+          question_type: 'mcq',
+          question_text: 'What is the basic unit of life?',
+          choices: ['Atom', 'Cell', 'Organ', 'Tissue'],
+          correct_answer: 'Cell',
+          explanation: 'Cells are the smallest living units'
+        },
+        {
+          seed_key: 'y7-science-biology-easy-02',
+          subject_id: null,
+          topic_id: null,
+          year_group: 7,
+          difficulty: 'easy',
+          question_type: 'mcq',
+          question_text: 'What process do plants use to make food?',
+          choices: ['Respiration', 'Photosynthesis', 'Digestion', 'Circulation'],
+          correct_answer: 'Photosynthesis',
+          explanation: 'Plants use sunlight, water and CO2 to make glucose'
+        },
+        {
+          seed_key: 'y7-science-biology-medium-01',
+          subject_id: null,
+          topic_id: null,
+          year_group: 7,
+          difficulty: 'medium',
+          question_type: 'mcq',
+          question_text: 'Which blood vessel carries blood away from the heart?',
+          choices: ['Vein', 'Artery', 'Capillary', 'Valve'],
+          correct_answer: 'Artery',
+          explanation: 'Arteries carry oxygenated blood away from the heart'
+        },
+        {
+          seed_key: 'y7-science-biology-medium-02',
+          subject_id: null,
+          topic_id: null,
+          year_group: 7,
+          difficulty: 'medium',
+          question_type: 'mcq',
+          question_text: 'What is the powerhouse of the cell?',
+          choices: ['Nucleus', 'Mitochondria', 'Chloroplast', 'Ribosome'],
+          correct_answer: 'Mitochondria',
+          explanation: 'Mitochondria produce energy (ATP) for the cell'
+        },
+        {
+          seed_key: 'y7-science-biology-hard-01',
+          subject_id: null,
+          topic_id: null,
+          year_group: 7,
+          difficulty: 'hard',
+          question_type: 'mcq',
+          question_text: 'What organelle controls what enters and leaves the cell?',
+          choices: ['Cell wall', 'Cell membrane', 'Cytoplasm', 'Nucleus'],
+          correct_answer: 'Cell membrane',
+          explanation: 'The cell membrane is selectively permeable'
+        }
+      ]
     };
 
-    const packData = seedPacks[pack];
-    if (!packData) {
+    const questions = seedPacks[pack];
+    if (!questions) {
       return Response.json({ error: 'Invalid pack name' }, { status: 400 });
     }
 
-    // Check which questions already exist
-    const existingQuestions = await base44.asServiceRole.entities.QuizQuestion.list('-created_date', 5000);
-    const existingSeedKeys = new Set(existingQuestions.map(q => q.seed_key).filter(Boolean));
+    // Get existing global questions to check duplicates
+    const existing = await base44.asServiceRole.entities.GlobalQuestion.list('-created_date', 5000);
+    const existingSeedKeys = new Set(existing.map(q => q.seed_key));
 
     let created = 0;
     let skipped = 0;
-    const sampleIds = [];
 
-    for (const questionData of packData.questions) {
-      // Skip if already exists
-      if (existingSeedKeys.has(questionData.seed_key)) {
-        console.log(`⏭️  Skipping ${questionData.seed_key} - already exists`);
+    for (const q of questions) {
+      if (existingSeedKeys.has(q.seed_key)) {
         skipped++;
         continue;
       }
 
-      // Create the question in QuizQuestion entity
-      const newQuestion = await base44.asServiceRole.entities.QuizQuestion.create({
-        quiz_set_id: 'global-bank',
-        prompt: questionData.prompt,
-        question_type: questionData.question_type,
-        options: questionData.options,
-        correct_index: questionData.correct_index,
-        difficulty: questionData.difficulty,
-        explanation: questionData.explanation,
-        year_group: packData.year_group,
-        subject_id: packData.subject_id,
-        topic_id: packData.topic_id,
-        seed_key: questionData.seed_key,
-        visibility: 'global',
-        is_reusable: true,
-        owner_email: 'system',
-        order: 0,
-        usage_count: 0,
-        rating_count: 0
-      });
-
-      if (sampleIds.length < 3) {
-        sampleIds.push(newQuestion.id);
-      }
-
+      await base44.asServiceRole.entities.GlobalQuestion.create(q);
       created++;
-      console.log(`✅ Created ${questionData.seed_key}`);
     }
 
-    // Count total global questions
-    const allQuestionsAfter = await base44.asServiceRole.entities.QuizQuestion.list('-created_date', 5000);
-    const totalGlobal = allQuestionsAfter.filter(q => q.visibility === 'global').length;
+    // Verify
+    const allGlobalQuestions = await base44.asServiceRole.entities.GlobalQuestion.list('-created_date', 5000);
 
     return Response.json({
-      success: true,
-      message: `Seeded ${pack} pack successfully`,
+      message: `Successfully seeded ${pack}`,
       created,
       skipped,
-      total_global: totalGlobal,
-      sample_ids: sampleIds
+      total_global: allGlobalQuestions.length,
+      sample_ids: allGlobalQuestions.slice(0, 3).map(q => q.id)
     });
-
   } catch (error) {
-    console.error('❌ Seeding error:', error);
-    return Response.json({ error: error.message, stack: error.stack }, { status: 500 });
+    console.error('Seeding error:', error);
+    return Response.json({ error: error.message }, { status: 500 });
   }
 });
