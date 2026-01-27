@@ -33,7 +33,6 @@ import {
   Shield,
   Database
 } from 'lucide-react';
-import toast, { Toaster } from 'react-hot-toast';
 
 export default function AdminPanel() {
   const queryClient = useQueryClient();
@@ -134,63 +133,62 @@ export default function AdminPanel() {
   const handleSeedGlobalQuestions = async (pack) => {
     setSeeding(true);
     setSeedResult(null);
+    setDbDebug(null);
+    
     try {
-      // Call the seed function and AWAIT it
+      console.log(`🌱 Starting seed for pack: ${pack}`);
+      
+      // Call the seed function
       const response = await base44.functions.invoke('seedGlobalQuestions', { pack });
+      console.log('✅ Seed function response:', response.data);
       
-      // Verify the seeding worked - fetch fresh data
-      const allQuestions = await base44.entities.QuizQuestion.list('-created_date', 5000);
-      const globalQuestions = allQuestions.filter(q => 
-        (q.visibility || q.Visibility) === 'global'
-      );
+      // Verify the seeding worked - fetch from DB
+      const all = await base44.entities.QuizQuestion.list('-created_date', 5000);
+      const globals = all.filter(q => q.visibility === 'global');
       
-      console.log('🔍 Verification after seeding:');
-      console.log(`   Total questions: ${allQuestions.length}`);
-      console.log(`   Global questions: ${globalQuestions.length}`);
-      console.log(`   First 3 global IDs:`, globalQuestions.slice(0, 3).map(q => q.id));
-      
-      // Update debug panel
-      setDbDebug({
-        total: allQuestions.length,
-        global: globalQuestions.length,
-        sampleIds: globalQuestions.slice(0, 3).map(q => q.id),
-        sampleQuestions: globalQuestions.slice(0, 3).map(q => ({
+      const debugInfo = {
+        totalCount: all.length,
+        globalCount: globals.length,
+        sampleGlobalIds: globals.slice(0, 3).map(q => q.id),
+        sampleGlobalRecords: globals.slice(0, 3).map(q => ({
           id: q.id,
           prompt: q.prompt?.substring(0, 40),
-          visibility: q.visibility
+          visibility: q.visibility,
+          year_group: q.year_group
         }))
-      });
+      };
+      
+      console.log('🔍 Verification after seeding:', debugInfo);
+      setDbDebug(debugInfo);
       
       setSeedResult({ 
         success: true, 
-        data: {
-          ...response.data,
-          verified_total: allQuestions.length,
-          verified_global: globalQuestions.length,
-          sample_global_ids: globalQuestions.slice(0, 3).map(q => q.id)
-        }
+        data: response.data
       });
-      
+
       // Show success toast
-      toast.success(`✅ Seeded ${response.data.created}, Skipped ${response.data.skipped}`, {
-        duration: 5000,
+      toast.success(`Seeded ${response.data.created} questions, skipped ${response.data.skipped}`, {
+        duration: 4000,
         style: {
-          background: '#10b981',
+          background: '#1e293b',
           color: '#fff',
+          border: '1px solid #334155'
         }
       });
       
-      // Invalidate queries to trigger refetch
+      // Invalidate queries to refresh
       queryClient.invalidateQueries(['questionBankGlobal']);
       queryClient.invalidateQueries(['questions']);
+      
     } catch (error) {
-      console.error('Seeding error:', error);
+      console.error('❌ Seeding error:', error);
       setSeedResult({ success: false, message: error.message });
-      toast.error(`❌ Seeding failed: ${error.message}`, {
+      toast.error(`Seeding failed: ${error.message}`, {
         duration: 5000,
         style: {
-          background: '#ef4444',
+          background: '#1e293b',
           color: '#fff',
+          border: '1px solid #ef4444'
         }
       });
     } finally {
@@ -202,7 +200,6 @@ export default function AdminPanel() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50 p-6">
-      <Toaster position="top-right" />
       <div className="max-w-7xl mx-auto">
         <motion.div
           className="flex items-center gap-4 mb-8"
@@ -555,48 +552,20 @@ export default function AdminPanel() {
               <p className="text-sm text-slate-500">Seed shared questions for all teachers by year group, subject, and topic</p>
             </div>
 
-            {/* DEBUG PANEL */}
-            {dbDebug && (
-              <div className="mb-6 p-4 bg-blue-50 border-2 border-blue-300 rounded-lg space-y-2 text-sm">
-                <p className="font-bold text-blue-900 text-base">🔍 DB DEBUG PANEL (AdminPanel Global Library)</p>
-                <p className="text-gray-800">📊 TOTAL QuizQuestion records in DB: <span className="font-bold text-lg">{dbDebug.total}</span></p>
-                <p className="text-gray-800">🌍 GLOBAL QuizQuestion records: <span className="font-bold text-lg text-green-600">{dbDebug.global}</span> (where visibility === "global")</p>
-                {dbDebug.sampleIds.length > 0 && (
-                  <p className="text-gray-800">🆔 Sample GLOBAL IDs: <span className="font-mono text-xs">[{dbDebug.sampleIds.join(', ')}]</span></p>
-                )}
-                {dbDebug.sampleQuestions.length > 0 && (
-                  <div className="mt-2 space-y-1 bg-white p-2 rounded border border-blue-200">
-                    <p className="text-gray-700 font-semibold">Sample Global Questions:</p>
-                    {dbDebug.sampleQuestions.map((q, idx) => (
-                      <p key={idx} className="text-gray-600 text-xs pl-2">• {q.prompt} (vis: {q.visibility})</p>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-
             {seedResult && (
               <div className={`mb-4 p-4 rounded-lg ${seedResult.success ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
                 <p className={seedResult.success ? 'text-green-800 font-semibold' : 'text-red-800'}>
-                  {seedResult.success ? seedResult.data.message : seedResult.message}
+                  {seedResult.success ? `✅ ${seedResult.data.message}` : `❌ ${seedResult.message}`}
                 </p>
                 {seedResult.success && (
                   <div className="text-sm text-green-700 mt-3 space-y-1">
                     <p className="font-semibold">📊 Seeding Results:</p>
-                    <p>✅ Created: {seedResult.data.created}</p>
-                    <p>⏭️  Skipped: {seedResult.data.skipped}</p>
-                    <p>🌍 Total global questions: {seedResult.data.total_global}</p>
+                    <p>✅ Created: <strong>{seedResult.data.created}</strong></p>
+                    <p>⏭️  Skipped: <strong>{seedResult.data.skipped}</strong></p>
+                    <p>🌍 Total global questions: <strong>{seedResult.data.total_global}</strong></p>
                     {seedResult.data.sample_ids && seedResult.data.sample_ids.length > 0 && (
                       <p>🆔 Sample IDs: {seedResult.data.sample_ids.join(', ')}</p>
                     )}
-                    <div className="mt-3 pt-3 border-t border-green-300">
-                      <p className="font-semibold">✓ Verification:</p>
-                      <p>📝 Total questions in DB: {seedResult.data.verified_total}</p>
-                      <p>🌍 Global questions found: {seedResult.data.verified_global}</p>
-                      {seedResult.data.sample_global_ids && seedResult.data.sample_global_ids.length > 0 && (
-                        <p>🔍 Sample global IDs: {seedResult.data.sample_global_ids.join(', ')}</p>
-                      )}
-                    </div>
                   </div>
                 )}
               </div>

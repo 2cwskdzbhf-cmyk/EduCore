@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
-import { Search, Plus, Filter, Folder, History, Users, Upload, Star, Sparkles, TrendingUp, Calendar, User, AlertCircle } from 'lucide-react';
+import { Search, Plus, Filter, Folder, History, Users, Upload, Star, Sparkles, TrendingUp, Calendar, User, AlertCircle, Database } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import FolderManager from './FolderManager';
@@ -31,43 +31,42 @@ export default function QuestionBankDialog({ open, onOpenChange, onAddQuestions,
   const [showAISuggestions, setShowAISuggestions] = useState(false);
   const [aiSuggestions, setAiSuggestions] = useState(null);
   const [loadingAI, setLoadingAI] = useState(false);
-  const [dbDebug, setDbDebug] = useState(null);
 
-  const { data: allQuestions = [], isLoading: questionsLoading } = useQuery({
+  const { data: dbStats, isLoading: questionsLoading } = useQuery({
     queryKey: ['questionBankGlobal'],
     queryFn: async () => {
-      console.log('🔍 Fetching GLOBAL questions from entity: QuizQuestion');
+      console.log('🔍 Fetching from entity: QuizQuestion');
       
-      // Fetch ALL questions without any filter
-      const allRecords = await base44.entities.QuizQuestion.list('-created_date', 5000);
-      console.log(`✅ Loaded ${allRecords.length} TOTAL QuizQuestion records from database`);
+      // Fetch ALL questions (no server filter)
+      const all = await base44.entities.QuizQuestion.list('-created_date', 5000);
+      console.log(`✅ Fetched ${all.length} total QuizQuestion records`);
       
-      // Client-side filter for GLOBAL questions only
-      const globalQuestions = allRecords.filter(q => 
-        (q.visibility || q.Visibility) === 'global'
-      );
+      // Client-side filter for global
+      const globals = all.filter(q => (q.visibility || q.Visibility) === 'global');
       
-      console.log(`✅ ${globalQuestions.length} GLOBAL questions found (filtered client-side)`);
-      console.log('🔍 First 3 global IDs:', globalQuestions.slice(0, 3).map(q => q.id));
+      console.log(`✅ Global questions: ${globals.length}`);
+      console.log('🔍 First 3 global IDs:', globals.slice(0, 3).map(q => q.id));
+      console.log('🔍 Sample global records:', globals.slice(0, 3).map(q => ({
+        id: q.id, 
+        prompt: q.prompt?.substring(0, 40),
+        visibility: q.visibility,
+        year_group: q.year_group
+      })));
       
-      // Set debug info
-      setDbDebug({
-        total: allRecords.length,
-        global: globalQuestions.length,
-        sampleIds: globalQuestions.slice(0, 3).map(q => q.id),
-        sampleQuestions: globalQuestions.slice(0, 3).map(q => ({
-          id: q.id,
-          prompt: q.prompt?.substring(0, 40) + '...',
-          visibility: q.visibility
-        }))
-      });
-      
-      return globalQuestions;
+      return {
+        all,
+        globals,
+        totalCount: all.length,
+        globalCount: globals.length,
+        sampleGlobalIds: globals.slice(0, 3).map(q => q.id)
+      };
     },
     enabled: open && !!teacherEmail,
     refetchOnMount: true,
     refetchOnWindowFocus: false
   });
+
+  const allQuestions = dbStats?.globals || [];
 
   // Apply filters client-side
   const questions = allQuestions.filter(q => {
@@ -247,28 +246,8 @@ Respond in JSON format.`,
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="bg-slate-900 border-white/10 max-w-4xl max-h-[80vh] overflow-hidden flex flex-col">
         <DialogHeader>
-          <DialogTitle className="text-white">Question Bank - Global Library</DialogTitle>
+          <DialogTitle className="text-white">Question Bank</DialogTitle>
         </DialogHeader>
-
-        {/* DEBUG PANEL */}
-        {dbDebug && (
-          <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg text-xs space-y-1">
-            <p className="font-bold text-amber-300">🔍 DB DEBUG PANEL (Live Quiz Question Bank Modal)</p>
-            <p className="text-white">📊 TOTAL QuizQuestion records in DB: <span className="font-bold">{dbDebug.total}</span></p>
-            <p className="text-white">🌍 GLOBAL QuizQuestion records: <span className="font-bold text-green-400">{dbDebug.global}</span> (where visibility === "global")</p>
-            {dbDebug.sampleIds.length > 0 && (
-              <p className="text-white">🆔 Sample GLOBAL IDs: [{dbDebug.sampleIds.join(', ')}]</p>
-            )}
-            {dbDebug.sampleQuestions.length > 0 && (
-              <div className="mt-2 space-y-1">
-                <p className="text-slate-300 font-semibold">Sample Global Questions:</p>
-                {dbDebug.sampleQuestions.map((q, idx) => (
-                  <p key={idx} className="text-slate-300 pl-2">• {q.prompt} (vis: {q.visibility})</p>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
 
         <Tabs defaultValue="browse" className="space-y-4">
           <TabsList className="bg-white/5 border border-white/10">
@@ -278,6 +257,19 @@ Respond in JSON format.`,
           </TabsList>
 
           <TabsContent value="browse" className="space-y-3">
+            {/* DB DEBUG PANEL */}
+            <div className="p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg">
+              <div className="flex items-center gap-2 mb-2">
+                <Database className="w-4 h-4 text-blue-400" />
+                <span className="text-xs font-semibold text-blue-400">DB DEBUG (QuizQuestion entity)</span>
+              </div>
+              <div className="space-y-1 text-xs text-slate-300">
+                <p>📊 TOTAL QuizQuestion records: <strong className="text-white">{dbStats?.totalCount || 0}</strong></p>
+                <p>🌍 GLOBAL QuizQuestion records: <strong className="text-green-400">{dbStats?.globalCount || 0}</strong></p>
+                <p>🆔 Sample GLOBAL IDs: <span className="text-purple-300">{dbStats?.sampleGlobalIds?.join(', ') || 'none'}</span></p>
+              </div>
+            </div>
+
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
               <Input
@@ -393,9 +385,6 @@ Respond in JSON format.`,
 
             {/* Questions List */}
             <div className="flex-1 overflow-y-auto space-y-2 pr-2 max-h-96">
-              <div className="mb-3 p-2 bg-purple-500/10 border border-purple-500/30 rounded text-xs text-purple-300">
-                {questionsLoading ? '⏳ Loading...' : `🌍 Global questions loaded: ${allQuestions.length} | After filters: ${filteredQuestions.length}`}
-              </div>
           {filteredQuestions.length === 0 ? (
             <div className="text-center py-8">
               <Filter className="w-8 h-8 mx-auto mb-2 text-slate-400 opacity-50" />
