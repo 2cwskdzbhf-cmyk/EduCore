@@ -133,10 +133,31 @@ export default function AdminPanel() {
     setSeeding(true);
     setSeedResult(null);
     try {
+      // Call the seed function
       const response = await base44.functions.invoke('seedGlobalQuestions', { pack });
-      setSeedResult({ success: true, data: response.data });
+      
+      // Verify the seeding worked
+      const allQuestions = await base44.entities.QuizQuestion.list('-created_date', 100);
+      const globalQuestions = allQuestions.filter(q => q.visibility === 'global');
+      
+      console.log('🔍 Verification after seeding:');
+      console.log(`   Total questions: ${allQuestions.length}`);
+      console.log(`   Global questions: ${globalQuestions.length}`);
+      console.log(`   First 3 global IDs:`, globalQuestions.slice(0, 3).map(q => q.id));
+      
+      setSeedResult({ 
+        success: true, 
+        data: {
+          ...response.data,
+          verified_total: allQuestions.length,
+          verified_global: globalQuestions.length,
+          sample_global_ids: globalQuestions.slice(0, 3).map(q => q.id)
+        }
+      });
       queryClient.invalidateQueries(['questionBankGlobal']);
+      queryClient.invalidateQueries(['questions']);
     } catch (error) {
+      console.error('Seeding error:', error);
       setSeedResult({ success: false, message: error.message });
     } finally {
       setSeeding(false);
@@ -505,13 +526,22 @@ export default function AdminPanel() {
                   {seedResult.success ? seedResult.data.message : seedResult.message}
                 </p>
                 {seedResult.success && (
-                  <div className="text-sm text-green-700 mt-2 space-y-1">
+                  <div className="text-sm text-green-700 mt-3 space-y-1">
+                    <p className="font-semibold">📊 Seeding Results:</p>
                     <p>✅ Created: {seedResult.data.created}</p>
                     <p>⏭️  Skipped: {seedResult.data.skipped}</p>
-                    <p>📊 Total global questions: {seedResult.data.total_global}</p>
+                    <p>🌍 Total global questions: {seedResult.data.total_global}</p>
                     {seedResult.data.sample_ids && seedResult.data.sample_ids.length > 0 && (
                       <p>🆔 Sample IDs: {seedResult.data.sample_ids.join(', ')}</p>
                     )}
+                    <div className="mt-3 pt-3 border-t border-green-300">
+                      <p className="font-semibold">✓ Verification:</p>
+                      <p>📝 Total questions in DB: {seedResult.data.verified_total}</p>
+                      <p>🌍 Global questions found: {seedResult.data.verified_global}</p>
+                      {seedResult.data.sample_global_ids && seedResult.data.sample_global_ids.length > 0 && (
+                        <p>🔍 Sample global IDs: {seedResult.data.sample_global_ids.join(', ')}</p>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>

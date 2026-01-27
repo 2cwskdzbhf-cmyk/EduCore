@@ -32,21 +32,32 @@ export default function QuestionBankDialog({ open, onOpenChange, onAddQuestions,
   const [aiSuggestions, setAiSuggestions] = useState(null);
   const [loadingAI, setLoadingAI] = useState(false);
 
-  const { data: allQuestions = [] } = useQuery({
+  const { data: allQuestions = [], isLoading: questionsLoading } = useQuery({
     queryKey: ['questionBankGlobal'],
     queryFn: async () => {
       console.log('🔍 Fetching GLOBAL questions from entity: QuizQuestion');
+      
+      // Fetch all questions without filter (Base44 filter syntax may vary)
       const questions = await base44.entities.QuizQuestion.list('-created_date', 5000);
       console.log(`✅ Loaded ${questions.length} total QuizQuestion records from database`);
       
-      // Filter for GLOBAL questions only (used in Live Quiz modal)
+      // Client-side filter for GLOBAL questions only
       const globalQuestions = questions.filter(q => q.visibility === 'global');
       
-      console.log(`✅ ${globalQuestions.length} GLOBAL questions found`);
+      console.log(`✅ ${globalQuestions.length} GLOBAL questions found (filtered client-side)`);
       console.log('🔍 First 3 global question IDs:', globalQuestions.slice(0, 3).map(q => q.id));
+      console.log('🔍 First 3 global questions:', globalQuestions.slice(0, 3).map(q => ({
+        id: q.id, 
+        prompt: q.prompt?.substring(0, 50),
+        visibility: q.visibility,
+        year_group: q.year_group
+      })));
+      
       return globalQuestions;
     },
-    enabled: open && !!teacherEmail
+    enabled: open && !!teacherEmail,
+    refetchOnMount: true,
+    refetchOnWindowFocus: false
   });
 
   // Apply filters client-side
@@ -354,7 +365,7 @@ Respond in JSON format.`,
             {/* Questions List */}
             <div className="flex-1 overflow-y-auto space-y-2 pr-2 max-h-96">
               <div className="mb-3 p-2 bg-purple-500/10 border border-purple-500/30 rounded text-xs text-purple-300">
-                Global questions loaded: {allQuestions.length} | After filters: {filteredQuestions.length}
+                {questionsLoading ? '⏳ Loading...' : `🌍 Global questions loaded: ${allQuestions.length} | After filters: ${filteredQuestions.length}`}
               </div>
           {filteredQuestions.length === 0 ? (
             <div className="text-center py-8">
