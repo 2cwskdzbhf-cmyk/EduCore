@@ -233,15 +233,23 @@ Deno.serve(async (req) => {
       created++;
     }
 
-    // Verify
-    const allGlobalQuestions = await base44.asServiceRole.entities.GlobalQuestion.list('-created_date', 5000);
+    // Verify by fetching all records
+    const verify = await base44.asServiceRole.entities.GlobalQuestion.list('-created_date', 5000);
+    const sampleRecords = verify.slice(0, 3).map(q => ({
+      year_group: q.year_group,
+      difficulty: q.difficulty,
+      question_type: q.question_type,
+      subject_id: q.subject_id
+    }));
 
     return Response.json({
       message: `Successfully seeded ${pack}`,
       created,
       skipped,
-      total_global: allGlobalQuestions.length,
-      sample_ids: allGlobalQuestions.slice(0, 3).map(q => q.id)
+      total: verify.length,
+      sample_ids: verify.slice(0, 3).map(q => q.id),
+      sample_year_groups: verify.slice(0, 5).map(q => q.year_group),
+      sample_records: sampleRecords
     });
   } catch (error) {
     console.error('Seeding error:', error);

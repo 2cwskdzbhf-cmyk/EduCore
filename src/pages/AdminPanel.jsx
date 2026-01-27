@@ -165,14 +165,18 @@ export default function AdminPanel() {
       });
 
       // Show success toast
-      toast.success(`Seeded ${response.data.created} questions, skipped ${response.data.skipped}`, {
-        duration: 4000,
-        style: {
-          background: '#1e293b',
-          color: '#fff',
-          border: '1px solid #334155'
+      const yearGroups = response.data.sample_year_groups || [];
+      toast.success(
+        `Seeded ${response.data.created}. Total global: ${response.data.total}. Sample years: ${yearGroups.join(', ')}`,
+        {
+          duration: 6000,
+          style: {
+            background: '#1e293b',
+            color: '#fff',
+            border: '1px solid #334155'
+          }
         }
-      });
+      );
       
       // Invalidate queries to refresh
       queryClient.invalidateQueries(['globalQuestions']);
@@ -580,7 +584,10 @@ export default function AdminPanel() {
                     <p className="font-semibold">📊 Seeding Results:</p>
                     <p>✅ Created: <strong>{seedResult.data.created}</strong></p>
                     <p>⏭️  Skipped: <strong>{seedResult.data.skipped}</strong></p>
-                    <p>🌍 Total global questions: <strong>{seedResult.data.total_global}</strong></p>
+                    <p>🌍 Total global questions: <strong>{seedResult.data.total}</strong></p>
+                    {seedResult.data.sample_year_groups && seedResult.data.sample_year_groups.length > 0 && (
+                      <p>🔢 Sample year_groups: {seedResult.data.sample_year_groups.join(', ')}</p>
+                    )}
                     {seedResult.data.sample_ids && seedResult.data.sample_ids.length > 0 && (
                       <p>🆔 Sample IDs: {seedResult.data.sample_ids.join(', ')}</p>
                     )}

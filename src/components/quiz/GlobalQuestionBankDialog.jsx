@@ -69,13 +69,30 @@ export default function GlobalQuestionBankDialog({ open, onClose, onAddQuestions
     }
   });
 
-  const filteredQuestions = globalQuestions.filter(q => {
-    if (selectedYearGroup !== 'all' && q.year_group !== parseInt(selectedYearGroup)) return false;
-    if (selectedDifficulty !== 'all' && q.difficulty !== selectedDifficulty) return false;
-    if (selectedType !== 'all' && q.question_type !== selectedType) return false;
-    if (searchQuery && !q.question_text.toLowerCase().includes(searchQuery.toLowerCase())) return false;
-    return true;
+  // Normalize year group for comparison
+  const normalizeYearGroup = (value) => {
+    if (!value) return null;
+    const str = String(value).replace(/\D/g, '');
+    return str ? Number(str) : null;
+  };
+
+  // Step-by-step filtering for debug visibility
+  const afterSubjectFilter = globalQuestions;
+  const afterYearFilter = afterSubjectFilter.filter(q => {
+    if (selectedYearGroup === 'all') return true;
+    const recordYear = normalizeYearGroup(q.year_group);
+    const selectedYear = normalizeYearGroup(selectedYearGroup);
+    return recordYear === selectedYear;
   });
+  const afterDifficultyFilter = afterYearFilter.filter(q => 
+    selectedDifficulty === 'all' || q.difficulty === selectedDifficulty
+  );
+  const afterTypeFilter = afterDifficultyFilter.filter(q => 
+    selectedType === 'all' || q.question_type === selectedType
+  );
+  const filteredQuestions = afterTypeFilter.filter(q => 
+    !searchQuery || q.question_text.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   const handleClose = () => {
     setScreen('subjects');
@@ -255,6 +272,36 @@ export default function GlobalQuestionBankDialog({ open, onClose, onAddQuestions
           {/* Questions Screen */}
           {screen === 'questions' && (
             <div>
+              {/* DEBUG PANEL */}
+              <div className="mb-6 p-4 bg-blue-900/30 border border-blue-500/50 rounded-lg space-y-2 text-xs font-mono">
+                <p className="font-bold text-blue-300 text-sm">🔍 DEBUG PANEL</p>
+                <p className="text-white">Total GlobalQuestion records fetched: <strong>{globalQuestions.length}</strong></p>
+                <p className="text-white">After subject filter: <strong>{afterSubjectFilter.length}</strong></p>
+                <p className="text-white">After year filter (Year {selectedYearGroup}): <strong>{afterYearFilter.length}</strong></p>
+                <p className="text-white">After difficulty filter ({selectedDifficulty}): <strong>{afterDifficultyFilter.length}</strong></p>
+                <p className="text-white">After type filter ({selectedType}): <strong>{afterTypeFilter.length}</strong></p>
+                <p className="text-white">After search: <strong>{filteredQuestions.length}</strong></p>
+                {globalQuestions.slice(0, 3).length > 0 && (
+                  <details className="mt-2">
+                    <summary className="cursor-pointer text-blue-300 hover:text-blue-200">Show first 3 records</summary>
+                    <pre className="mt-2 text-xs bg-slate-900/50 p-2 rounded overflow-x-auto">
+                      {JSON.stringify(
+                        globalQuestions.slice(0, 3).map(q => ({
+                          id: q.id,
+                          year_group: q.year_group,
+                          difficulty: q.difficulty,
+                          question_type: q.question_type,
+                          subject_id: q.subject_id,
+                          topic_id: q.topic_id
+                        })),
+                        null,
+                        2
+                      )}
+                    </pre>
+                  </details>
+                )}
+              </div>
+
               <div className="mb-6">
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
