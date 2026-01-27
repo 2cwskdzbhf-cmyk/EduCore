@@ -581,12 +581,22 @@ export default function AdminPanel() {
                 </p>
                 {seedResult.success && (
                   <div className="text-sm text-green-700 mt-3 space-y-1">
-                    <p className="font-semibold">📊 Seeding Results:</p>
+                    <p className="font-semibold">📊 Results:</p>
                     <p>✅ Created: <strong>{seedResult.data.created}</strong></p>
-                    <p>⏭️  Skipped: <strong>{seedResult.data.skipped}</strong></p>
+                    {seedResult.data.skipped !== undefined && (
+                      <p>⏭️  Skipped: <strong>{seedResult.data.skipped}</strong></p>
+                    )}
                     <p>🌍 Total global questions: <strong>{seedResult.data.total}</strong></p>
                     {seedResult.data.sample_year_groups && seedResult.data.sample_year_groups.length > 0 && (
                       <p>🔢 Sample year_groups: {seedResult.data.sample_year_groups.join(', ')}</p>
+                    )}
+                    {seedResult.data.sample_questions && seedResult.data.sample_questions.length > 0 && (
+                      <div>
+                        <p className="font-semibold mt-2">📝 First 3 questions:</p>
+                        {seedResult.data.sample_questions.map((q, i) => (
+                          <p key={i} className="text-xs ml-2">• {q}</p>
+                        ))}
+                      </div>
                     )}
                     {seedResult.data.sample_ids && seedResult.data.sample_ids.length > 0 && (
                       <p>🆔 Sample IDs: {seedResult.data.sample_ids.join(', ')}</p>
@@ -647,15 +657,26 @@ export default function AdminPanel() {
                       <p className="text-sm text-slate-600 mb-3">
                         Basic fractions, simplification, addition, subtraction, multiplication. (5 questions: 2 easy, 2 medium, 1 hard)
                       </p>
-                      <Button
-                        onClick={() => handleSeedGlobalQuestions('y7-maths-fractions')}
-                        disabled={seeding}
-                        size="sm"
-                        className="bg-blue-600 hover:bg-blue-700"
-                      >
-                        {seeding ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" /> : <Database className="w-4 h-4 mr-2" />}
-                        Seed Y7 Fractions
-                      </Button>
+                      <div className="flex gap-2">
+                        <Button
+                          onClick={() => handleSeedGlobalQuestions('y7-maths-fractions')}
+                          disabled={seeding}
+                          size="sm"
+                          className="bg-blue-600 hover:bg-blue-700"
+                        >
+                          {seeding ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" /> : <Database className="w-4 h-4 mr-2" />}
+                          Seed Y7 Fractions
+                        </Button>
+                        <Button
+                          onClick={handleForceCreateQuestions}
+                          disabled={seeding}
+                          size="sm"
+                          className="bg-green-600 hover:bg-green-700"
+                        >
+                          {seeding ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" /> : <Database className="w-4 h-4 mr-2" />}
+                          Force Create 6
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 </Card>
