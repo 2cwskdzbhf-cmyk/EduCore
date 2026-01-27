@@ -200,6 +200,7 @@ export default function AdminPanel() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50 p-6">
+      <Toaster position="top-right" />
       <div className="max-w-7xl mx-auto">
         <motion.div
           className="flex items-center gap-4 mb-8"
@@ -551,6 +552,27 @@ export default function AdminPanel() {
               <h2 className="text-xl font-bold text-slate-900 mb-1">Global Question Library</h2>
               <p className="text-sm text-slate-500">Seed shared questions for all teachers by year group, subject, and topic</p>
             </div>
+
+            {/* DB DEBUG PANEL */}
+            {dbDebug && (
+              <Card className="bg-blue-50 border-blue-200 p-4 mb-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <Database className="w-5 h-5 text-blue-600" />
+                  <h4 className="font-semibold text-blue-900">DB Verification (QuizQuestion entity)</h4>
+                </div>
+                <div className="space-y-1 text-sm text-slate-700">
+                  <p>📊 TOTAL QuizQuestion records in DB: <strong className="text-slate-900">{dbDebug.totalCount}</strong></p>
+                  <p>🌍 GLOBAL QuizQuestion records: <strong className="text-green-700">{dbDebug.globalCount}</strong></p>
+                  <p>🆔 Sample GLOBAL IDs: <span className="text-purple-700 font-mono text-xs">{dbDebug.sampleGlobalIds.join(', ')}</span></p>
+                  <details className="mt-2">
+                    <summary className="cursor-pointer text-blue-700 hover:text-blue-900 font-medium">Show sample records</summary>
+                    <pre className="mt-2 text-xs bg-white p-3 rounded border border-blue-200 overflow-x-auto">
+                      {JSON.stringify(dbDebug.sampleGlobalRecords, null, 2)}
+                    </pre>
+                  </details>
+                </div>
+              </Card>
+            )}
 
             {seedResult && (
               <div className={`mb-4 p-4 rounded-lg ${seedResult.success ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
