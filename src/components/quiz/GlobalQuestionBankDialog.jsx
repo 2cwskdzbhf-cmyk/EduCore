@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -14,7 +14,9 @@ import {
   X,
   ArrowLeft,
   Database,
-  FolderOpen
+  FolderOpen,
+  ChevronRight,
+  Plus
 } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
@@ -22,77 +24,112 @@ import { toast } from 'sonner';
 
 export default function GlobalQuestionBankDialog({ open, onClose, onAddQuestions, quizSetId }) {
   const queryClient = useQueryClient();
-  const [screen, setScreen] = useState('filters'); // 'filters' | 'topics' | 'topic-questions'
-  const [activeTopic, setActiveTopic] = useState(null);
+  const [screen, setScreen] = useState('topics'); // 'topics' | 'subtopics' | 'questions'
+  const [selectedTopic, setSelectedTopic] = useState(null); // top-level topic
+  const [selectedSubtopic, setSelectedSubtopic] = useState(null); // subtopic
   const [selectedYearGroup, setSelectedYearGroup] = useState('all');
   const [selectedDifficulty, setSelectedDifficulty] = useState('all');
   const [selectedType, setSelectedType] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedQuestions, setSelectedQuestions] = useState([]);
-  const [testResult, setTestResult] = useState(null);
-  const [creating, setCreating] = useState(false);
 
-  const { data: globalQuestions = [], isLoading } = useQuery({
+  // Debug logging
+  useEffect(() => {
+    if (open) {
+      console.log('[GlobalQuestionBankDialog] quiz_set_id:', quizSetId);
+    }
+  }, [open, quizSetId]);
+
+  const { data: globalTopics = [], isLoading: loadingTopics } = useQuery({
+    queryKey: ['globalTopics'],
+    queryFn: () => base44.entities.GlobalTopic.list('order_index', 1000),
+    enabled: open
+  });
+
+  const { data: globalQuestions = [], isLoading: loadingQuestions } = useQuery({
     queryKey: ['globalQuestions'],
     queryFn: () => base44.entities.GlobalQuestion.list('-created_date', 5000),
-    enabled: open
+    enabled: open && screen === 'questions' && !!selectedSubtopic
   });
 
   const addQuestionsMutation = useMutation({
     mutationFn: async (questions) => {
+      console.log('[AddToQuiz] Starting with quiz_set_id:', quizSetId);
+      console.log('[AddToQuiz] Selected question IDs:', questions.map(q => q.id));
+
       if (!quizSetId) {
-        throw new Error('Quiz set ID is required');
+        throw new Error('No quiz selected');
       }
 
-      // Get current max order
+      // Get existing questions to check for duplicates and determine order
       const existingQuestions = await base44.entities.QuizQuestion.filter({ quiz_set_id: quizSetId });
+      const existingSourceIds = new Set(
+        existingQuestions
+          .filter(q => q.source_global_id)
+          .map(q => q.source_global_id)
+      );
+
       let maxOrder = existingQuestions.length > 0 
         ? Math.max(...existingQuestions.map(q => q.order || 0))
         : -1;
 
-      // Copy each global question to QuizQuestion entity
-      // This creates a COPY that can be edited independently
-      // The source_global_id tracks the origin but changes won't affect GlobalQuestion
       const createdQuestions = [];
+      let skippedDuplicates = 0;
       
       for (const gq of questions) {
+        // Skip if already added
+        if (existingSourceIds.has(gq.id)) {
+          skippedDuplicates++;
+          console.log('[AddToQuiz] Skipping duplicate:', gq.id);
+          continue;
+        }
+
         maxOrder++;
         try {
-          const created = await base44.entities.QuizQuestion.create({
+          const questionData = {
             quiz_set_id: quizSetId,
             order: maxOrder,
             prompt: gq.question_text,
-            question_type: gq.question_type === 'mcq' ? 'multiple_choice' : 'short_answer',
+            question_type: gq.question_type === 'mcq' ? 'multiple_choice' : 
+                          gq.question_type === 'numeric' ? 'short_answer' : 'short_answer',
             options: gq.choices || [],
-            correct_index: gq.choices ? gq.choices.indexOf(gq.correct_answer) : undefined,
+            correct_index: gq.correct_index !== undefined ? gq.correct_index :
+                          (gq.choices ? gq.choices.indexOf(gq.correct_answer) : undefined),
             correct_answer: gq.correct_answer,
             explanation: gq.explanation || '',
             difficulty: gq.difficulty,
             year_group: gq.year_group,
             subject_id: gq.subject_id,
-            topic_id: gq.topic_id,
+            topic_id: gq.global_topic_id,
             source_global_id: gq.id,
             is_reusable: false,
             visibility: 'private'
-          });
+          };
+
+          console.log('[AddToQuiz] Creating QuizQuestion:', questionData);
+          const created = await base44.entities.QuizQuestion.create(questionData);
           createdQuestions.push(created);
         } catch (err) {
-          console.error('Failed to create QuizQuestion:', err);
+          console.error('[AddToQuiz] Failed to create QuizQuestion:', err);
           throw new Error(`Failed to add question: ${err.message || err}`);
         }
       }
 
-      return { count: createdQuestions.length };
+      console.log('[AddToQuiz] Created:', createdQuestions.length, 'Skipped:', skippedDuplicates);
+      return { count: createdQuestions.length, skipped: skippedDuplicates };
     },
     onSuccess: (data) => {
-      toast.success(`${data.count} questions added to quiz`);
+      const message = data.skipped > 0 
+        ? `Added ${data.count} questions to quiz (skipped ${data.skipped} duplicates)`
+        : `Added ${data.count} questions to quiz`;
+      toast.success(message);
       queryClient.invalidateQueries(['quizQuestions']);
       onAddQuestions?.(data.count);
-      handleClose();
+      setSelectedQuestions([]);
     },
     onError: (error) => {
-      console.error('Add questions error:', error);
-      toast.error(`Failed to add questions: ${error.message || error}`);
+      console.error('[AddToQuiz] Error:', error);
+      toast.error(error.message || 'Failed to add questions');
     }
   });
 
@@ -103,58 +140,56 @@ export default function GlobalQuestionBankDialog({ open, onClose, onAddQuestions
     return str ? Number(str) : null;
   };
 
-  // Apply filters BEFORE grouping by topics
-  const filteredByFilters = useMemo(() => {
-    return globalQuestions.filter(q => {
-      // Year filter
-      if (selectedYearGroup !== 'all') {
-        const recordYear = normalizeYearGroup(q.year_group);
-        const selectedYear = normalizeYearGroup(selectedYearGroup);
-        if (recordYear !== selectedYear) return false;
-      }
-      // Difficulty filter
-      if (selectedDifficulty !== 'all' && q.difficulty !== selectedDifficulty) return false;
-      // Type filter
-      if (selectedType !== 'all' && q.question_type !== selectedType) return false;
-      return true;
-    });
-  }, [globalQuestions, selectedYearGroup, selectedDifficulty, selectedType]);
+  // Top-level topics (parent_topic_id == null)
+  const topLevelTopics = useMemo(() => {
+    return globalTopics
+      .filter(t => !t.parent_topic_id)
+      .sort((a, b) => (a.order_index || 0) - (b.order_index || 0));
+  }, [globalTopics]);
 
-  // Group questions by topic
-  const questionsByTopic = useMemo(() => {
-    const groups = {};
+  // Subtopics for selected topic
+  const subtopics = useMemo(() => {
+    if (!selectedTopic) return [];
+    return globalTopics
+      .filter(t => t.parent_topic_id === selectedTopic.id)
+      .sort((a, b) => (a.order_index || 0) - (b.order_index || 0));
+  }, [globalTopics, selectedTopic]);
+
+  // Get question count for each topic/subtopic
+  const getQuestionCount = (topicId) => {
+    return globalQuestions.filter(q => q.global_topic_id === topicId).length;
+  };
+
+  // Filter questions for selected subtopic
+  const filteredQuestions = useMemo(() => {
+    if (!selectedSubtopic) return [];
     
-    filteredByFilters.forEach(q => {
-      const topicName = q.topic_name || 'Uncategorised';
-      if (!groups[topicName]) {
-        groups[topicName] = [];
-      }
-      groups[topicName].push(q);
-    });
-
-    return groups;
-  }, [filteredByFilters]);
-
-  // Get topics sorted by count
-  const topics = useMemo(() => {
-    return Object.entries(questionsByTopic)
-      .map(([name, questions]) => ({ name, count: questions.length }))
-      .sort((a, b) => b.count - a.count);
-  }, [questionsByTopic]);
-
-  // Filter questions within active topic by search query
-  const topicQuestions = useMemo(() => {
-    if (!activeTopic) return [];
-    const questions = questionsByTopic[activeTopic] || [];
-    if (!searchQuery) return questions;
-    return questions.filter(q => 
-      q.question_text.toLowerCase().includes(searchQuery.toLowerCase())
-    );
-  }, [activeTopic, questionsByTopic, searchQuery]);
+    let questions = globalQuestions.filter(q => q.global_topic_id === selectedSubtopic.id);
+    
+    // Apply filters
+    if (selectedYearGroup !== 'all') {
+      const selectedYear = normalizeYearGroup(selectedYearGroup);
+      questions = questions.filter(q => normalizeYearGroup(q.year_group) === selectedYear);
+    }
+    if (selectedDifficulty !== 'all') {
+      questions = questions.filter(q => q.difficulty === selectedDifficulty);
+    }
+    if (selectedType !== 'all') {
+      questions = questions.filter(q => q.question_type === selectedType);
+    }
+    if (searchQuery) {
+      questions = questions.filter(q => 
+        q.question_text.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+    }
+    
+    return questions;
+  }, [globalQuestions, selectedSubtopic, selectedYearGroup, selectedDifficulty, selectedType, searchQuery]);
 
   const handleClose = () => {
-    setScreen('filters');
-    setActiveTopic(null);
+    setScreen('topics');
+    setSelectedTopic(null);
+    setSelectedSubtopic(null);
     setSelectedYearGroup('all');
     setSelectedDifficulty('all');
     setSelectedType('all');
@@ -163,20 +198,30 @@ export default function GlobalQuestionBankDialog({ open, onClose, onAddQuestions
     onClose();
   };
 
-  const handleApplyFilters = () => {
-    setScreen('topics');
+  const handleSelectTopic = (topic) => {
+    setSelectedTopic(topic);
+    setScreen('subtopics');
+    setSelectedQuestions([]);
   };
 
-  const handleSelectTopic = (topicName) => {
-    setActiveTopic(topicName);
-    setScreen('topic-questions');
+  const handleSelectSubtopic = (subtopic) => {
+    setSelectedSubtopic(subtopic);
+    setScreen('questions');
     setSearchQuery('');
     setSelectedQuestions([]);
   };
 
   const handleBackToTopics = () => {
     setScreen('topics');
-    setActiveTopic(null);
+    setSelectedTopic(null);
+    setSelectedSubtopic(null);
+    setSearchQuery('');
+    setSelectedQuestions([]);
+  };
+
+  const handleBackToSubtopics = () => {
+    setScreen('subtopics');
+    setSelectedSubtopic(null);
     setSearchQuery('');
     setSelectedQuestions([]);
   };
@@ -190,7 +235,7 @@ export default function GlobalQuestionBankDialog({ open, onClose, onAddQuestions
   };
 
   const handleSelectAll = () => {
-    setSelectedQuestions(topicQuestions);
+    setSelectedQuestions(filteredQuestions);
   };
 
   const handleClearSelection = () => {
@@ -198,60 +243,15 @@ export default function GlobalQuestionBankDialog({ open, onClose, onAddQuestions
   };
 
   const handleAddToQuiz = () => {
+    if (!quizSetId) {
+      toast.error('No quiz selected');
+      return;
+    }
     if (selectedQuestions.length === 0) {
       toast.error('Please select at least one question');
       return;
     }
     addQuestionsMutation.mutate(selectedQuestions);
-  };
-
-  const handleCreateTestQuestions = async () => {
-    setCreating(true);
-    setTestResult(null);
-    const created = [];
-    const errors = [];
-
-    try {
-      for (let i = 0; i < 3; i++) {
-        try {
-          const record = await base44.entities.GlobalQuestion.create({
-            subject_name: "Maths",
-            topic_name: "Fractions",
-            year_group: 7,
-            difficulty: "easy",
-            question_type: "mcq",
-            question_text: `TEST ${i + 1}: 1/2 + 1/4 = ?`,
-            choices: ["1/4", "1/2", "3/4", "1"],
-            correct_answer: "3/4"
-          });
-          created.push({ id: record.id, question_text: record.question_text });
-        } catch (err) {
-          errors.push(`Record ${i + 1}: ${err.message || err.toString()}`);
-        }
-      }
-
-      // Immediate read-back
-      const verify = await base44.entities.GlobalQuestion.list('-created_date', 50);
-
-      setTestResult({
-        success: true,
-        createdIds: created.map(c => c.id),
-        createdTexts: created.map(c => c.question_text),
-        errors: errors,
-        verifyTotal: verify.length,
-        verifyFirst3: verify.slice(0, 3).map(q => q.question_text)
-      });
-
-      // Refresh the list
-      queryClient.invalidateQueries(['globalQuestions']);
-    } catch (err) {
-      setTestResult({
-        success: false,
-        error: err.message || err.toString()
-      });
-    } finally {
-      setCreating(false);
-    }
   };
 
   return (
@@ -260,27 +260,37 @@ export default function GlobalQuestionBankDialog({ open, onClose, onAddQuestions
         {/* Header */}
         <DialogHeader className="border-b border-white/10 px-6 py-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              {screen !== 'filters' && (
+            <div className="flex items-center gap-3 flex-1">
+              {screen !== 'topics' && (
                 <Button
                   variant="ghost"
                   size="icon"
-                  onClick={screen === 'topic-questions' ? handleBackToTopics : () => setScreen('filters')}
+                  onClick={screen === 'questions' ? handleBackToSubtopics : handleBackToTopics}
                   className="text-slate-400 hover:text-white"
                 >
                   <ArrowLeft className="w-5 h-5" />
                 </Button>
               )}
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-1">
                 <Database className="w-6 h-6 text-purple-400" />
-                <DialogTitle className="text-xl text-white">
-                  {screen === 'filters' && 'Global Question Bank - Filters'}
-                  {screen === 'topics' && 'Select a Topic'}
-                  {screen === 'topic-questions' && activeTopic}
-                </DialogTitle>
+                <div className="flex items-center gap-2 text-sm text-slate-400">
+                  <span className={screen === 'topics' ? 'text-white font-semibold' : 'cursor-pointer hover:text-white'} onClick={handleBackToTopics}>Topics</span>
+                  {selectedTopic && (
+                    <>
+                      <ChevronRight className="w-4 h-4" />
+                      <span className={screen === 'subtopics' ? 'text-white font-semibold' : 'cursor-pointer hover:text-white'} onClick={handleBackToSubtopics}>{selectedTopic.name}</span>
+                    </>
+                  )}
+                  {selectedSubtopic && (
+                    <>
+                      <ChevronRight className="w-4 h-4" />
+                      <span className="text-white font-semibold">{selectedSubtopic.name}</span>
+                    </>
+                  )}
+                </div>
               </div>
             </div>
-            {screen === 'topic-questions' && (
+            {screen === 'questions' && (
               <div className="flex items-center gap-3">
                 <Badge variant="outline" className="text-sm text-purple-300 border-purple-400">
                   {selectedQuestions.length} selected
@@ -294,7 +304,7 @@ export default function GlobalQuestionBankDialog({ open, onClose, onAddQuestions
                 </Button>
               </div>
             )}
-            <Button variant="ghost" size="icon" onClick={handleClose} className="text-slate-400 hover:text-white">
+            <Button variant="ghost" size="icon" onClick={handleClose} className="text-slate-400 hover:text-white ml-2">
               <X className="w-5 h-5" />
             </Button>
           </div>
@@ -302,8 +312,8 @@ export default function GlobalQuestionBankDialog({ open, onClose, onAddQuestions
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-6">
-          {/* Filters Screen */}
-          {screen === 'filters' && (
+          {/* Topics Screen */}
+          {screen === 'topics' && (
             <div className="max-w-2xl mx-auto">
               <div className="mb-6">
                 <h3 className="text-lg font-semibold text-white mb-2">Filter Questions</h3>
@@ -373,50 +383,109 @@ export default function GlobalQuestionBankDialog({ open, onClose, onAddQuestions
           {/* Topics Screen */}
           {screen === 'topics' && (
             <div>
-              <div className="mb-6">
-                <p className="text-slate-400">
-                  {filteredByFilters.length} questions found after filters. Click a topic to browse questions.
-                </p>
+              <div className="mb-6 flex items-center justify-between">
+                <p className="text-slate-400">Select a subtopic to view questions</p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="bg-white/5 border-white/10 text-slate-300 hover:bg-white/10"
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  New Subtopic
+                </Button>
               </div>
 
-              {topics.length === 0 ? (
+              {subtopics.length === 0 ? (
                 <div className="text-center py-12">
                   <FolderOpen className="w-16 h-16 text-slate-600 mx-auto mb-4" />
-                  <p className="text-slate-400">No topics found with the selected filters</p>
+                  <p className="text-slate-400">No subtopics found</p>
+                  <p className="text-sm text-slate-500 mt-2">Create subtopics to organize questions</p>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {topics.map(topic => (
-                    <Card
-                      key={topic.name}
-                      className="p-6 bg-white/5 border-white/10 hover:bg-white/10 transition-all cursor-pointer"
-                      onClick={() => handleSelectTopic(topic.name)}
-                    >
-                      <div className="flex items-center gap-4">
-                        <div className="w-14 h-14 rounded-xl bg-purple-500/20 flex items-center justify-center">
-                          <FolderOpen className="w-7 h-7 text-purple-400" />
+                  {subtopics.map(subtopic => {
+                    const count = getQuestionCount(subtopic.id);
+                    return (
+                      <Card
+                        key={subtopic.id}
+                        className="p-6 bg-white/5 border-white/10 hover:bg-white/10 transition-all cursor-pointer"
+                        onClick={() => handleSelectSubtopic(subtopic)}
+                      >
+                        <div className="flex items-center gap-4">
+                          <div className="w-14 h-14 rounded-xl bg-blue-500/20 flex items-center justify-center">
+                            <BookOpen className="w-7 h-7 text-blue-400" />
+                          </div>
+                          <div>
+                            <h3 className="font-semibold text-lg text-white">{subtopic.name}</h3>
+                            <p className="text-sm text-slate-400">{count} question{count !== 1 ? 's' : ''}</p>
+                          </div>
                         </div>
-                        <div>
-                          <h3 className="font-semibold text-lg text-white">{topic.name}</h3>
-                          <p className="text-sm text-slate-400">{topic.count} question{topic.count !== 1 ? 's' : ''}</p>
-                        </div>
-                      </div>
-                    </Card>
-                  ))}
+                      </Card>
+                    );
+                  })}
                 </div>
               )}
             </div>
           )}
 
-          {/* Topic Questions Screen */}
-          {screen === 'topic-questions' && (
+          {/* Questions Screen */}
+          {screen === 'questions' && (
             <div>
-              {/* Search and Actions */}
-              <div className="mb-6">
-                <div className="relative mb-4">
+              {/* Filters and Search */}
+              <div className="mb-6 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="bg-white/5 border-white/10 text-slate-300 hover:bg-white/10"
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      New Question
+                    </Button>
+                  </div>
+                  <div className="flex gap-2">
+                    <Select value={selectedYearGroup} onValueChange={setSelectedYearGroup}>
+                      <SelectTrigger className="w-32 bg-white/5 border-white/10 text-white">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Years</SelectItem>
+                        <SelectItem value="7">Year 7</SelectItem>
+                        <SelectItem value="8">Year 8</SelectItem>
+                        <SelectItem value="9">Year 9</SelectItem>
+                        <SelectItem value="10">Year 10</SelectItem>
+                        <SelectItem value="11">Year 11</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Select value={selectedDifficulty} onValueChange={setSelectedDifficulty}>
+                      <SelectTrigger className="w-32 bg-white/5 border-white/10 text-white">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Difficulty</SelectItem>
+                        <SelectItem value="easy">Easy</SelectItem>
+                        <SelectItem value="medium">Medium</SelectItem>
+                        <SelectItem value="hard">Hard</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Select value={selectedType} onValueChange={setSelectedType}>
+                      <SelectTrigger className="w-32 bg-white/5 border-white/10 text-white">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Types</SelectItem>
+                        <SelectItem value="mcq">MCQ</SelectItem>
+                        <SelectItem value="numeric">Numeric</SelectItem>
+                        <SelectItem value="short">Short</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
                   <Input
-                    placeholder="Search questions in this topic..."
+                    placeholder="Search questions..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="pl-10 bg-white/5 border-white/10 text-white"
@@ -430,7 +499,7 @@ export default function GlobalQuestionBankDialog({ open, onClose, onAddQuestions
                       onClick={handleSelectAll}
                       className="bg-white/5 border-white/10 text-slate-300 hover:bg-white/10"
                     >
-                      Select All ({topicQuestions.length})
+                      Select All ({filteredQuestions.length})
                     </Button>
                     <Button
                       variant="outline"
@@ -443,14 +512,19 @@ export default function GlobalQuestionBankDialog({ open, onClose, onAddQuestions
                     </Button>
                   </div>
                   <Badge className="bg-purple-500/20 text-purple-300">
-                    {topicQuestions.length} questions
+                    {filteredQuestions.length} questions
                   </Badge>
                 </div>
               </div>
 
               {/* Questions List */}
-              <div className="space-y-3">
-                {topicQuestions.map((question, idx) => {
+              {loadingQuestions ? (
+                <div className="text-center py-12">
+                  <div className="w-12 h-12 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mx-auto" />
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {filteredQuestions.map((question, idx) => {
                   const isSelected = selectedQuestions.find(q => q.id === question.id);
                   return (
                     <Card
@@ -502,18 +576,19 @@ export default function GlobalQuestionBankDialog({ open, onClose, onAddQuestions
                         </div>
                       </div>
                     </Card>
-                  );
-                })}
+                    );
+                  })}
 
-                {topicQuestions.length === 0 && (
-                  <div className="text-center py-12">
-                    <Database className="w-16 h-16 text-slate-600 mx-auto mb-4" />
-                    <p className="text-slate-400">
-                      {searchQuery ? 'No questions match your search' : 'No questions in this topic'}
-                    </p>
-                  </div>
-                )}
-              </div>
+                  {filteredQuestions.length === 0 && (
+                    <div className="text-center py-12">
+                      <Database className="w-16 h-16 text-slate-600 mx-auto mb-4" />
+                      <p className="text-slate-400">
+                        {searchQuery ? 'No questions match your search' : 'No questions in this subtopic'}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </div>
