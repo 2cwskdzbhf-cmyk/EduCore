@@ -314,74 +314,55 @@ export default function GlobalQuestionBankDialog({ open, onClose, onAddQuestions
         <div className="flex-1 overflow-y-auto p-6">
           {/* Topics Screen */}
           {screen === 'topics' && (
-            <div className="max-w-2xl mx-auto">
-              <div className="mb-6">
-                <h3 className="text-lg font-semibold text-white mb-2">Filter Questions</h3>
-                <p className="text-sm text-slate-400">Filters apply before grouping questions by topic. Total questions: <strong className="text-white">{globalQuestions.length}</strong></p>
-              </div>
-
-              <div className="space-y-6 bg-white/5 border border-white/10 rounded-xl p-6">
-                <div>
-                  <Label className="mb-2 text-slate-300">Year Group</Label>
-                  <Select value={selectedYearGroup} onValueChange={setSelectedYearGroup}>
-                    <SelectTrigger className="bg-white/5 border-white/10 text-white">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Years</SelectItem>
-                      <SelectItem value="7">Year 7</SelectItem>
-                      <SelectItem value="8">Year 8</SelectItem>
-                      <SelectItem value="9">Year 9</SelectItem>
-                      <SelectItem value="10">Year 10</SelectItem>
-                      <SelectItem value="11">Year 11</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
-                  <Label className="mb-2 text-slate-300">Difficulty</Label>
-                  <Select value={selectedDifficulty} onValueChange={setSelectedDifficulty}>
-                    <SelectTrigger className="bg-white/5 border-white/10 text-white">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Difficulties</SelectItem>
-                      <SelectItem value="easy">Easy</SelectItem>
-                      <SelectItem value="medium">Medium</SelectItem>
-                      <SelectItem value="hard">Hard</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
-                  <Label className="mb-2 text-slate-300">Question Type</Label>
-                  <Select value={selectedType} onValueChange={setSelectedType}>
-                    <SelectTrigger className="bg-white/5 border-white/10 text-white">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Types</SelectItem>
-                      <SelectItem value="mcq">Multiple Choice</SelectItem>
-                      <SelectItem value="numeric">Numeric</SelectItem>
-                      <SelectItem value="short">Short Answer</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
+            <div>
+              <div className="mb-6 flex items-center justify-between">
+                <p className="text-slate-400">Select a topic to view subtopics</p>
                 <Button
-                  onClick={handleApplyFilters}
-                  className="w-full bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600"
-                  size="lg"
+                  variant="outline"
+                  size="sm"
+                  className="bg-white/5 border-white/10 text-slate-300 hover:bg-white/10"
                 >
-                  <Filter className="w-5 h-5 mr-2" />
-                  Apply Filters
+                  <Plus className="w-4 h-4 mr-2" />
+                  New Topic
                 </Button>
               </div>
+
+              {loadingTopics ? (
+                <div className="text-center py-12">
+                  <div className="w-12 h-12 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mx-auto" />
+                </div>
+              ) : topLevelTopics.length === 0 ? (
+                <div className="text-center py-12">
+                  <FolderOpen className="w-16 h-16 text-slate-600 mx-auto mb-4" />
+                  <p className="text-slate-400">No topics found</p>
+                  <p className="text-sm text-slate-500 mt-2">Create a topic to organize questions</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {topLevelTopics.map(topic => (
+                    <Card
+                      key={topic.id}
+                      className="p-6 bg-white/5 border-white/10 hover:bg-white/10 transition-all cursor-pointer"
+                      onClick={() => handleSelectTopic(topic)}
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className="w-14 h-14 rounded-xl bg-purple-500/20 flex items-center justify-center">
+                          <FolderOpen className="w-7 h-7 text-purple-400" />
+                        </div>
+                        <div>
+                          <h3 className="font-semibold text-lg text-white">{topic.name}</h3>
+                          <p className="text-sm text-slate-400">{topic.description || 'Click to view subtopics'}</p>
+                        </div>
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
-          {/* Topics Screen */}
-          {screen === 'topics' && (
+          {/* Subtopics Screen */}
+          {screen === 'subtopics' && (
             <div>
               <div className="mb-6 flex items-center justify-between">
                 <p className="text-slate-400">Select a subtopic to view questions</p>
