@@ -32,6 +32,7 @@ export default function GlobalQuestionBankDialog({ open, onClose, onAddQuestions
   const [selectedDifficulty, setSelectedDifficulty] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedQuestions, setSelectedQuestions] = useState([]);
+  const [lastApplyResult, setLastApplyResult] = useState(null);
 
   // Debug logging
   useEffect(() => {
@@ -135,18 +136,43 @@ export default function GlobalQuestionBankDialog({ open, onClose, onAddQuestions
       return { count: createdQuestions.length, skipped: skippedDuplicates };
     },
     onSuccess: (data) => {
+      toast.dismiss(); // Dismiss loading toast
+      
       const message = data.skipped > 0 
-        ? `Added ${data.count} questions to quiz (skipped ${data.skipped} duplicates)`
+        ? `Added ${data.count} questions (${data.skipped} duplicates skipped)`
         : `Added ${data.count} questions to quiz`;
       toast.success(message);
+      
+      console.log('[APPLY_SUCCESS]', {
+        createdCount: data.count,
+        skippedDuplicateCount: data.skipped,
+        total: data.count + data.skipped
+      });
+      
+      setLastApplyResult({
+        created: data.count,
+        skipped: data.skipped,
+        timestamp: new Date().toISOString()
+      });
+      
+      // Force refresh quiz questions
       queryClient.invalidateQueries(['liveQuizQuestions']);
       queryClient.invalidateQueries(['quizQuestions']);
+      queryClient.refetchQueries(['liveQuizQuestions', quizSetId]);
+      
       onAddQuestions?.(data.count);
       setSelectedQuestions([]);
       handleClose();
     },
     onError: (error) => {
-      console.error('[AddToQuiz] Error:', error);
+      toast.dismiss(); // Dismiss loading toast
+      console.error('[APPLY_ERROR] Failed to add questions:', error);
+      console.error('[APPLY_ERROR] Error details:', {
+        message: error.message,
+        stack: error.stack,
+        quizSetId,
+        selectedCount: selectedQuestions.length
+      });
       toast.error(error.message || 'Failed to add questions');
     }
   });
@@ -253,18 +279,36 @@ export default function GlobalQuestionBankDialog({ open, onClose, onAddQuestions
   };
 
   const handleAddToQuiz = () => {
-    console.log('[handleAddToQuiz] selectedQuestions.length:', selectedQuestions.length);
-    console.log('[handleAddToQuiz] quizSetId:', quizSetId);
-    console.log('[handleAddToQuiz] selectedQuestionIds:', selectedQuestions.map(q => q.id));
+    console.log('=== APPLY_CLICKED ===');
+    console.log('selectedQuestionIds:', selectedQuestions.map(q => q.id));
+    console.log('selected count:', selectedQuestions.length);
+    console.log('currentQuizId:', quizSetId);
+    console.log('==================');
     
-    if (!quizSetId) {
-      toast.error('No quiz selected');
-      return;
-    }
+    // Guard: No questions selected
     if (selectedQuestions.length === 0) {
-      toast.error('Please select at least one question');
+      toast.error('No questions selected');
+      console.error('[APPLY_ERROR] No questions selected');
       return;
     }
+    
+    // Guard: Quiz ID missing
+    if (!quizSetId) {
+      toast.error('ERROR: quiz_id is missing');
+      console.error('[APPLY_ERROR] Missing quiz_id', {
+        quizSetId,
+        selectedQuestions: selectedQuestions.length,
+        screen,
+        selectedSubject,
+        selectedTopic,
+        selectedSubtopic
+      });
+      return;
+    }
+    
+    // Show loading toast
+    toast.loading(`Applying ${selectedQuestions.length} questions...`);
+    
     addQuestionsMutation.mutate(selectedQuestions);
   };
 
@@ -273,6 +317,21 @@ export default function GlobalQuestionBankDialog({ open, onClose, onAddQuestions
       <DialogContent className="max-w-[95vw] max-h-[95vh] h-[95vh] p-0 gap-0 bg-gradient-to-br from-slate-900 via-purple-900/20 to-slate-900 border-white/10">
         {/* Header */}
         <DialogHeader className="border-b border-white/10 px-6 py-4">
+          {/* Debug Panel */}
+          <div className="absolute top-2 right-2 bg-slate-800/90 border border-white/20 rounded-lg px-3 py-2 text-xs space-y-1 z-50">
+            <div className="text-slate-400">
+              <span className="font-semibold">Quiz ID:</span> {quizSetId || <span className="text-red-400 font-bold">MISSING</span>}
+            </div>
+            <div className="text-slate-400">
+              <span className="font-semibold">Selected:</span> {selectedQuestions.length}
+            </div>
+            {lastApplyResult && (
+              <div className="text-slate-400 border-t border-white/10 pt-1 mt-1">
+                <span className="font-semibold">Last Apply:</span> {lastApplyResult.created}/{lastApplyResult.skipped}
+              </div>
+            )}
+          </div>
+
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3 flex-1">
               {screen !== 'subject' && (
