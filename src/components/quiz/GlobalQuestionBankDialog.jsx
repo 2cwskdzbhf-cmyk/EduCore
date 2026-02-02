@@ -573,25 +573,27 @@ export default function GlobalQuestionBankDialog({ open, onClose, onAddQuestions
                   return (
                     <Card
                       key={question.id}
-                      className={`p-4 cursor-pointer transition-all ${
+                      className={`p-4 transition-all ${
                         isSelected ? 'ring-2 ring-purple-500 bg-purple-500/20 border-purple-400' : 'bg-white/5 border-white/10 hover:bg-white/10'
                       }`}
-                      onClick={() => toggleQuestion(question)}
                     >
                       <div className="flex items-start gap-4">
-                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                          isSelected ? 'bg-gradient-to-r from-purple-500 to-blue-500' : 'bg-white/10'
-                        }`}>
+                        <div 
+                          className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 cursor-pointer ${
+                            isSelected ? 'bg-gradient-to-r from-purple-500 to-blue-500' : 'bg-white/10'
+                          }`}
+                          onClick={() => toggleQuestion(question)}
+                        >
                           {isSelected ? (
                             <Check className="w-5 h-5 text-white" />
                           ) : (
                             <span className="text-sm font-medium text-slate-300">{idx + 1}</span>
                           )}
                         </div>
-                        <div className="flex-1">
+                        <div className="flex-1 cursor-pointer" onClick={() => toggleQuestion(question)}>
                           <p className="text-white font-medium mb-2">{question.question_text}</p>
                           {question.options && question.options.length > 0 && (
-                            <div className="space-y-1 mb-3">
+                            <div className="space-y-1 mb-3" onClick={(e) => e.stopPropagation()}>
                               {question.options.map((option, i) => (
                                 <div key={i} className={`text-sm px-3 py-1.5 rounded ${
                                   i === question.correct_index || option === question.correct_answer
@@ -603,7 +605,7 @@ export default function GlobalQuestionBankDialog({ open, onClose, onAddQuestions
                               ))}
                             </div>
                           )}
-                          <div className="flex gap-2">
+                          <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
                             <Badge className={`text-xs ${
                               question.difficulty === 'easy' ? 'bg-green-100 text-green-700' :
                               question.difficulty === 'medium' ? 'bg-amber-100 text-amber-700' :
