@@ -253,6 +253,10 @@ export default function GlobalQuestionBankDialog({ open, onClose, onAddQuestions
   };
 
   const handleAddToQuiz = () => {
+    console.log('[handleAddToQuiz] selectedQuestions.length:', selectedQuestions.length);
+    console.log('[handleAddToQuiz] quizSetId:', quizSetId);
+    console.log('[handleAddToQuiz] selectedQuestionIds:', selectedQuestions.map(q => q.id));
+    
     if (!quizSetId) {
       toast.error('No quiz selected');
       return;
