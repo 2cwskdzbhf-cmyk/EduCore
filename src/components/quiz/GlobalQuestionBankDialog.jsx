@@ -24,12 +24,12 @@ import { toast } from 'sonner';
 
 export default function GlobalQuestionBankDialog({ open, onClose, onAddQuestions, quizSetId }) {
   const queryClient = useQueryClient();
-  const [screen, setScreen] = useState('topics'); // 'topics' | 'subtopics' | 'questions'
-  const [selectedTopic, setSelectedTopic] = useState(null); // top-level topic
-  const [selectedSubtopic, setSelectedSubtopic] = useState(null); // subtopic
+  const [screen, setScreen] = useState('subject'); // 'subject' | 'topics' | 'subtopics' | 'filter' | 'questions'
+  const [selectedSubject, setSelectedSubject] = useState(null);
+  const [selectedTopic, setSelectedTopic] = useState(null);
+  const [selectedSubtopic, setSelectedSubtopic] = useState(null);
   const [selectedYearGroup, setSelectedYearGroup] = useState('all');
   const [selectedDifficulty, setSelectedDifficulty] = useState('all');
-  const [selectedType, setSelectedType] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedQuestions, setSelectedQuestions] = useState([]);
 
@@ -37,19 +37,45 @@ export default function GlobalQuestionBankDialog({ open, onClose, onAddQuestions
   useEffect(() => {
     if (open) {
       console.log('[GlobalQuestionBankDialog] quiz_set_id:', quizSetId);
+      console.log('[GlobalQuestionBankDialog] selectedSubjectId:', selectedSubject?.id);
+      console.log('[GlobalQuestionBankDialog] selectedTopicId:', selectedTopic?.id);
+      console.log('[GlobalQuestionBankDialog] selectedSubtopicId:', selectedSubtopic?.id);
     }
-  }, [open, quizSetId]);
+  }, [open, quizSetId, selectedSubject, selectedTopic, selectedSubtopic]);
 
-  const { data: globalTopics = [], isLoading: loadingTopics } = useQuery({
-    queryKey: ['globalTopics'],
-    queryFn: () => base44.entities.GlobalTopic.list('order_index', 1000),
+  const { data: subjects = [], isLoading: loadingSubjects } = useQuery({
+    queryKey: ['subjects'],
+    queryFn: () => base44.entities.Subject.list('order', 100),
     enabled: open
   });
 
-  const { data: globalQuestions = [], isLoading: loadingQuestions } = useQuery({
-    queryKey: ['globalQuestions'],
-    queryFn: () => base44.entities.GlobalQuestion.list('-created_date', 5000),
-    enabled: open && screen === 'questions' && !!selectedSubtopic
+  const { data: topics = [], isLoading: loadingTopics } = useQuery({
+    queryKey: ['topics', selectedSubject?.id],
+    queryFn: () => base44.entities.Topic.filter({ subject_id: selectedSubject.id }),
+    enabled: open && !!selectedSubject
+  });
+
+  const { data: subtopics = [], isLoading: loadingSubtopics } = useQuery({
+    queryKey: ['subtopics', selectedTopic?.id],
+    queryFn: () => base44.entities.Subtopic.filter({ topic_id: selectedTopic.id }),
+    enabled: open && !!selectedTopic
+  });
+
+  const { data: questions = [], isLoading: loadingQuestions } = useQuery({
+    queryKey: ['questions', selectedSubtopic?.id, selectedYearGroup, selectedDifficulty],
+    queryFn: async () => {
+      console.log('[Questions Query] subtopic_id:', selectedSubtopic.id);
+      console.log('[Questions Query] filters:', { year_group: selectedYearGroup, difficulty: selectedDifficulty });
+      
+      const filters = { subtopic_id: selectedSubtopic.id };
+      if (selectedYearGroup !== 'all') filters.year_group = Number(selectedYearGroup);
+      if (selectedDifficulty !== 'all') filters.difficulty = selectedDifficulty;
+      
+      const result = await base44.entities.Question.filter(filters);
+      console.log('[Questions Query] results count:', result.length);
+      return result;
+    },
+    enabled: open && screen === 'questions' && !!selectedSubtopic && selectedYearGroup !== 'all' && selectedDifficulty !== 'all'
   });
 
   const addQuestionsMutation = useMutation({
@@ -62,11 +88,9 @@ export default function GlobalQuestionBankDialog({ open, onClose, onAddQuestions
       }
 
       // Get existing questions to check for duplicates and determine order
-      const existingQuestions = await base44.entities.QuizQuestion.filter({ quiz_set_id: quizSetId });
-      const existingSourceIds = new Set(
-        existingQuestions
-          .filter(q => q.source_global_id)
-          .map(q => q.source_global_id)
+      const existingQuestions = await base44.entities.LiveQuizQuestion.filter({ quiz_id: quizSetId });
+      const existingQuestionIds = new Set(
+        existingQuestions.map(q => q.question_id)
       );
 
       let maxOrder = existingQuestions.length > 0 
@@ -76,41 +100,33 @@ export default function GlobalQuestionBankDialog({ open, onClose, onAddQuestions
       const createdQuestions = [];
       let skippedDuplicates = 0;
       
-      for (const gq of questions) {
+      for (const q of questions) {
         // Skip if already added
-        if (existingSourceIds.has(gq.id)) {
+        if (existingQuestionIds.has(q.id)) {
           skippedDuplicates++;
-          console.log('[AddToQuiz] Skipping duplicate:', gq.id);
+          console.log('[AddToQuiz] Skipping duplicate:', q.id);
           continue;
         }
 
         maxOrder++;
         try {
           const questionData = {
-            quiz_set_id: quizSetId,
+            quiz_id: quizSetId,
+            question_id: q.id,
             order: maxOrder,
-            prompt: gq.question_text,
-            question_type: gq.question_type === 'mcq' ? 'multiple_choice' : 
-                          gq.question_type === 'numeric' ? 'short_answer' : 'short_answer',
-            options: gq.choices || [],
-            correct_index: gq.correct_index !== undefined ? gq.correct_index :
-                          (gq.choices ? gq.choices.indexOf(gq.correct_answer) : undefined),
-            correct_answer: gq.correct_answer,
-            explanation: gq.explanation || '',
-            difficulty: gq.difficulty,
-            year_group: gq.year_group,
-            subject_id: gq.subject_id,
-            topic_id: gq.global_topic_id,
-            source_global_id: gq.id,
-            is_reusable: false,
-            visibility: 'private'
+            prompt: q.question_text,
+            options: q.options || [],
+            correct_answer: q.correct_answer,
+            correct_index: q.correct_index,
+            difficulty: q.difficulty,
+            year_group: q.year_group
           };
 
-          console.log('[AddToQuiz] Creating QuizQuestion:', questionData);
-          const created = await base44.entities.QuizQuestion.create(questionData);
+          console.log('[AddToQuiz] Creating LiveQuizQuestion:', questionData);
+          const created = await base44.entities.LiveQuizQuestion.create(questionData);
           createdQuestions.push(created);
         } catch (err) {
-          console.error('[AddToQuiz] Failed to create QuizQuestion:', err);
+          console.error('[AddToQuiz] Failed to create LiveQuizQuestion:', err);
           throw new Error(`Failed to add question: ${err.message || err}`);
         }
       }
@@ -123,9 +139,11 @@ export default function GlobalQuestionBankDialog({ open, onClose, onAddQuestions
         ? `Added ${data.count} questions to quiz (skipped ${data.skipped} duplicates)`
         : `Added ${data.count} questions to quiz`;
       toast.success(message);
+      queryClient.invalidateQueries(['liveQuizQuestions']);
       queryClient.invalidateQueries(['quizQuestions']);
       onAddQuestions?.(data.count);
       setSelectedQuestions([]);
+      handleClose();
     },
     onError: (error) => {
       console.error('[AddToQuiz] Error:', error);
@@ -140,74 +158,63 @@ export default function GlobalQuestionBankDialog({ open, onClose, onAddQuestions
     return str ? Number(str) : null;
   };
 
-  // Top-level topics (parent_topic_id == null)
-  const topLevelTopics = useMemo(() => {
-    return globalTopics
-      .filter(t => !t.parent_topic_id)
-      .sort((a, b) => (a.order_index || 0) - (b.order_index || 0));
-  }, [globalTopics]);
-
-  // Subtopics for selected topic
-  const subtopics = useMemo(() => {
-    if (!selectedTopic) return [];
-    return globalTopics
-      .filter(t => t.parent_topic_id === selectedTopic.id)
-      .sort((a, b) => (a.order_index || 0) - (b.order_index || 0));
-  }, [globalTopics, selectedTopic]);
-
-  // Get question count for each topic/subtopic
-  const getQuestionCount = (topicId) => {
-    return globalQuestions.filter(q => q.global_topic_id === topicId).length;
-  };
-
-  // Filter questions for selected subtopic
+  // Filter questions with search
   const filteredQuestions = useMemo(() => {
-    if (!selectedSubtopic) return [];
+    if (!questions || questions.length === 0) return [];
     
-    let questions = globalQuestions.filter(q => q.global_topic_id === selectedSubtopic.id);
-    
-    // Apply filters
-    if (selectedYearGroup !== 'all') {
-      const selectedYear = normalizeYearGroup(selectedYearGroup);
-      questions = questions.filter(q => normalizeYearGroup(q.year_group) === selectedYear);
-    }
-    if (selectedDifficulty !== 'all') {
-      questions = questions.filter(q => q.difficulty === selectedDifficulty);
-    }
-    if (selectedType !== 'all') {
-      questions = questions.filter(q => q.question_type === selectedType);
-    }
     if (searchQuery) {
-      questions = questions.filter(q => 
+      return questions.filter(q => 
         q.question_text.toLowerCase().includes(searchQuery.toLowerCase())
       );
     }
     
     return questions;
-  }, [globalQuestions, selectedSubtopic, selectedYearGroup, selectedDifficulty, selectedType, searchQuery]);
+  }, [questions, searchQuery]);
 
   const handleClose = () => {
-    setScreen('topics');
+    setScreen('subject');
+    setSelectedSubject(null);
     setSelectedTopic(null);
     setSelectedSubtopic(null);
     setSelectedYearGroup('all');
     setSelectedDifficulty('all');
-    setSelectedType('all');
     setSearchQuery('');
     setSelectedQuestions([]);
     onClose();
   };
 
+  const handleSelectSubject = (subject) => {
+    console.log('[SelectSubject]', subject);
+    setSelectedSubject(subject);
+    setScreen('topics');
+  };
+
   const handleSelectTopic = (topic) => {
+    console.log('[SelectTopic]', topic);
     setSelectedTopic(topic);
     setScreen('subtopics');
-    setSelectedQuestions([]);
   };
 
   const handleSelectSubtopic = (subtopic) => {
+    console.log('[SelectSubtopic]', subtopic);
     setSelectedSubtopic(subtopic);
+    setScreen('filter');
+  };
+
+  const handleApplyFilters = () => {
+    if (selectedYearGroup === 'all' || selectedDifficulty === 'all') {
+      toast.error('Please select both Year Group and Difficulty');
+      return;
+    }
+    console.log('[ApplyFilters]', { year_group: selectedYearGroup, difficulty: selectedDifficulty });
     setScreen('questions');
-    setSearchQuery('');
+  };
+
+  const handleBackToSubject = () => {
+    setScreen('subject');
+    setSelectedSubject(null);
+    setSelectedTopic(null);
+    setSelectedSubtopic(null);
     setSelectedQuestions([]);
   };
 
@@ -215,14 +222,17 @@ export default function GlobalQuestionBankDialog({ open, onClose, onAddQuestions
     setScreen('topics');
     setSelectedTopic(null);
     setSelectedSubtopic(null);
-    setSearchQuery('');
     setSelectedQuestions([]);
   };
 
   const handleBackToSubtopics = () => {
     setScreen('subtopics');
     setSelectedSubtopic(null);
-    setSearchQuery('');
+    setSelectedQuestions([]);
+  };
+
+  const handleBackToFilters = () => {
+    setScreen('filter');
     setSelectedQuestions([]);
   };
 
@@ -261,11 +271,16 @@ export default function GlobalQuestionBankDialog({ open, onClose, onAddQuestions
         <DialogHeader className="border-b border-white/10 px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3 flex-1">
-              {screen !== 'topics' && (
+              {screen !== 'subject' && (
                 <Button
                   variant="ghost"
                   size="icon"
-                  onClick={screen === 'questions' ? handleBackToSubtopics : handleBackToTopics}
+                  onClick={
+                    screen === 'topics' ? handleBackToSubject :
+                    screen === 'subtopics' ? handleBackToTopics :
+                    screen === 'filter' ? handleBackToSubtopics :
+                    handleBackToFilters
+                  }
                   className="text-slate-400 hover:text-white"
                 >
                   <ArrowLeft className="w-5 h-5" />
@@ -274,7 +289,13 @@ export default function GlobalQuestionBankDialog({ open, onClose, onAddQuestions
               <div className="flex items-center gap-2 flex-1">
                 <Database className="w-6 h-6 text-purple-400" />
                 <div className="flex items-center gap-2 text-sm text-slate-400">
-                  <span className={screen === 'topics' ? 'text-white font-semibold' : 'cursor-pointer hover:text-white'} onClick={handleBackToTopics}>Topics</span>
+                  <span className={screen === 'subject' ? 'text-white font-semibold' : 'cursor-pointer hover:text-white'} onClick={handleBackToSubject}>Subject</span>
+                  {selectedSubject && (
+                    <>
+                      <ChevronRight className="w-4 h-4" />
+                      <span className={screen === 'topics' ? 'text-white font-semibold' : 'cursor-pointer hover:text-white'} onClick={handleBackToTopics}>{selectedSubject.name}</span>
+                    </>
+                  )}
                   {selectedTopic && (
                     <>
                       <ChevronRight className="w-4 h-4" />
@@ -284,7 +305,7 @@ export default function GlobalQuestionBankDialog({ open, onClose, onAddQuestions
                   {selectedSubtopic && (
                     <>
                       <ChevronRight className="w-4 h-4" />
-                      <span className="text-white font-semibold">{selectedSubtopic.name}</span>
+                      <span className={screen === 'filter' || screen === 'questions' ? 'text-white font-semibold' : ''}>{selectedSubtopic.name}</span>
                     </>
                   )}
                 </div>
@@ -300,7 +321,7 @@ export default function GlobalQuestionBankDialog({ open, onClose, onAddQuestions
                   disabled={selectedQuestions.length === 0 || addQuestionsMutation.isPending}
                   className="bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600"
                 >
-                  {addQuestionsMutation.isPending ? 'Adding...' : `Add ${selectedQuestions.length} to Quiz`}
+                  {addQuestionsMutation.isPending ? 'Adding...' : `Apply (${selectedQuestions.length})`}
                 </Button>
               </div>
             )}
@@ -312,34 +333,66 @@ export default function GlobalQuestionBankDialog({ open, onClose, onAddQuestions
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-6">
+          {/* Subject Screen */}
+          {screen === 'subject' && (
+            <div>
+              <div className="mb-6">
+                <p className="text-slate-400">Select a subject to browse topics</p>
+              </div>
+
+              {loadingSubjects ? (
+                <div className="text-center py-12">
+                  <div className="w-12 h-12 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mx-auto" />
+                </div>
+              ) : subjects.length === 0 ? (
+                <div className="text-center py-12">
+                  <Database className="w-16 h-16 text-slate-600 mx-auto mb-4" />
+                  <p className="text-slate-400">No subjects found</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {subjects.map(subject => (
+                    <Card
+                      key={subject.id}
+                      className="p-6 bg-white/5 border-white/10 hover:bg-white/10 transition-all cursor-pointer"
+                      onClick={() => handleSelectSubject(subject)}
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className="w-14 h-14 rounded-xl bg-blue-500/20 flex items-center justify-center">
+                          <BookOpen className="w-7 h-7 text-blue-400" />
+                        </div>
+                        <div>
+                          <h3 className="font-semibold text-lg text-white">{subject.name}</h3>
+                          <p className="text-sm text-slate-400">{subject.description || 'Click to browse'}</p>
+                        </div>
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Topics Screen */}
           {screen === 'topics' && (
             <div>
-              <div className="mb-6 flex items-center justify-between">
-                <p className="text-slate-400">Select a topic to view subtopics</p>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="bg-white/5 border-white/10 text-slate-300 hover:bg-white/10"
-                >
-                  <Plus className="w-4 h-4 mr-2" />
-                  New Topic
-                </Button>
+              <div className="mb-6">
+                <p className="text-slate-400">Select a topic within {selectedSubject?.name}</p>
               </div>
 
               {loadingTopics ? (
                 <div className="text-center py-12">
                   <div className="w-12 h-12 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mx-auto" />
                 </div>
-              ) : topLevelTopics.length === 0 ? (
+              ) : topics.length === 0 ? (
                 <div className="text-center py-12">
                   <FolderOpen className="w-16 h-16 text-slate-600 mx-auto mb-4" />
-                  <p className="text-slate-400">No topics found</p>
-                  <p className="text-sm text-slate-500 mt-2">Create a topic to organize questions</p>
+                  <p className="text-slate-400">No topics found for {selectedSubject?.name}</p>
+                  <p className="text-sm text-slate-500 mt-2">Debug: subject_id = {selectedSubject?.id}</p>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {topLevelTopics.map(topic => (
+                  {topics.map(topic => (
                     <Card
                       key={topic.id}
                       className="p-6 bg-white/5 border-white/10 hover:bg-white/10 transition-all cursor-pointer"
@@ -364,104 +417,114 @@ export default function GlobalQuestionBankDialog({ open, onClose, onAddQuestions
           {/* Subtopics Screen */}
           {screen === 'subtopics' && (
             <div>
-              <div className="mb-6 flex items-center justify-between">
-                <p className="text-slate-400">Select a subtopic to view questions</p>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="bg-white/5 border-white/10 text-slate-300 hover:bg-white/10"
-                >
-                  <Plus className="w-4 h-4 mr-2" />
-                  New Subtopic
-                </Button>
+              <div className="mb-6">
+                <p className="text-slate-400">Select a subtopic within {selectedTopic?.name}</p>
               </div>
 
-              {subtopics.length === 0 ? (
+              {loadingSubtopics ? (
+                <div className="text-center py-12">
+                  <div className="w-12 h-12 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mx-auto" />
+                </div>
+              ) : subtopics.length === 0 ? (
                 <div className="text-center py-12">
                   <FolderOpen className="w-16 h-16 text-slate-600 mx-auto mb-4" />
-                  <p className="text-slate-400">No subtopics found</p>
-                  <p className="text-sm text-slate-500 mt-2">Create subtopics to organize questions</p>
+                  <p className="text-slate-400">No subtopics found for {selectedTopic?.name}</p>
+                  <p className="text-sm text-slate-500 mt-2">Debug: topic_id = {selectedTopic?.id}</p>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {subtopics.map(subtopic => {
-                    const count = getQuestionCount(subtopic.id);
-                    return (
-                      <Card
-                        key={subtopic.id}
-                        className="p-6 bg-white/5 border-white/10 hover:bg-white/10 transition-all cursor-pointer"
-                        onClick={() => handleSelectSubtopic(subtopic)}
-                      >
-                        <div className="flex items-center gap-4">
-                          <div className="w-14 h-14 rounded-xl bg-blue-500/20 flex items-center justify-center">
-                            <BookOpen className="w-7 h-7 text-blue-400" />
-                          </div>
-                          <div>
-                            <h3 className="font-semibold text-lg text-white">{subtopic.name}</h3>
-                            <p className="text-sm text-slate-400">{count} question{count !== 1 ? 's' : ''}</p>
-                          </div>
+                  {subtopics.map(subtopic => (
+                    <Card
+                      key={subtopic.id}
+                      className="p-6 bg-white/5 border-white/10 hover:bg-white/10 transition-all cursor-pointer"
+                      onClick={() => handleSelectSubtopic(subtopic)}
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className="w-14 h-14 rounded-xl bg-emerald-500/20 flex items-center justify-center">
+                          <BookOpen className="w-7 h-7 text-emerald-400" />
                         </div>
-                      </Card>
-                    );
-                  })}
+                        <div>
+                          <h3 className="font-semibold text-lg text-white">{subtopic.name}</h3>
+                          <p className="text-sm text-slate-400">{subtopic.description || 'Click to filter questions'}</p>
+                        </div>
+                      </div>
+                    </Card>
+                  ))}
                 </div>
               )}
+            </div>
+          )}
+
+          {/* Filter Screen */}
+          {screen === 'filter' && (
+            <div className="max-w-2xl mx-auto">
+              <div className="mb-6">
+                <h3 className="text-lg font-semibold text-white mb-2">Filter Questions</h3>
+                <p className="text-sm text-slate-400">Select year group and difficulty to view questions in {selectedSubtopic?.name}</p>
+              </div>
+
+              <div className="space-y-6 bg-white/5 border border-white/10 rounded-xl p-6">
+                <div>
+                  <Label className="text-slate-300 mb-2 block">Year Group *</Label>
+                  <Select value={selectedYearGroup} onValueChange={setSelectedYearGroup}>
+                    <SelectTrigger className="bg-white/5 border-white/10 text-white">
+                      <SelectValue placeholder="Select year group" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="7">Year 7</SelectItem>
+                      <SelectItem value="8">Year 8</SelectItem>
+                      <SelectItem value="9">Year 9</SelectItem>
+                      <SelectItem value="10">Year 10</SelectItem>
+                      <SelectItem value="11">Year 11</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <Label className="text-slate-300 mb-2 block">Difficulty *</Label>
+                  <Select value={selectedDifficulty} onValueChange={setSelectedDifficulty}>
+                    <SelectTrigger className="bg-white/5 border-white/10 text-white">
+                      <SelectValue placeholder="Select difficulty" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="easy">Easy</SelectItem>
+                      <SelectItem value="medium">Medium</SelectItem>
+                      <SelectItem value="hard">Hard</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <Button
+                  onClick={handleApplyFilters}
+                  disabled={selectedYearGroup === 'all' || selectedDifficulty === 'all'}
+                  className="w-full bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600"
+                  size="lg"
+                >
+                  <Filter className="w-5 h-5 mr-2" />
+                  Show Questions
+                </Button>
+              </div>
             </div>
           )}
 
           {/* Questions Screen */}
           {screen === 'questions' && (
             <div>
-              {/* Filters and Search */}
+              {/* Search and Actions */}
               <div className="mb-6 space-y-4">
                 <div className="flex items-center justify-between">
                   <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="bg-white/5 border-white/10 text-slate-300 hover:bg-white/10"
-                    >
-                      <Plus className="w-4 h-4 mr-2" />
-                      New Question
-                    </Button>
+                    <Badge className="bg-blue-500/20 text-blue-300">Year {selectedYearGroup}</Badge>
+                    <Badge className="bg-purple-500/20 text-purple-300">{selectedDifficulty}</Badge>
                   </div>
-                  <div className="flex gap-2">
-                    <Select value={selectedYearGroup} onValueChange={setSelectedYearGroup}>
-                      <SelectTrigger className="w-32 bg-white/5 border-white/10 text-white">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Years</SelectItem>
-                        <SelectItem value="7">Year 7</SelectItem>
-                        <SelectItem value="8">Year 8</SelectItem>
-                        <SelectItem value="9">Year 9</SelectItem>
-                        <SelectItem value="10">Year 10</SelectItem>
-                        <SelectItem value="11">Year 11</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <Select value={selectedDifficulty} onValueChange={setSelectedDifficulty}>
-                      <SelectTrigger className="w-32 bg-white/5 border-white/10 text-white">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Difficulty</SelectItem>
-                        <SelectItem value="easy">Easy</SelectItem>
-                        <SelectItem value="medium">Medium</SelectItem>
-                        <SelectItem value="hard">Hard</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <Select value={selectedType} onValueChange={setSelectedType}>
-                      <SelectTrigger className="w-32 bg-white/5 border-white/10 text-white">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Types</SelectItem>
-                        <SelectItem value="mcq">MCQ</SelectItem>
-                        <SelectItem value="numeric">Numeric</SelectItem>
-                        <SelectItem value="short">Short</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleBackToFilters}
+                    className="bg-white/5 border-white/10 text-slate-300 hover:bg-white/10"
+                  >
+                    Change Filters
+                  </Button>
                 </div>
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
@@ -527,15 +590,15 @@ export default function GlobalQuestionBankDialog({ open, onClose, onAddQuestions
                         </div>
                         <div className="flex-1">
                           <p className="text-white font-medium mb-2">{question.question_text}</p>
-                          {question.choices && question.choices.length > 0 && (
+                          {question.options && question.options.length > 0 && (
                             <div className="space-y-1 mb-3">
-                              {question.choices.map((choice, i) => (
+                              {question.options.map((option, i) => (
                                 <div key={i} className={`text-sm px-3 py-1.5 rounded ${
-                                  choice === question.correct_answer
+                                  i === question.correct_index || option === question.correct_answer
                                     ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/50'
                                     : 'bg-white/5 text-slate-300 border border-white/10'
                                 }`}>
-                                  {String.fromCharCode(65 + i)}. {choice}
+                                  {String.fromCharCode(65 + i)}. {option}
                                 </div>
                               ))}
                             </div>
@@ -549,8 +612,9 @@ export default function GlobalQuestionBankDialog({ open, onClose, onAddQuestions
                               {question.difficulty}
                             </Badge>
                             <Badge variant="outline" className="text-xs text-slate-300">
-                              {question.question_type === 'mcq' ? 'Multiple Choice' :
-                               question.question_type === 'numeric' ? 'Numeric' : 'Short Answer'}
+                              {question.question_type === 'multiple_choice' ? 'Multiple Choice' :
+                               question.question_type === 'true_false' ? 'True/False' :
+                               question.question_type === 'short_answer' ? 'Short Answer' : 'Written'}
                             </Badge>
                             <Badge variant="outline" className="text-xs text-slate-300">Year {question.year_group}</Badge>
                           </div>
