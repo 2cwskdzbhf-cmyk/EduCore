@@ -15,11 +15,13 @@ import GlassCard from '@/components/ui/GlassCard';
 import { toast } from 'sonner';
 import {
   ChevronLeft, Plus, Trash2, Save, Play,
-  BookOpen, Sparkles, Check, Upload, Database, FileText, Image as ImageIcon
+  BookOpen, Sparkles, Check, Upload, Database, FileText, Image
 } from 'lucide-react';
 
 import BulkImportDialog from '@/components/quiz/BulkImportDialog';
 import GlobalQuestionBankDialog from '@/components/quiz/GlobalQuestionBankDialog';
+import TemplateSelectorDialog from '@/components/quiz/TemplateSelectorDialog';
+import SaveTemplateDialog from '@/components/quiz/SaveTemplateDialog';
 
 export default function CreateQuiz() {
   const navigate = useNavigate();
@@ -42,13 +44,11 @@ export default function CreateQuiz() {
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [showBulkImportDialog, setShowBulkImportDialog] = useState(false);
   const [showGlobalQuestionBankDialog, setShowGlobalQuestionBankDialog] = useState(false);
-  const [showTemplateDialog, setShowTemplateDialog] = useState(false);
+  const [showTemplateSelectorDialog, setShowTemplateSelectorDialog] = useState(false);
   const [showSaveTemplateDialog, setShowSaveTemplateDialog] = useState(false);
-  const [templateName, setTemplateName] = useState('');
-  const [templateDescription, setTemplateDescription] = useState('');
-  const [uploadingImage, setUploadingImage] = useState(false);
 
   const [quizSetId, setQuizSetId] = useState(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
 
   // --------- AUTH ----------
   useEffect(() => {
@@ -198,16 +198,6 @@ export default function CreateQuiz() {
     enabled: !!quizSet.subject_id
   });
 
-  const { data: templates = [] } = useQuery({
-    queryKey: ['quizTemplates', user?.email],
-    queryFn: async () => {
-      const myTemplates = await base44.entities.QuizTemplate.filter({ owner_email: user.email });
-      const sharedTemplates = await base44.entities.QuizTemplate.filter({ is_shared: true });
-      return [...myTemplates, ...sharedTemplates.filter(t => t.owner_email !== user.email)];
-    },
-    enabled: !!user?.email
-  });
-
   // --------- SAVE QUIZ (UPSERT) ----------
   const saveQuizMutation = useMutation({
     mutationFn: async ({ status }) => {
@@ -265,7 +255,9 @@ export default function CreateQuiz() {
             difficulty: q.difficulty || 'medium',
             explanation: q.explanation || '',
             tags: q.tags || [],
-            source_global_id: q.source_global_id || null
+            source_global_id: q.source_global_id || null,
+            image_url: q.image_url || '',
+            option_images: q.option_images || []
           })
         )
       );
@@ -375,107 +367,6 @@ export default function CreateQuiz() {
     return true;
   };
 
-  // --------- TEMPLATE HELPERS ----------
-  const saveAsTemplate = useMutation({
-    mutationFn: async () => {
-      if (!user?.email || !templateName.trim()) {
-        throw new Error('Template name is required');
-      }
-
-      await base44.entities.QuizTemplate.create({
-        name: templateName.trim(),
-        description: templateDescription.trim(),
-        owner_email: user.email,
-        is_shared: false,
-        quiz_title: quizSet.title || '',
-        quiz_description: quizSet.description || '',
-        subject_id: quizSet.subject_id || '',
-        topic_id: quizSet.topic_id || '',
-        time_limit_per_question: quizSet.time_limit_per_question || 15000,
-        questions: questions.map(q => ({
-          prompt: q.prompt,
-          question_type: q.question_type,
-          options: q.options,
-          correct_index: q.correct_index,
-          difficulty: q.difficulty,
-          explanation: q.explanation,
-          tags: q.tags,
-          image_url: q.image_url
-        })),
-        usage_count: 0
-      });
-
-      return true;
-    },
-    onSuccess: () => {
-      toast.success('Template saved successfully');
-      setShowSaveTemplateDialog(false);
-      setTemplateName('');
-      setTemplateDescription('');
-      queryClient.invalidateQueries(['quizTemplates']);
-    },
-    onError: (error) => {
-      toast.error(error.message || 'Failed to save template');
-    }
-  });
-
-  const loadFromTemplate = (template) => {
-    setQuizSet({
-      title: template.quiz_title || '',
-      description: template.quiz_description || '',
-      subject_id: template.subject_id || '',
-      topic_id: template.topic_id || '',
-      time_limit_per_question: template.time_limit_per_question || 15000,
-      status: 'draft'
-    });
-
-    const templateQuestions = Array.isArray(template.questions) ? template.questions : [];
-    setQuestions(templateQuestions.map(q => ({
-      prompt: q.prompt || '',
-      question_type: q.question_type || 'multiple_choice',
-      options: Array.isArray(q.options) ? q.options : ['', '', '', ''],
-      correct_index: q.correct_index ?? 0,
-      difficulty: q.difficulty || 'medium',
-      explanation: q.explanation || '',
-      tags: q.tags || [],
-      image_url: q.image_url || null
-    })));
-
-    base44.entities.QuizTemplate.update(template.id, {
-      usage_count: (template.usage_count || 0) + 1
-    }).catch(console.error);
-
-    setShowTemplateDialog(false);
-    toast.success('Template loaded');
-  };
-
-  const uploadImage = async (file, questionIndex, optionIndex = null) => {
-    try {
-      setUploadingImage(true);
-      const { data } = await base44.integrations.Core.UploadFile({ file });
-      
-      if (optionIndex !== null) {
-        // Upload for option
-        const updated = [...questions];
-        if (!updated[questionIndex].option_images) {
-          updated[questionIndex].option_images = {};
-        }
-        updated[questionIndex].option_images[optionIndex] = data.file_url;
-        setQuestions(updated);
-      } else {
-        // Upload for question
-        updateQuestion(questionIndex, 'image_url', data.file_url);
-      }
-      
-      toast.success('Image uploaded');
-    } catch (error) {
-      toast.error('Failed to upload image');
-      console.error(error);
-    } finally {
-      setUploadingImage(false);
-    }
-  };
-
   // --------- UI HELPERS ----------
   const handleGlobalQuestionBankAdd = (count) => {
     if (quizSetId) {
@@ -492,10 +383,64 @@ export default function CreateQuiz() {
       correct_index: 0,
       difficulty: 'medium',
       explanation: '',
-      tags: []
+      tags: [],
+      image_url: '',
+      option_images: ['', '', '', '']
     };
     setQuestions([...questions, baseQuestion]);
     setEditingIndex(questions.length);
+  };
+
+  const handleImageUpload = async (file, qIndex, optionIndex = null) => {
+    if (!file) return;
+    
+    setUploadingImage(true);
+    try {
+      const { data } = await base44.integrations.Core.UploadFile({ file });
+      const updated = [...questions];
+      
+      if (optionIndex !== null) {
+        if (!updated[qIndex].option_images) {
+          updated[qIndex].option_images = ['', '', '', ''];
+        }
+        updated[qIndex].option_images[optionIndex] = data.file_url;
+      } else {
+        updated[qIndex].image_url = data.file_url;
+      }
+      
+      setQuestions(updated);
+      toast.success('Image uploaded');
+    } catch (error) {
+      toast.error('Failed to upload image');
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
+  const handleTemplateSelect = (template) => {
+    setQuizSet({
+      title: template.name || '',
+      description: template.description || '',
+      subject_id: template.subject_id || '',
+      topic_id: template.topic_id || '',
+      time_limit_per_question: template.time_limit_per_question || 15000,
+      status: 'draft'
+    });
+    
+    if (template.questions && Array.isArray(template.questions)) {
+      setQuestions(template.questions.map(q => ({
+        ...q,
+        image_url: q.image_url || '',
+        option_images: q.option_images || ['', '', '', '']
+      })));
+    }
+    
+    // Increment usage count
+    base44.entities.QuizTemplate.update(template.id, {
+      usage_count: (template.usage_count || 0) + 1
+    }).catch(console.error);
+    
+    toast.success('Template loaded');
   };
 
   const updateQuestion = (index, field, value) => {
@@ -629,6 +574,16 @@ export default function CreateQuiz() {
 
                   <div className="space-y-2">
                     <Button
+                      onClick={() => setShowSaveTemplateDialog(true)}
+                      disabled={!quizSet.title?.trim() || questions.length === 0}
+                      variant="outline"
+                      className="w-full border-purple-500/30 text-purple-300 hover:bg-purple-500/10"
+                    >
+                      <FileText className="w-4 h-4 mr-2" />
+                      Save as Template
+                    </Button>
+
+                    <Button
                       onClick={() => {
                         if (!validateAllQuestions()) return;
                         saveQuizMutation.mutate({ status: 'draft' });
@@ -674,20 +629,12 @@ export default function CreateQuiz() {
               <h3 className="text-xl font-bold text-white">Questions</h3>
               <div className="flex flex-wrap gap-2">
                 <Button
-                  onClick={() => setShowTemplateDialog(true)}
-                  className="bg-slate-500/20 hover:bg-slate-500/30 border border-slate-500/50"
+                  onClick={() => setShowTemplateSelectorDialog(true)}
+                  variant="outline"
+                  className="border-purple-500/30 text-purple-300 hover:bg-purple-500/10"
                 >
                   <FileText className="w-4 h-4 mr-2" />
                   Load Template
-                </Button>
-
-                <Button
-                  onClick={() => setShowSaveTemplateDialog(true)}
-                  disabled={!quizSet.title?.trim() || questions.length === 0}
-                  className="bg-slate-500/20 hover:bg-slate-500/30 border border-slate-500/50"
-                >
-                  <Save className="w-4 h-4 mr-2" />
-                  Save as Template
                 </Button>
 
                 <Button
@@ -739,82 +686,61 @@ export default function CreateQuiz() {
                       </div>
 
                       <div className="flex-1">
-                        {/* Minimal display; keep your existing editing UI if you want */}
-                        <div className="space-y-3">
-                          <div>
-                            <Input
-                              value={q.prompt}
-                              onChange={(e) => updateQuestion(index, 'prompt', e.target.value)}
-                              placeholder="Enter question..."
-                              className="bg-white/5 border-white/10 text-white mb-2"
+                        <div className="text-white font-medium mb-2">{q.prompt || '(empty question)'}</div>
+                        
+                        {q.image_url && (
+                          <img src={q.image_url} alt="Question" className="w-full max-w-md h-32 object-cover rounded-lg mb-3" />
+                        )}
+                        
+                        <div className="grid grid-cols-2 gap-2 mb-3">
+                          {q.options?.map((opt, i) => (
+                            <div key={i} className="text-sm text-slate-300 bg-white/5 border border-white/10 rounded px-3 py-2">
+                              {q.option_images?.[i] && (
+                                <img src={q.option_images[i]} alt={`Option ${i + 1}`} className="w-full h-16 object-cover rounded mb-2" />
+                              )}
+                              {opt || '(empty)'}
+                            </div>
+                          ))}
+                        </div>
+
+                        <div className="flex items-center gap-2 mb-2">
+                          <label className="cursor-pointer">
+                            <input
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              onChange={(e) => handleImageUpload(e.target.files[0], index)}
+                              disabled={uploadingImage}
                             />
-                            {q.image_url && (
-                              <div className="relative w-32 h-32 mb-2">
-                                <img src={q.image_url} alt="Question" className="w-full h-full object-cover rounded" />
-                                <Button
-                                  size="icon"
-                                  variant="ghost"
-                                  className="absolute top-1 right-1 bg-red-500 hover:bg-red-600 w-6 h-6"
-                                  onClick={() => updateQuestion(index, 'image_url', null)}
-                                >
-                                  <Trash2 className="w-3 h-3" />
-                                </Button>
-                              </div>
-                            )}
-                            <label className="cursor-pointer">
+                            <Button variant="outline" size="sm" className="pointer-events-none" disabled={uploadingImage}>
+                              <Image className="w-3 h-3 mr-1" />
+                              {q.image_url ? 'Change' : 'Add'} Question Image
+                            </Button>
+                          </label>
+                          
+                          {q.options?.map((_, i) => (
+                            <label key={i} className="cursor-pointer">
                               <input
                                 type="file"
                                 accept="image/*"
                                 className="hidden"
-                                onChange={(e) => {
-                                  const file = e.target.files?.[0];
-                                  if (file) uploadImage(file, index);
-                                }}
+                                onChange={(e) => handleImageUpload(e.target.files[0], index, i)}
                                 disabled={uploadingImage}
                               />
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant="outline"
-                                className="bg-white/5 border-white/10"
-                                disabled={uploadingImage}
-                              >
-                                <ImageIcon className="w-4 h-4 mr-2" />
-                                {uploadingImage ? 'Uploading...' : 'Add Image'}
+                              <Button variant="ghost" size="sm" className="pointer-events-none text-xs" disabled={uploadingImage}>
+                                <Image className="w-3 h-3" />
                               </Button>
                             </label>
-                          </div>
+                          ))}
+                        </div>
 
-                          <div className="grid grid-cols-2 gap-2">
-                            {q.options?.map((opt, i) => (
-                              <div key={i} className="space-y-1">
-                                <Input
-                                  value={opt}
-                                  onChange={(e) => updateOption(index, i, e.target.value)}
-                                  placeholder={`Option ${i + 1}`}
-                                  className="text-sm bg-white/5 border-white/10 text-white"
-                                />
-                                <div className="flex items-center gap-2">
-                                  <input
-                                    type="radio"
-                                    checked={q.correct_index === i}
-                                    onChange={() => updateQuestion(index, 'correct_index', i)}
-                                    className="cursor-pointer"
-                                  />
-                                  <span className="text-xs text-slate-400">Correct</span>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-
-                          <div className="flex items-center gap-2">
-                            <Badge className="bg-white/10 text-slate-200">{q.difficulty || 'medium'}</Badge>
-                            {q.source_global_id && (
-                              <Badge className="bg-blue-500/20 text-blue-200 border border-blue-500/30">
-                                From Global Bank
-                              </Badge>
-                            )}
-                          </div>
+                        <div className="flex items-center gap-2">
+                          <Badge className="bg-white/10 text-slate-200">{q.difficulty || 'medium'}</Badge>
+                          {q.source_global_id && (
+                            <Badge className="bg-blue-500/20 text-blue-200 border border-blue-500/30">
+                              From Global Bank
+                            </Badge>
+                          )}
                         </div>
                       </div>
 
@@ -847,88 +773,21 @@ export default function CreateQuiz() {
               quizSetId={quizSetId}
             />
 
-            {/* Template Selection Dialog */}
-            <Dialog open={showTemplateDialog} onOpenChange={setShowTemplateDialog}>
-              <DialogContent className="max-w-2xl bg-slate-900 border-white/10 text-white">
-                <h3 className="text-2xl font-bold mb-4">Load Template</h3>
-                {templates.length === 0 ? (
-                  <div className="text-center py-8 text-slate-400">
-                    <FileText className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                    <p>No templates available</p>
-                  </div>
-                ) : (
-                  <div className="space-y-3 max-h-96 overflow-y-auto">
-                    {templates.map(template => (
-                      <div
-                        key={template.id}
-                        onClick={() => loadFromTemplate(template)}
-                        className="p-4 bg-white/5 rounded-lg border border-white/10 hover:bg-white/10 cursor-pointer transition-colors"
-                      >
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <h4 className="font-semibold text-white mb-1">{template.name}</h4>
-                            {template.description && (
-                              <p className="text-sm text-slate-400 mb-2">{template.description}</p>
-                            )}
-                            <div className="flex items-center gap-2 text-xs text-slate-500">
-                              <span>{template.questions?.length || 0} questions</span>
-                              <span>•</span>
-                              <span>Used {template.usage_count || 0} times</span>
-                              {template.is_shared && (
-                                <>
-                                  <span>•</span>
-                                  <Badge className="bg-blue-500/20 text-blue-300 text-xs">Shared</Badge>
-                                </>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </DialogContent>
-            </Dialog>
+            {/* Template Selector Dialog */}
+            <TemplateSelectorDialog
+              open={showTemplateSelectorDialog}
+              onClose={() => setShowTemplateSelectorDialog(false)}
+              onSelectTemplate={handleTemplateSelect}
+              userEmail={user?.email}
+            />
 
             {/* Save Template Dialog */}
-            <Dialog open={showSaveTemplateDialog} onOpenChange={setShowSaveTemplateDialog}>
-              <DialogContent className="bg-slate-900 border-white/10 text-white">
-                <h3 className="text-2xl font-bold mb-4">Save as Template</h3>
-                <div className="space-y-4">
-                  <div>
-                    <Label className="text-slate-300">Template Name *</Label>
-                    <Input
-                      value={templateName}
-                      onChange={(e) => setTemplateName(e.target.value)}
-                      placeholder="e.g., Year 9 Fractions Quiz"
-                      className="mt-1 bg-white/5 border-white/10 text-white"
-                    />
-                  </div>
-                  <div>
-                    <Label className="text-slate-300">Description</Label>
-                    <Textarea
-                      value={templateDescription}
-                      onChange={(e) => setTemplateDescription(e.target.value)}
-                      placeholder="Optional description..."
-                      className="mt-1 bg-white/5 border-white/10 text-white"
-                      rows={3}
-                    />
-                  </div>
-                  <div className="flex justify-end gap-2">
-                    <Button variant="outline" onClick={() => setShowSaveTemplateDialog(false)}>
-                      Cancel
-                    </Button>
-                    <Button
-                      onClick={() => saveAsTemplate.mutate()}
-                      disabled={!templateName.trim() || saveAsTemplate.isPending}
-                      className="bg-gradient-to-r from-purple-500 to-blue-500"
-                    >
-                      Save Template
-                    </Button>
-                  </div>
-                </div>
-              </DialogContent>
-            </Dialog>
+            <SaveTemplateDialog
+              open={showSaveTemplateDialog}
+              onClose={() => setShowSaveTemplateDialog(false)}
+              quizData={{ ...quizSet, questions }}
+              userEmail={user?.email}
+            />
 
             {/* AI dialog placeholder */}
             <Dialog open={showImportDialog} onOpenChange={setShowImportDialog}>
