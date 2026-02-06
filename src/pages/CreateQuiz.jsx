@@ -647,9 +647,13 @@ export default function CreateQuiz() {
                       </div>
 
                       <div className="flex-1">
-                        <div className="text-white font-medium mb-2">
-                          {q.prompt?.trim() ? q.prompt : 'New question (click to edit)'}
-                        </div>
+                        <Textarea
+                          value={q.prompt || ''}
+                          onChange={(e) => updateQuestion(index, 'prompt', e.target.value)}
+                          placeholder="Enter question text..."
+                          className="mb-2 bg-white/5 border-white/10 text-white"
+                          rows={2}
+                        />
 
                         {q.image_url && (
                           <img src={q.image_url} alt="Question" className="w-full max-w-md h-32 object-cover rounded-lg mb-3" />
@@ -657,16 +661,44 @@ export default function CreateQuiz() {
 
                         <div className="grid grid-cols-2 gap-2 mb-3">
                           {q.options?.map((opt, i) => (
-                            <div key={i} className="text-sm text-slate-300 bg-white/5 border border-white/10 rounded px-3 py-2">
+                            <div key={i} className="relative">
                               {q.option_images?.[i] && (
                                 <img src={q.option_images[i]} alt={`Option ${i + 1}`} className="w-full h-16 object-cover rounded mb-2" />
                               )}
-                              {String(opt || '').trim() ? opt : '—'}
+                              <Input
+                                value={String(opt || '')}
+                                onChange={(e) => updateOption(index, i, e.target.value)}
+                                placeholder={`Option ${i + 1}`}
+                                className={`bg-white/5 border-white/10 text-white ${q.correct_index === i ? 'ring-2 ring-green-500' : ''}`}
+                              />
                             </div>
                           ))}
                         </div>
 
                         <div className="flex items-center gap-2 mb-2">
+                          <Select value={String(q.correct_index)} onValueChange={(v) => updateQuestion(index, 'correct_index', Number(v))}>
+                            <SelectTrigger className="w-40 bg-white/5 border-white/10 text-white">
+                              <SelectValue placeholder="Correct answer" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="0">Option 1</SelectItem>
+                              <SelectItem value="1">Option 2</SelectItem>
+                              <SelectItem value="2">Option 3</SelectItem>
+                              <SelectItem value="3">Option 4</SelectItem>
+                            </SelectContent>
+                          </Select>
+
+                          <Select value={q.difficulty} onValueChange={(v) => updateQuestion(index, 'difficulty', v)}>
+                            <SelectTrigger className="w-32 bg-white/5 border-white/10 text-white">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="easy">Easy</SelectItem>
+                              <SelectItem value="medium">Medium</SelectItem>
+                              <SelectItem value="hard">Hard</SelectItem>
+                            </SelectContent>
+                          </Select>
+
                           <label className="cursor-pointer">
                             <input
                               type="file"
@@ -675,9 +707,9 @@ export default function CreateQuiz() {
                               onChange={(e) => handleImageUpload(e.target.files[0], index)}
                               disabled={uploadingImage}
                             />
-                            <Button variant="outline" size="sm" className="pointer-events-none" disabled={uploadingImage}>
+                            <Button variant="outline" size="sm" disabled={uploadingImage}>
                               <Image className="w-3 h-3 mr-1" />
-                              {q.image_url ? 'Change' : 'Add'} Question Image
+                              {q.image_url ? 'Change' : 'Add'} Image
                             </Button>
                           </label>
 
@@ -690,21 +722,18 @@ export default function CreateQuiz() {
                                 onChange={(e) => handleImageUpload(e.target.files[0], index, i)}
                                 disabled={uploadingImage}
                               />
-                              <Button variant="ghost" size="sm" className="pointer-events-none text-xs" disabled={uploadingImage}>
+                              <Button variant="ghost" size="sm" disabled={uploadingImage}>
                                 <Image className="w-3 h-3" />
                               </Button>
                             </label>
                           ))}
                         </div>
 
-                        <div className="flex items-center gap-2">
-                          <Badge className="bg-white/10 text-slate-200">{q.difficulty || 'medium'}</Badge>
-                          {q.source_global_id && (
-                            <Badge className="bg-blue-500/20 text-blue-200 border border-blue-500/30">
-                              From Global Bank
-                            </Badge>
-                          )}
-                        </div>
+                        {q.source_global_id && (
+                          <Badge className="bg-blue-500/20 text-blue-200 border border-blue-500/30">
+                            From Global Bank
+                          </Badge>
+                        )}
                       </div>
 
                       <Button
