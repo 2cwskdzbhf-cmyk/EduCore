@@ -467,7 +467,7 @@ export default function GlobalQuestionBankDialog({ open, onClose, onAddQuestions
                           <div className="text-white font-medium">
                             {idx + 1}. {q.question_text}
                           </div>
-                          <Badge className={isSel ? 'bg-purple-500/30 text-purple-100' : 'bg-white/10 text-slate-200'}>
+                          <Badge className={`pointer-events-none ${isSel ? 'bg-purple-500/30 text-purple-100' : 'bg-white/10 text-slate-200'}`}>
                             {isSel ? 'Selected' : 'Tap to select'}
                           </Badge>
                         </div>
