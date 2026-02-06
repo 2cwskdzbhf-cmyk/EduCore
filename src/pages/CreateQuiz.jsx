@@ -110,45 +110,39 @@ export default function CreateQuiz() {
     enabled: !!quizSetId
   });
 
-  // Keep editor UI in sync with database quiz questions, filtering out invalid ones
+  // Keep editor UI in sync with database quiz questions, auto-sanitizing invalid ones
   useEffect(() => {
     if (!quizSetId) return;
 
-    const mapped = persistedQuizQuestions
-      .map((qq) => ({
-        prompt: qq.prompt || '',
-        question_type: qq.question_type || 'multiple_choice',
-        options: Array.isArray(qq.options) ? qq.options : ['', '', '', ''],
-        correct_index: typeof qq.correct_index === 'number'
-          ? qq.correct_index
-          : 0,
-        correct_answer: qq.correct_answer || '',
-        difficulty: qq.difficulty || 'medium',
-        explanation: qq.explanation || '',
-        tags: qq.tags || [],
-        source_global_id: qq.source_global_id || null,
-        _quiz_question_id: qq.id,
-        _order: qq.order ?? 0
-      }))
-      .filter(q => validateQuestion(q) === null); // Only load valid questions
+    const mapped = persistedQuizQuestions.map((qq) => ({
+      prompt: qq.prompt || '',
+      question_type: qq.question_type || 'multiple_choice',
+      options: Array.isArray(qq.options) ? qq.options : ['', '', '', ''],
+      correct_index: typeof qq.correct_index === 'number' ? qq.correct_index : 0,
+      correct_answer: qq.correct_answer || '',
+      difficulty: qq.difficulty || 'medium',
+      explanation: qq.explanation || '',
+      tags: qq.tags || [],
+      source_global_id: qq.source_global_id || null,
+      _quiz_question_id: qq.id,
+      _order: qq.order ?? 0
+    }));
 
-    setQuestions(mapped);
+    const sanitized = sanitizeQuestions(mapped);
+    setQuestions(sanitized);
 
     // Auto-delete invalid questions from database
-    const invalidQuestions = persistedQuizQuestions.filter((qq) => {
-      const mapped = {
-        prompt: qq.prompt || '',
-        options: Array.isArray(qq.options) ? qq.options : ['', '', '', ''],
-        correct_index: qq.correct_index ?? 0
-      };
-      return validateQuestion(mapped) !== null;
-    });
+    const invalidCount = mapped.length - sanitized.length;
+    if (invalidCount > 0) {
+      console.log('[AUTO_CLEANUP] Deleting', invalidCount, 'invalid questions');
+      const invalidIds = mapped
+        .filter(q => validateQuestion(q) !== null)
+        .map(q => q._quiz_question_id)
+        .filter(Boolean);
 
-    if (invalidQuestions.length > 0) {
-      console.log('[AUTO_CLEANUP] Deleting', invalidQuestions.length, 'invalid questions');
-      invalidQuestions.forEach(async (qq) => {
+      invalidIds.forEach(async (id) => {
         try {
-          await base44.entities.QuizQuestion.delete(qq.id);
+          await base44.entities.QuizQuestion.delete(id);
         } catch (error) {
           console.error('[AUTO_CLEANUP_ERROR]', error);
         }
@@ -181,8 +175,8 @@ export default function CreateQuiz() {
       const id = await ensureDraftQuizSet();
       if (!id) throw new Error('Failed to create draft quiz');
 
-      // Filter out invalid questions before saving
-      const validQuestions = questions.filter(q => validateQuestion(q) === null);
+      // Sanitize questions before saving
+      const validQuestions = sanitizeQuestions(questions);
       
       if (validQuestions.length === 0) {
         throw new Error('No valid questions to save');
@@ -315,6 +309,10 @@ export default function CreateQuiz() {
     return null;
   };
 
+  const sanitizeQuestions = (questionsArray) => {
+    return questionsArray.filter(q => validateQuestion(q) === null);
+  };
+
   const validateAllQuestions = () => {
     if (!quizSet.title?.trim()) {
       toast.error('Quiz must have a title');
@@ -341,8 +339,11 @@ export default function CreateQuiz() {
   };
 
   // --------- UI HELPERS ----------
-  const handleGlobalQuestionBankAdd = () => {
-    if (quizSetId) queryClient.invalidateQueries(['quizQuestions', quizSetId]);
+  const handleGlobalQuestionBankAdd = (count) => {
+    if (quizSetId) {
+      queryClient.invalidateQueries(['quizQuestions', quizSetId]);
+      // Questions will be sanitized on next render via useEffect
+    }
   };
 
   const addManualQuestion = () => {
