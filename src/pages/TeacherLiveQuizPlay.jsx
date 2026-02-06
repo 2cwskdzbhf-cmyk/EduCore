@@ -14,6 +14,10 @@ export default function TeacherLiveQuizPlay() {
 
   const [timeLeft, setTimeLeft] = useState(15);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
+  const [quizStartTime, setQuizStartTime] = useState(null);
+  const [totalQuizTime, setTotalQuizTime] = useState(0);
+  const [showPlayerStats, setShowPlayerStats] = useState(false);
+  const [selectedPlayer, setSelectedPlayer] = useState(null);
 
   const lastSessionRef = useRef(null);
 
@@ -38,6 +42,21 @@ export default function TeacherLiveQuizPlay() {
       navigate(createPageUrl('TeacherDashboard'), { replace: true });
     }
   }, [session?.status, navigate]);
+
+  // Track total quiz time
+  useEffect(() => {
+    if (session?.status === 'live' && session?.started_at && !quizStartTime) {
+      setQuizStartTime(new Date(session.started_at).getTime());
+    }
+  }, [session?.status, session?.started_at, quizStartTime]);
+
+  useEffect(() => {
+    if (!quizStartTime) return;
+    const interval = setInterval(() => {
+      setTotalQuizTime(Math.floor((Date.now() - quizStartTime) / 1000));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [quizStartTime]);
 
   // timer
   useEffect(() => {
@@ -75,6 +94,13 @@ export default function TeacherLiveQuizPlay() {
     enabled: !!sessionId && idx >= 0,
     refetchInterval: 1200,
     staleTime: 800
+  });
+
+  const { data: allAnswers = [] } = useQuery({
+    queryKey: ['allLiveQuizAnswers', sessionId],
+    queryFn: () => base44.entities.LiveQuizAnswer.filter({ session_id: sessionId }),
+    enabled: !!sessionId && showPlayerStats,
+    refetchInterval: showPlayerStats ? 2000 : false
   });
 
   const nextQuestionMutation = useMutation({
@@ -160,6 +186,73 @@ export default function TeacherLiveQuizPlay() {
 
   const allAnswered = players.length > 0 && answeredCount >= players.length;
 
+  const getPlayerStats = (playerId) => {
+    const playerAnswers = allAnswers.filter(a => a.player_id === playerId);
+    const correctAnswers = playerAnswers.filter(a => a.is_correct).length;
+    const avgResponseTime = playerAnswers.length > 0
+      ? Math.round(playerAnswers.reduce((sum, a) => sum + (a.response_time_ms || 0), 0) / playerAnswers.length)
+      : 0;
+    return {
+      totalAnswers: playerAnswers.length,
+      correctAnswers,
+      accuracy: playerAnswers.length > 0 ? Math.round((correctAnswers / playerAnswers.length) * 100) : 0,
+      avgResponseTime
+    };
+  };
+
+  if (showPlayerStats && selectedPlayer) {
+    const stats = getPlayerStats(selectedPlayer.id);
+    return (
+      <div className="min-h-screen p-6 flex items-center justify-center">
+        <GlassCard className="p-8 max-w-2xl w-full">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-2xl font-bold text-white">{selectedPlayer.nickname}'s Stats</h2>
+            <Button variant="ghost" onClick={() => { setShowPlayerStats(false); setSelectedPlayer(null); }}>
+              <X className="w-5 h-5" />
+            </Button>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4 mb-6">
+            <div className="bg-white/5 p-4 rounded-lg text-center">
+              <div className="text-3xl font-bold text-purple-400">{selectedPlayer.total_points || 0}</div>
+              <div className="text-sm text-slate-400">Total Points</div>
+            </div>
+            <div className="bg-white/5 p-4 rounded-lg text-center">
+              <div className="text-3xl font-bold text-emerald-400">{stats.accuracy}%</div>
+              <div className="text-sm text-slate-400">Accuracy</div>
+            </div>
+            <div className="bg-white/5 p-4 rounded-lg text-center">
+              <div className="text-3xl font-bold text-blue-400">{stats.correctAnswers}/{stats.totalAnswers}</div>
+              <div className="text-sm text-slate-400">Correct Answers</div>
+            </div>
+            <div className="bg-white/5 p-4 rounded-lg text-center">
+              <div className="text-3xl font-bold text-amber-400">{(stats.avgResponseTime / 1000).toFixed(1)}s</div>
+              <div className="text-sm text-slate-400">Avg Response Time</div>
+            </div>
+          </div>
+
+          <div className="bg-white/5 p-4 rounded-lg">
+            <h3 className="text-white font-semibold mb-3">Recent Performance</h3>
+            <div className="space-y-2">
+              {allAnswers.filter(a => a.player_id === selectedPlayer.id).slice(-5).reverse().map((answer, i) => (
+                <div key={i} className="flex items-center justify-between text-sm">
+                  <span className="text-slate-300">Question {answer.question_index + 1}</span>
+                  <div className="flex items-center gap-3">
+                    <span className={answer.is_correct ? 'text-emerald-400' : 'text-red-400'}>
+                      {answer.is_correct ? '✓' : '✗'}
+                    </span>
+                    <span className="text-slate-400">{(answer.response_time_ms / 1000).toFixed(1)}s</span>
+                    <span className="text-amber-400">+{answer.points_awarded}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </GlassCard>
+      </div>
+    );
+  }
+
   if (showLeaderboard) {
     return (
       <div className="min-h-screen p-6 flex items-center justify-center">
@@ -210,6 +303,10 @@ export default function TeacherLiveQuizPlay() {
           </div>
 
           <div className="flex items-center gap-3">
+            <div className="text-center px-4 py-2 bg-white/5 rounded-lg">
+              <div className="text-xs text-slate-400">Quiz Duration</div>
+              <div className="text-xl font-bold">{Math.floor(totalQuizTime / 60)}:{String(totalQuizTime % 60).padStart(2, '0')}</div>
+            </div>
             <div className="flex items-center gap-2 bg-purple-500/20 px-4 py-2 rounded-lg">
               <Clock className="w-5 h-5 text-amber-400" />
               <span className="text-2xl font-bold">{timeLeft}s</span>
@@ -239,7 +336,8 @@ export default function TeacherLiveQuizPlay() {
               return (
                 <div
                   key={player.id}
-                  className={`flex items-center gap-2 p-3 rounded-lg border ${
+                  onClick={() => { setSelectedPlayer(player); setShowPlayerStats(true); }}
+                  className={`flex items-center gap-2 p-3 rounded-lg border cursor-pointer hover:bg-white/10 transition-colors ${
                     hasAnswered
                       ? 'bg-green-500/10 border-green-500/30'
                       : 'bg-white/5 border-white/10'

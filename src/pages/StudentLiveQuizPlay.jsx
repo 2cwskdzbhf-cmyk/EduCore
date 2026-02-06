@@ -16,12 +16,29 @@ export default function StudentLiveQuizPlay() {
   const [timeLeft, setTimeLeft] = useState(15);
   const [answerResult, setAnswerResult] = useState(null);
   const [showScoreboard, setShowScoreboard] = useState(false);
+  const [quizStartTime, setQuizStartTime] = useState(null);
+  const [totalQuizTime, setTotalQuizTime] = useState(0);
 
   const lastSessionRef = useRef(null);
 
   useEffect(() => {
     base44.auth.me().then(setUser);
   }, []);
+
+  // Track total quiz time
+  useEffect(() => {
+    if (session?.status === 'live' && session?.started_at && !quizStartTime) {
+      setQuizStartTime(new Date(session.started_at).getTime());
+    }
+  }, [session?.status, session?.started_at, quizStartTime]);
+
+  useEffect(() => {
+    if (!quizStartTime) return;
+    const interval = setInterval(() => {
+      setTotalQuizTime(Math.floor((Date.now() - quizStartTime) / 1000));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [quizStartTime]);
 
   const { data: sessionRaw } = useQuery({
     queryKey: ['liveQuizSession', sessionId],
@@ -235,9 +252,15 @@ export default function StudentLiveQuizPlay() {
               <span>{player.total_points || 0} pts</span>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <Clock className="w-6 h-6" />
-            <span className="text-3xl font-bold">{timeLeft}s</span>
+          <div className="flex items-center gap-4">
+            <div className="text-center">
+              <div className="text-xs text-slate-400">Quiz Time</div>
+              <div className="text-lg font-bold">{Math.floor(totalQuizTime / 60)}:{String(totalQuizTime % 60).padStart(2, '0')}</div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Clock className="w-6 h-6" />
+              <span className="text-3xl font-bold">{timeLeft}s</span>
+            </div>
           </div>
         </div>
 
@@ -362,19 +385,21 @@ export default function StudentLiveQuizPlay() {
                     transition={{ delay: i * 0.1 }}
                   >
                     <Button
-                      onClick={() => {
-                        setSelected(i);
-                        submitAnswer.mutate(i);
-                      }}
-                      disabled={selected !== null}
-                      className={`h-20 text-lg w-full transition-all ${
-                        showCorrect ? 'bg-emerald-500 hover:bg-emerald-600 border-2 border-emerald-400' :
-                        showIncorrect ? 'bg-red-500 hover:bg-red-600 border-2 border-red-400' :
-                        isSelected ? 'bg-purple-500 hover:bg-purple-600' : ''
-                      }`}
-                      variant={isSelected || showCorrect || showIncorrect ? 'default' : 'outline'}
+                     onClick={() => {
+                       setSelected(i);
+                       submitAnswer.mutate(i);
+                     }}
+                     disabled={selected !== null}
+                     className={`h-20 text-lg w-full transition-all relative ${
+                       showCorrect ? 'bg-emerald-500 hover:bg-emerald-600 border-2 border-emerald-400 animate-pulse' :
+                       showIncorrect ? 'bg-red-500 hover:bg-red-600 border-2 border-red-400 animate-shake' :
+                       isSelected ? 'bg-purple-500 hover:bg-purple-600 opacity-70' : ''
+                     }`}
+                     variant={isSelected || showCorrect || showIncorrect ? 'default' : 'outline'}
                     >
-                      {opt}
+                     {opt}
+                     {showCorrect && <CheckCircle2 className="absolute right-3 top-1/2 -translate-y-1/2 w-6 h-6" />}
+                     {showIncorrect && <XCircle className="absolute right-3 top-1/2 -translate-y-1/2 w-6 h-6" />}
                     </Button>
                   </motion.div>
                 );
