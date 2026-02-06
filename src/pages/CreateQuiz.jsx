@@ -54,8 +54,8 @@ export default function CreateQuiz() {
     fetchUser();
   }, []);
 
-  // --------- DRAFT QUIZ CREATION (FIX #1) ----------
-  // This is the most important fix: create a draft quiz set so Apply has a real ID to attach to.
+  // --------- DRAFT QUIZ CREATION ----------
+  // Create a draft quiz set on-demand when needed (NOT automatically on page load)
   const ensureDraftQuizSet = useCallback(async () => {
     if (!user?.email) return null;
     if (quizSetId) return quizSetId;
@@ -94,12 +94,6 @@ export default function CreateQuiz() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.email, quizSetId]);
 
-  // Create draft automatically when user loads the page
-  useEffect(() => {
-    if (!user?.email) return;
-    ensureDraftQuizSet();
-  }, [user?.email, ensureDraftQuizSet]);
-
   // --------- LOAD PERSISTED QUIZ QUESTIONS (FIX #2) ----------
   const { data: persistedQuizQuestions = [] } = useQuery({
     queryKey: ['quizQuestions', quizSetId],
@@ -113,6 +107,9 @@ export default function CreateQuiz() {
   // Keep editor UI in sync with database quiz questions, auto-sanitizing invalid ones
   useEffect(() => {
     if (!quizSetId) return;
+
+    // Run cleanup of empty questions first
+    cleanupEmptyQuestionsFromDB();
 
     const mapped = persistedQuizQuestions.map((qq) => ({
       prompt: qq.prompt || '',
@@ -148,7 +145,7 @@ export default function CreateQuiz() {
         }
       });
     }
-  }, [quizSetId, persistedQuizQuestions]);
+  }, [quizSetId, persistedQuizQuestions, cleanupEmptyQuestionsFromDB]);
 
   // --------- SIDEBAR DATA ----------
   const { data: subjects = [] } = useQuery({
@@ -313,18 +310,43 @@ export default function CreateQuiz() {
     return questionsArray.filter(q => validateQuestion(q) === null);
   };
 
+  // Delete any stored questions where prompt is empty and all options are empty
+  const cleanupEmptyQuestionsFromDB = useCallback(async () => {
+    if (!quizSetId) return;
+    
+    try {
+      const allQuestions = await base44.entities.QuizQuestion.filter({ quiz_set_id: quizSetId });
+      const emptyQuestions = allQuestions.filter(q => {
+        const hasPrompt = q.prompt && q.prompt.trim();
+        const hasOptions = Array.isArray(q.options) && q.options.some(o => String(o).trim());
+        return !hasPrompt && !hasOptions;
+      });
+
+      if (emptyQuestions.length > 0) {
+        console.log('[CLEANUP] Deleting', emptyQuestions.length, 'empty questions');
+        await Promise.all(emptyQuestions.map(q => base44.entities.QuizQuestion.delete(q.id)));
+      }
+    } catch (error) {
+      console.error('[CLEANUP_ERROR]', error);
+    }
+  }, [quizSetId]);
+
   const validateAllQuestions = () => {
     if (!quizSet.title?.trim()) {
       toast.error('Quiz must have a title');
       return false;
     }
-    if (questions.length === 0) {
-      toast.error('Quiz must have at least 1 question');
+    
+    // Sanitize questions before validating
+    const validQuestions = sanitizeQuestions(questions);
+    
+    if (validQuestions.length === 0) {
+      toast.error('Quiz must have at least 1 valid question');
       return false;
     }
     
     const errors = [];
-    questions.forEach((q, idx) => {
+    validQuestions.forEach((q, idx) => {
       const error = validateQuestion(q);
       if (error) errors.push(`Question ${idx + 1}: ${error}`);
     });
