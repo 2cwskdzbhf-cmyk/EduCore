@@ -60,7 +60,6 @@ export default function CreateQuiz() {
   }, []);
 
   // --------- DRAFT QUIZ CREATION ----------
-  // Create a draft quiz set on-demand when needed (NOT automatically on page load)
   const ensureDraftQuizSet = useCallback(async () => {
     if (!user?.email) return null;
     if (quizSetId) return quizSetId;
@@ -76,40 +75,38 @@ export default function CreateQuiz() {
       question_count: 0
     };
 
-    // Try QuizSet first
     try {
       const created = await base44.entities.QuizSet.create(basePayload);
-      console.log('[DEBUG] Draft QuizSet created:', created.id);
       setQuizSetId(created.id);
       return created.id;
     } catch (e) {
       console.warn('[WARN] QuizSet.create failed, trying LiveQuizSet...', e);
     }
 
-    // Fallback to LiveQuizSet if your schema uses that
     try {
       const created = await base44.entities.LiveQuizSet.create(basePayload);
-      console.log('[DEBUG] Draft LiveQuizSet created:', created.id);
       setQuizSetId(created.id);
       return created.id;
     } catch (e) {
       console.error('[ERROR] Failed to create any draft quiz set:', e);
       return null;
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.email, quizSetId]);
+  }, [user?.email, quizSetId, quizSet]);
 
-  // --------- VALIDATION HELPERS ----------
-  const validateQuestion = (q) => {
-    if (!q.prompt || !q.prompt.trim()) return 'Question is missing prompt';
+  // --------- VALIDATION (STRICT, ONLY FOR SAVE/START) ----------
+  const validateQuestionStrict = (q) => {
+    if (!q?.prompt || !q.prompt.trim()) return 'Question is missing prompt';
     if (!Array.isArray(q.options) || q.options.length !== 4) return 'Question must have 4 options';
-    if (q.options.some(o => !String(o).trim())) return 'All options must be filled';
+    if (q.options.some(o => !String(o || '').trim())) return 'All options must be filled';
     if (typeof q.correct_index !== 'number' || q.correct_index < 0 || q.correct_index > 3) return 'Invalid correct answer';
     return null;
   };
 
-  const sanitizeQuestions = (questionsArray) => {
-    return questionsArray.filter(q => validateQuestion(q) === null);
+  // Only remove truly empty placeholders (prompt empty AND all options empty)
+  const isTrulyEmptyQuestion = (q) => {
+    const hasPrompt = !!(q?.prompt && String(q.prompt).trim());
+    const hasAnyOption = Array.isArray(q?.options) && q.options.some(o => String(o || '').trim());
+    return !hasPrompt && !hasAnyOption;
   };
 
   // --------- LOAD PERSISTED QUIZ QUESTIONS ----------
@@ -122,33 +119,33 @@ export default function CreateQuiz() {
     enabled: !!quizSetId
   });
 
-  // Delete any stored questions where prompt is empty and all options are empty
-  const cleanupEmptyQuestionsFromDB = useCallback(async () => {
+  // Cleanup ONLY truly empty DB questions (no prompt + no options)
+  const cleanupTrulyEmptyQuestionsFromDB = useCallback(async () => {
     if (!quizSetId) return;
-    
+
     try {
-      const allQuestions = await base44.entities.QuizQuestion.filter({ quiz_set_id: quizSetId });
-      const emptyQuestions = allQuestions.filter(q => {
-        const hasPrompt = q.prompt && q.prompt.trim();
-        const hasOptions = Array.isArray(q.options) && q.options.some(o => String(o).trim());
-        return !hasPrompt && !hasOptions;
+      const all = await base44.entities.QuizQuestion.filter({ quiz_set_id: quizSetId });
+
+      const empties = all.filter(qRow => {
+        const prompt = (qRow.prompt || '').trim();
+        const opts = Array.isArray(qRow.options) ? qRow.options : [];
+        const anyOpt = opts.some(o => String(o || '').trim());
+        return !prompt && !anyOpt;
       });
 
-      if (emptyQuestions.length > 0) {
-        console.log('[CLEANUP] Deleting', emptyQuestions.length, 'empty questions');
-        await Promise.all(emptyQuestions.map(q => base44.entities.QuizQuestion.delete(q.id)));
+      if (empties.length) {
+        await Promise.all(empties.map(qRow => base44.entities.QuizQuestion.delete(qRow.id)));
       }
-    } catch (error) {
-      console.error('[CLEANUP_ERROR]', error);
+    } catch (e) {
+      console.error('[CLEANUP_ERROR]', e);
     }
   }, [quizSetId]);
 
-  // Keep editor UI in sync with database quiz questions, auto-sanitizing invalid ones
+  // Keep editor UI in sync with DB, but DO NOT auto-delete partially-filled questions
   useEffect(() => {
     if (!quizSetId) return;
 
-    // Run cleanup of empty questions first
-    cleanupEmptyQuestionsFromDB();
+    cleanupTrulyEmptyQuestionsFromDB();
 
     const mapped = persistedQuizQuestions.map((qq) => ({
       prompt: qq.prompt || '',
@@ -160,31 +157,16 @@ export default function CreateQuiz() {
       explanation: qq.explanation || '',
       tags: qq.tags || [],
       source_global_id: qq.source_global_id || null,
+      image_url: qq.image_url || '',
+      option_images: Array.isArray(qq.option_images) ? qq.option_images : ['', '', '', ''],
       _quiz_question_id: qq.id,
       _order: qq.order ?? 0
     }));
 
-    const sanitized = sanitizeQuestions(mapped);
-    setQuestions(sanitized);
-
-    // Auto-delete invalid questions from database
-    const invalidCount = mapped.length - sanitized.length;
-    if (invalidCount > 0) {
-      console.log('[AUTO_CLEANUP] Deleting', invalidCount, 'invalid questions');
-      const invalidIds = mapped
-        .filter(q => validateQuestion(q) !== null)
-        .map(q => q._quiz_question_id)
-        .filter(Boolean);
-
-      invalidIds.forEach(async (id) => {
-        try {
-          await base44.entities.QuizQuestion.delete(id);
-        } catch (error) {
-          console.error('[AUTO_CLEANUP_ERROR]', error);
-        }
-      });
-    }
-  }, [quizSetId, persistedQuizQuestions, cleanupEmptyQuestionsFromDB]);
+    // Only remove truly empty placeholders from UI
+    const filtered = mapped.filter(q => !isTrulyEmptyQuestion(q));
+    setQuestions(filtered);
+  }, [quizSetId, persistedQuizQuestions, cleanupTrulyEmptyQuestionsFromDB]);
 
   // --------- SIDEBAR DATA ----------
   const { data: subjects = [] } = useQuery({
@@ -198,27 +180,52 @@ export default function CreateQuiz() {
     enabled: !!quizSet.subject_id
   });
 
+  // --------- VALIDATE ALL (STRICT) ----------
+  const validateAllQuestions = () => {
+    if (!quizSet.title?.trim()) {
+      toast.error('Quiz must have a title');
+      return false;
+    }
+
+    const nonEmpty = questions.filter(q => !isTrulyEmptyQuestion(q));
+    if (nonEmpty.length === 0) {
+      toast.error('Quiz must have at least 1 question');
+      return false;
+    }
+
+    const errors = [];
+    nonEmpty.forEach((q, idx) => {
+      const err = validateQuestionStrict(q);
+      if (err) errors.push(`Question ${idx + 1}: ${err}`);
+    });
+
+    if (errors.length > 0) {
+      toast.error(errors[0]);
+      console.error('[VALIDATION_FAILED]', errors);
+      return false;
+    }
+
+    return true;
+  };
+
   // --------- SAVE QUIZ (UPSERT) ----------
   const saveQuizMutation = useMutation({
     mutationFn: async ({ status }) => {
       if (!user?.email) throw new Error('Not signed in');
-
-      // Validate before saving
-      if (!validateAllQuestions()) {
-        throw new Error('Quiz validation failed');
-      }
+      if (!validateAllQuestions()) throw new Error('Quiz validation failed');
 
       const id = await ensureDraftQuizSet();
       if (!id) throw new Error('Failed to create draft quiz');
 
-      // Sanitize questions before saving
-      const validQuestions = sanitizeQuestions(questions);
-      
-      if (validQuestions.length === 0) {
-        throw new Error('No valid questions to save');
-      }
+      const validQuestions = questions
+        .filter(q => !isTrulyEmptyQuestion(q))
+        .map(q => ({
+          ...q,
+          prompt: String(q.prompt || '').trim(),
+          options: (q.options || []).map(o => String(o || '').trim())
+        }));
 
-      // Update whichever entity exists
+      // Update quiz set
       try {
         await base44.entities.QuizSet.update(id, {
           ...quizSet,
@@ -237,7 +244,7 @@ export default function CreateQuiz() {
         });
       }
 
-      // Replace QuizQuestion rows (simple & reliable)
+      // Replace QuizQuestion rows
       const existing = await base44.entities.QuizQuestion.filter({ quiz_set_id: id });
       await Promise.all(existing.map((row) => base44.entities.QuizQuestion.delete(row.id)));
 
@@ -246,18 +253,17 @@ export default function CreateQuiz() {
           base44.entities.QuizQuestion.create({
             quiz_set_id: id,
             order: index,
-            prompt: q.prompt.trim(),
+            prompt: q.prompt,
             question_type: q.question_type || 'multiple_choice',
-            options: q.options.map(o => String(o).trim()),
+            options: q.options,
             correct_index: q.correct_index,
-            correct_answer:
-              q.correct_answer || q.options[q.correct_index] || '',
+            correct_answer: q.correct_answer || q.options[q.correct_index] || '',
             difficulty: q.difficulty || 'medium',
             explanation: q.explanation || '',
             tags: q.tags || [],
             source_global_id: q.source_global_id || null,
             image_url: q.image_url || '',
-            option_images: q.option_images || []
+            option_images: Array.isArray(q.option_images) ? q.option_images : ['', '', '', '']
           })
         )
       );
@@ -278,15 +284,12 @@ export default function CreateQuiz() {
   // --------- START LIVE QUIZ ----------
   const startLiveQuizMutation = useMutation({
     mutationFn: async () => {
-      // Validate before starting
-      if (!validateAllQuestions()) {
-        throw new Error('Quiz validation failed');
-      }
+      if (!user?.email) throw new Error('Not signed in');
+      if (!validateAllQuestions()) throw new Error('Quiz validation failed');
 
       const urlParams = new URLSearchParams(window.location.search);
       const classId = urlParams.get('classId');
 
-      // Create session
       const generateCode = () => Math.random().toString(36).substr(2, 6).toUpperCase();
       let joinCode = generateCode();
       for (let attempts = 0; attempts < 10; attempts++) {
@@ -310,9 +313,10 @@ export default function CreateQuiz() {
         }
       });
 
-      // Create live questions for session
-      for (let i = 0; i < questions.length; i++) {
-        const q = questions[i];
+      const usable = questions.filter(q => !isTrulyEmptyQuestion(q));
+
+      for (let i = 0; i < usable.length; i++) {
+        const q = usable[i];
         await base44.entities.LiveQuizQuestion.create({
           live_quiz_set_id: session.id,
           order: i,
@@ -338,40 +342,10 @@ export default function CreateQuiz() {
     }
   });
 
-  const validateAllQuestions = () => {
-    if (!quizSet.title?.trim()) {
-      toast.error('Quiz must have a title');
-      return false;
-    }
-    
-    // Sanitize questions before validating
-    const validQuestions = sanitizeQuestions(questions);
-    
-    if (validQuestions.length === 0) {
-      toast.error('Quiz must have at least 1 valid question');
-      return false;
-    }
-    
-    const errors = [];
-    validQuestions.forEach((q, idx) => {
-      const error = validateQuestion(q);
-      if (error) errors.push(`Question ${idx + 1}: ${error}`);
-    });
-
-    if (errors.length > 0) {
-      toast.error(errors[0]); // Show first error
-      console.error('[VALIDATION_FAILED]', errors);
-      return false;
-    }
-
-    return true;
-  };
-
   // --------- UI HELPERS ----------
-  const handleGlobalQuestionBankAdd = (count) => {
+  const handleGlobalQuestionBankAdd = () => {
     if (quizSetId) {
       queryClient.invalidateQueries(['quizQuestions', quizSetId]);
-      // Questions will be sanitized on next render via useEffect
     }
   };
 
@@ -387,27 +361,25 @@ export default function CreateQuiz() {
       image_url: '',
       option_images: ['', '', '', '']
     };
-    setQuestions([...questions, baseQuestion]);
+    setQuestions(prev => [...prev, baseQuestion]);
     setEditingIndex(questions.length);
   };
 
   const handleImageUpload = async (file, qIndex, optionIndex = null) => {
     if (!file) return;
-    
+
     setUploadingImage(true);
     try {
       const { data } = await base44.integrations.Core.UploadFile({ file });
       const updated = [...questions];
-      
+
       if (optionIndex !== null) {
-        if (!updated[qIndex].option_images) {
-          updated[qIndex].option_images = ['', '', '', ''];
-        }
+        if (!updated[qIndex].option_images) updated[qIndex].option_images = ['', '', '', ''];
         updated[qIndex].option_images[optionIndex] = data.file_url;
       } else {
         updated[qIndex].image_url = data.file_url;
       }
-      
+
       setQuestions(updated);
       toast.success('Image uploaded');
     } catch (error) {
@@ -426,7 +398,7 @@ export default function CreateQuiz() {
       time_limit_per_question: template.time_limit_per_question || 15000,
       status: 'draft'
     });
-    
+
     if (template.questions && Array.isArray(template.questions)) {
       setQuestions(template.questions.map(q => ({
         ...q,
@@ -434,33 +406,19 @@ export default function CreateQuiz() {
         option_images: q.option_images || ['', '', '', '']
       })));
     }
-    
-    // Increment usage count
+
     base44.entities.QuizTemplate.update(template.id, {
       usage_count: (template.usage_count || 0) + 1
     }).catch(console.error);
-    
+
     toast.success('Template loaded');
-  };
-
-  const updateQuestion = (index, field, value) => {
-    const updated = [...questions];
-    updated[index] = { ...updated[index], [field]: value };
-    setQuestions(updated);
-  };
-
-  const updateOption = (qIndex, optIndex, value) => {
-    const updated = [...questions];
-    updated[qIndex].options[optIndex] = value;
-    setQuestions(updated);
   };
 
   const deleteQuestion = async (index) => {
     const updatedQuestions = questions.filter((_, i) => i !== index);
     setQuestions(updatedQuestions);
-    
-    // If deleting persisted question, update database immediately
-    if (quizSetId && questions[index]._quiz_question_id) {
+
+    if (quizSetId && questions[index]?._quiz_question_id) {
       try {
         await base44.entities.QuizQuestion.delete(questions[index]._quiz_question_id);
         queryClient.invalidateQueries(['quizQuestions', quizSetId]);
@@ -470,14 +428,15 @@ export default function CreateQuiz() {
     }
   };
 
-  const canSave = quizSet.title?.trim() && questions.length > 0 &&
-    questions.every(q => q.prompt?.trim() && q.options?.every(o => String(o).trim()));
+  const canSave =
+    quizSet.title?.trim() &&
+    questions.filter(q => !isTrulyEmptyQuestion(q)).length > 0 &&
+    questions.filter(q => !isTrulyEmptyQuestion(q)).every(q => !validateQuestionStrict(q));
 
-  // IMPORTANT: Don’t open Global Bank until quizSetId exists (but also ensure it on click)
   const openGlobalBank = async () => {
     const id = await ensureDraftQuizSet();
     if (!id) {
-      alert('Quiz not ready yet. Please try again.');
+      toast.error('Quiz not ready yet. Please try again.');
       return;
     }
     setShowGlobalQuestionBankDialog(true);
@@ -569,13 +528,13 @@ export default function CreateQuiz() {
 
                 <div className="pt-4 border-t border-white/10">
                   <div className="text-sm text-slate-400 mb-2">
-                    {questions.length} question{questions.length !== 1 ? 's' : ''}
+                    {questions.filter(q => !isTrulyEmptyQuestion(q)).length} question{questions.length !== 1 ? 's' : ''}
                   </div>
 
                   <div className="space-y-2">
                     <Button
                       onClick={() => setShowSaveTemplateDialog(true)}
-                      disabled={!quizSet.title?.trim() || questions.length === 0}
+                      disabled={!quizSet.title?.trim() || questions.filter(q => !isTrulyEmptyQuestion(q)).length === 0}
                       variant="outline"
                       className="w-full border-purple-500/30 text-purple-300 hover:bg-purple-500/10"
                     >
@@ -670,7 +629,7 @@ export default function CreateQuiz() {
               </div>
             </div>
 
-            {questions.length === 0 ? (
+            {questions.filter(q => !isTrulyEmptyQuestion(q)).length === 0 ? (
               <GlassCard className="p-12 text-center">
                 <BookOpen className="w-12 h-12 text-slate-400 mx-auto mb-4" />
                 <h3 className="text-white font-semibold mb-2">No questions yet</h3>
@@ -678,7 +637,7 @@ export default function CreateQuiz() {
               </GlassCard>
             ) : (
               <div className="space-y-4">
-                {questions.map((q, index) => (
+                {questions.filter(q => !isTrulyEmptyQuestion(q)).map((q, index) => (
                   <GlassCard key={index} className="p-6">
                     <div className="flex items-start gap-4">
                       <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center text-white font-bold flex-shrink-0">
@@ -686,19 +645,21 @@ export default function CreateQuiz() {
                       </div>
 
                       <div className="flex-1">
-                        <div className="text-white font-medium mb-2">{q.prompt || '(empty question)'}</div>
-                        
+                        <div className="text-white font-medium mb-2">
+                          {q.prompt?.trim() ? q.prompt : 'New question (click to edit)'}
+                        </div>
+
                         {q.image_url && (
                           <img src={q.image_url} alt="Question" className="w-full max-w-md h-32 object-cover rounded-lg mb-3" />
                         )}
-                        
+
                         <div className="grid grid-cols-2 gap-2 mb-3">
                           {q.options?.map((opt, i) => (
                             <div key={i} className="text-sm text-slate-300 bg-white/5 border border-white/10 rounded px-3 py-2">
                               {q.option_images?.[i] && (
                                 <img src={q.option_images[i]} alt={`Option ${i + 1}`} className="w-full h-16 object-cover rounded mb-2" />
                               )}
-                              {opt || '(empty)'}
+                              {String(opt || '').trim() ? opt : '—'}
                             </div>
                           ))}
                         </div>
@@ -717,7 +678,7 @@ export default function CreateQuiz() {
                               {q.image_url ? 'Change' : 'Add'} Question Image
                             </Button>
                           </label>
-                          
+
                           {q.options?.map((_, i) => (
                             <label key={i} className="cursor-pointer">
                               <input
@@ -758,14 +719,12 @@ export default function CreateQuiz() {
               </div>
             )}
 
-            {/* Bulk Import Dialog */}
             <BulkImportDialog
               open={showBulkImportDialog}
               onOpenChange={setShowBulkImportDialog}
               onImport={() => {}}
             />
 
-            {/* Global Question Bank Dialog */}
             <GlobalQuestionBankDialog
               open={showGlobalQuestionBankDialog}
               onClose={() => setShowGlobalQuestionBankDialog(false)}
@@ -773,7 +732,6 @@ export default function CreateQuiz() {
               quizSetId={quizSetId}
             />
 
-            {/* Template Selector Dialog */}
             <TemplateSelectorDialog
               open={showTemplateSelectorDialog}
               onClose={() => setShowTemplateSelectorDialog(false)}
@@ -781,7 +739,6 @@ export default function CreateQuiz() {
               userEmail={user?.email}
             />
 
-            {/* Save Template Dialog */}
             <SaveTemplateDialog
               open={showSaveTemplateDialog}
               onClose={() => setShowSaveTemplateDialog(false)}
@@ -789,7 +746,6 @@ export default function CreateQuiz() {
               userEmail={user?.email}
             />
 
-            {/* AI dialog placeholder */}
             <Dialog open={showImportDialog} onOpenChange={setShowImportDialog}>
               <DialogContent className="bg-slate-900 border-white/10 text-white">
                 <div className="text-slate-300">AI dialog not included in this snippet.</div>
