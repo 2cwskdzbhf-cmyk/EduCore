@@ -94,7 +94,7 @@ export default function CreateQuiz() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.email, quizSetId]);
 
-  // --------- LOAD PERSISTED QUIZ QUESTIONS (FIX #2) ----------
+  // --------- LOAD PERSISTED QUIZ QUESTIONS ----------
   const { data: persistedQuizQuestions = [] } = useQuery({
     queryKey: ['quizQuestions', quizSetId],
     queryFn: async () => {
@@ -103,6 +103,27 @@ export default function CreateQuiz() {
     },
     enabled: !!quizSetId
   });
+
+  // Delete any stored questions where prompt is empty and all options are empty
+  const cleanupEmptyQuestionsFromDB = useCallback(async () => {
+    if (!quizSetId) return;
+    
+    try {
+      const allQuestions = await base44.entities.QuizQuestion.filter({ quiz_set_id: quizSetId });
+      const emptyQuestions = allQuestions.filter(q => {
+        const hasPrompt = q.prompt && q.prompt.trim();
+        const hasOptions = Array.isArray(q.options) && q.options.some(o => String(o).trim());
+        return !hasPrompt && !hasOptions;
+      });
+
+      if (emptyQuestions.length > 0) {
+        console.log('[CLEANUP] Deleting', emptyQuestions.length, 'empty questions');
+        await Promise.all(emptyQuestions.map(q => base44.entities.QuizQuestion.delete(q.id)));
+      }
+    } catch (error) {
+      console.error('[CLEANUP_ERROR]', error);
+    }
+  }, [quizSetId]);
 
   // Keep editor UI in sync with database quiz questions, auto-sanitizing invalid ones
   useEffect(() => {
@@ -309,27 +330,6 @@ export default function CreateQuiz() {
   const sanitizeQuestions = (questionsArray) => {
     return questionsArray.filter(q => validateQuestion(q) === null);
   };
-
-  // Delete any stored questions where prompt is empty and all options are empty
-  const cleanupEmptyQuestionsFromDB = useCallback(async () => {
-    if (!quizSetId) return;
-    
-    try {
-      const allQuestions = await base44.entities.QuizQuestion.filter({ quiz_set_id: quizSetId });
-      const emptyQuestions = allQuestions.filter(q => {
-        const hasPrompt = q.prompt && q.prompt.trim();
-        const hasOptions = Array.isArray(q.options) && q.options.some(o => String(o).trim());
-        return !hasPrompt && !hasOptions;
-      });
-
-      if (emptyQuestions.length > 0) {
-        console.log('[CLEANUP] Deleting', emptyQuestions.length, 'empty questions');
-        await Promise.all(emptyQuestions.map(q => base44.entities.QuizQuestion.delete(q.id)));
-      }
-    } catch (error) {
-      console.error('[CLEANUP_ERROR]', error);
-    }
-  }, [quizSetId]);
 
   const validateAllQuestions = () => {
     if (!quizSet.title?.trim()) {
