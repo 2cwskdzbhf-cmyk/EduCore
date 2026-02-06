@@ -26,6 +26,7 @@ export default function GlobalQuestionBankDialog({ open, onClose, onAddQuestions
   const [selectedDifficulty, setSelectedDifficulty] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedQuestions, setSelectedQuestions] = useState([]);
+  const [lastApplyResult, setLastApplyResult] = useState(null);
 
   // Debug
   useEffect(() => {
@@ -91,7 +92,7 @@ export default function GlobalQuestionBankDialog({ open, onClose, onAddQuestions
 
   const addQuestionsMutation = useMutation({
     mutationFn: async (picked) => {
-      if (!quizSetId) throw new Error('Quiz ID missing. Create/save quiz first.');
+      if (!quizSetId) throw new Error('ERROR: quiz_id is missing');
 
       const existingRows = await base44.entities.QuizQuestion.filter({ quiz_set_id: quizSetId });
       const existingGlobalIds = new Set(existingRows.map(r => r.source_global_id).filter(Boolean));
@@ -99,30 +100,56 @@ export default function GlobalQuestionBankDialog({ open, onClose, onAddQuestions
 
       let created = 0;
       let skipped = 0;
+      let invalid = 0;
 
       for (const q of picked) {
+        // Skip duplicates
         if (existingGlobalIds.has(q.id)) {
           skipped++;
           continue;
         }
 
-        maxOrder++;
+        // Validate question
+        const prompt = (q.question_text || q.prompt || '').trim();
+        if (!prompt) {
+          invalid++;
+          console.warn('[SKIP_INVALID] No prompt:', q.id);
+          continue;
+        }
 
-        const opts = Array.isArray(q.options) ? q.options : ['', '', '', ''];
+        const opts = Array.isArray(q.options) && q.options.length === 4
+          ? q.options.map(o => String(o).trim())
+          : ['', '', '', ''];
+
+        if (opts.some(o => !o)) {
+          invalid++;
+          console.warn('[SKIP_INVALID] Empty options:', q.id);
+          continue;
+        }
+
         let correctIndex = typeof q.correct_index === 'number' ? q.correct_index : -1;
         if (correctIndex < 0 && q.correct_answer) {
-          correctIndex = opts.findIndex(o => String(o).trim() === String(q.correct_answer).trim());
+          correctIndex = opts.findIndex(o => 
+            o.toLowerCase() === String(q.correct_answer).trim().toLowerCase()
+          );
         }
-        if (correctIndex < 0) correctIndex = 0;
+
+        if (correctIndex < 0 || correctIndex > 3) {
+          invalid++;
+          console.warn('[SKIP_INVALID] Invalid correct_index:', q.id);
+          continue;
+        }
+
+        maxOrder++;
 
         await base44.entities.QuizQuestion.create({
           quiz_set_id: quizSetId,
           order: maxOrder,
-          prompt: q.question_text,
+          prompt: prompt,
           question_type: 'multiple_choice',
           options: opts,
           correct_index: correctIndex,
-          correct_answer: q.correct_answer || opts[correctIndex] || '',
+          correct_answer: q.correct_answer || opts[correctIndex],
           difficulty: q.difficulty || 'medium',
           explanation: q.explanation || '',
           tags: [],
@@ -132,20 +159,47 @@ export default function GlobalQuestionBankDialog({ open, onClose, onAddQuestions
         created++;
       }
 
-      return { created, skipped };
+      return { created, skipped, invalid };
     },
-    onSuccess: ({ created, skipped }) => {
+    onSuccess: (data) => {
       toast.dismiss();
-      toast.success(skipped ? `Added ${created} (skipped ${skipped} duplicates)` : `Added ${created} questions`);
+      
+      let message = `Added ${data.created} questions`;
+      if (data.skipped > 0) message += ` (${data.skipped} duplicates skipped)`;
+      if (data.invalid > 0) message += ` (${data.invalid} invalid skipped)`;
+      
+      toast.success(message);
+      
+      console.log('[APPLY_SUCCESS]', {
+        createdCount: data.created,
+        skippedDuplicateCount: data.skipped,
+        invalidCount: data.invalid,
+        total: data.created + data.skipped + data.invalid
+      });
+      
+      setLastApplyResult({
+        created: data.created,
+        skipped: data.skipped,
+        invalid: data.invalid || 0,
+        timestamp: new Date().toISOString()
+      });
 
       queryClient.invalidateQueries(['quizQuestions', quizSetId]);
-      onAddQuestions?.(created);
+      queryClient.refetchQueries(['quizQuestions', quizSetId]);
+      onAddQuestions?.(data.created);
 
       setSelectedQuestions([]);
       close();
     },
     onError: (err) => {
       toast.dismiss();
+      console.error('[APPLY_ERROR] Failed to add questions:', err);
+      console.error('[APPLY_ERROR] Error details:', {
+        message: err.message,
+        stack: err.stack,
+        quizSetId,
+        selectedCount: selectedQuestions.length
+      });
       toast.error(err.message || 'Failed to apply questions');
     }
   });
@@ -170,14 +224,27 @@ export default function GlobalQuestionBankDialog({ open, onClose, onAddQuestions
   const clear = () => setSelectedQuestions([]);
 
   const apply = () => {
+    console.log('=== APPLY_CLICKED ===');
+    console.log('selectedQuestionIds:', selectedQuestions.map(q => q.id));
+    console.log('selected count:', selectedQuestions.length);
+    console.log('currentQuizId:', quizSetId);
+    console.log('==================');
+    
     if (!selectedQuestions.length) {
       toast.error('No questions selected');
+      console.error('[APPLY_ERROR] No questions selected');
       return;
     }
+    
     if (!quizSetId) {
-      toast.error('Quiz ID missing');
+      toast.error('ERROR: quiz_id is missing');
+      console.error('[APPLY_ERROR] Missing quiz_id', {
+        quizSetId,
+        selectedQuestions: selectedQuestions.length
+      });
       return;
     }
+    
     toast.loading(`Applying ${selectedQuestions.length} questions...`);
     addQuestionsMutation.mutate(selectedQuestions);
   };
@@ -198,9 +265,16 @@ export default function GlobalQuestionBankDialog({ open, onClose, onAddQuestions
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-[95vw] max-h-[95vh] h-[95vh] p-0 gap-0 bg-gradient-to-br from-slate-900 via-purple-900/20 to-slate-900 border-white/10">
         <DialogHeader className="border-b border-white/10 px-6 py-4">
-          <div className="absolute top-2 right-2 bg-slate-800/90 border border-white/20 rounded-lg px-3 py-2 text-xs z-50">
+          <div className="absolute top-2 right-2 bg-slate-800/90 border border-white/20 rounded-lg px-3 py-2 text-xs z-50 space-y-1">
             <div className="text-slate-300"><b>Quiz ID:</b> {quizSetId || <span className="text-red-400 font-bold">MISSING</span>}</div>
             <div className="text-slate-300"><b>Selected:</b> {selectedQuestions.length}</div>
+            {lastApplyResult && (
+              <div className="text-slate-300 border-t border-white/10 pt-1 mt-1">
+                <b>Last Apply:</b> {lastApplyResult.created} added
+                {lastApplyResult.skipped > 0 && ` / ${lastApplyResult.skipped} dup`}
+                {lastApplyResult.invalid > 0 && ` / ${lastApplyResult.invalid} invalid`}
+              </div>
+            )}
           </div>
 
           <div className="flex items-center justify-between">
