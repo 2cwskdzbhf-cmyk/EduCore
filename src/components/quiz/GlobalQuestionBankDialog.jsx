@@ -263,8 +263,8 @@ export default function GlobalQuestionBankDialog({ open, onClose, onAddQuestions
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[95vw] max-h-[95vh] h-[95vh] p-0 gap-0 bg-gradient-to-br from-slate-900 via-purple-900/20 to-slate-900 border-white/10">
-        <DialogHeader className="border-b border-white/10 px-6 py-4">
+      <DialogContent className="max-w-[95vw] max-h-[95vh] h-[95vh] p-0 gap-0 bg-gradient-to-br from-slate-900 via-purple-900/20 to-slate-900 border-white/10 flex flex-col">
+        <DialogHeader className="border-b border-white/10 px-6 py-4 flex-shrink-0">
           <div className="absolute top-2 right-2 bg-slate-800/90 border border-white/20 rounded-lg px-3 py-2 text-xs z-50 space-y-1">
             <div className="text-slate-300"><b>Quiz ID:</b> {quizSetId || <span className="text-red-400 font-bold">MISSING</span>}</div>
             <div className="text-slate-300"><b>Selected:</b> {selectedQuestions.length}</div>
@@ -293,28 +293,13 @@ export default function GlobalQuestionBankDialog({ open, onClose, onAddQuestions
               </div>
             </div>
 
-            {screen === 'questions' && (
-              <div className="flex items-center gap-3">
-                <Badge variant="outline" className="text-sm text-purple-300 border-purple-400">
-                  {selectedQuestions.length} selected
-                </Badge>
-                <Button
-                  onClick={apply}
-                  disabled={!selectedQuestions.length || addQuestionsMutation.isPending || !quizSetId}
-                  className="bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600"
-                >
-                  {addQuestionsMutation.isPending ? 'Adding...' : `Apply (${selectedQuestions.length})`}
-                </Button>
-              </div>
-            )}
-
             <Button variant="ghost" size="icon" onClick={close} className="text-slate-400 hover:text-white ml-2">
               <X className="w-5 h-5" />
             </Button>
           </div>
         </DialogHeader>
 
-        <div className="flex-1 overflow-y-auto p-6">
+        <div className="flex-1 overflow-y-auto p-6 relative">
           {screen === 'subject' && (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {subjects.map(subject => (
@@ -460,14 +445,14 @@ export default function GlobalQuestionBankDialog({ open, onClose, onAddQuestions
                     return (
                       <Card
                         key={q.id}
-                        className={`p-5 bg-white/5 border-white/10 cursor-pointer transition-all ${isSel ? 'ring-2 ring-purple-500' : 'hover:bg-white/10'}`}
+                        className={`p-5 bg-white/5 border-white/10 cursor-pointer transition-all relative ${isSel ? 'ring-2 ring-purple-500' : 'hover:bg-white/10'}`}
                         onClick={() => toggleQuestion(q)}
                       >
                         <div className="flex items-start justify-between gap-3">
-                          <div className="text-white font-medium">
+                          <div className="text-white font-medium flex-1">
                             {idx + 1}. {q.question_text}
                           </div>
-                          <Badge className={`pointer-events-none ${isSel ? 'bg-purple-500/30 text-purple-100' : 'bg-white/10 text-slate-200'}`}>
+                          <Badge className={`pointer-events-none flex-shrink-0 ${isSel ? 'bg-purple-500/30 text-purple-100' : 'bg-white/10 text-slate-200'}`}>
                             {isSel ? 'Selected' : 'Tap to select'}
                           </Badge>
                         </div>
@@ -477,9 +462,26 @@ export default function GlobalQuestionBankDialog({ open, onClose, onAddQuestions
                 </div>
               )}
             </div>
-          )}
-        </div>
-      </DialogContent>
-    </Dialog>
+            )}
+            </div>
+
+            {/* Sticky Apply Button Footer - only visible on questions screen */}
+            {screen === 'questions' && (
+            <div className="sticky bottom-0 left-0 right-0 z-50 bg-slate-900/95 backdrop-blur-xl border-t border-white/10 px-6 py-4 flex items-center justify-between gap-4 flex-shrink-0">
+            <Badge variant="outline" className="text-sm text-purple-300 border-purple-400 pointer-events-none">
+              {selectedQuestions.length} selected
+            </Badge>
+            <Button
+              onClick={apply}
+              disabled={!selectedQuestions.length || addQuestionsMutation.isPending || !quizSetId}
+              className="bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 shadow-lg shadow-purple-500/50"
+              size="lg"
+            >
+              {addQuestionsMutation.isPending ? 'Adding...' : `Apply (${selectedQuestions.length})`}
+            </Button>
+            </div>
+            )}
+            </DialogContent>
+            </Dialog>
   );
 }
