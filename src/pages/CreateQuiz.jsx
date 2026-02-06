@@ -102,11 +102,11 @@ export default function CreateQuiz() {
     return null;
   };
 
-  // Only remove truly empty placeholders (prompt empty AND all options empty)
+  // Only remove truly empty placeholders (prompt empty AND all options empty AND not a draft)
   const isTrulyEmptyQuestion = (q) => {
     const hasPrompt = !!(q?.prompt && String(q.prompt).trim());
     const hasAnyOption = Array.isArray(q?.options) && q.options.some(o => String(o || '').trim());
-    return !hasPrompt && !hasAnyOption;
+    return !hasPrompt && !hasAnyOption && q?._isDraft !== true;
   };
 
   // --------- LOAD PERSISTED QUIZ QUESTIONS ----------
@@ -359,7 +359,8 @@ export default function CreateQuiz() {
       explanation: '',
       tags: [],
       image_url: '',
-      option_images: ['', '', '', '']
+      option_images: ['', '', '', ''],
+      _isDraft: true
     };
     setQuestions(prev => [...prev, baseQuestion]);
     setEditingIndex(questions.length);
@@ -629,7 +630,7 @@ export default function CreateQuiz() {
               </div>
             </div>
 
-            {questions.filter(q => !isTrulyEmptyQuestion(q)).length === 0 ? (
+            {questions.length === 0 ? (
               <GlassCard className="p-12 text-center">
                 <BookOpen className="w-12 h-12 text-slate-400 mx-auto mb-4" />
                 <h3 className="text-white font-semibold mb-2">No questions yet</h3>
@@ -637,7 +638,7 @@ export default function CreateQuiz() {
               </GlassCard>
             ) : (
               <div className="space-y-4">
-                {questions.filter(q => !isTrulyEmptyQuestion(q)).map((q, index) => (
+                {questions.map((q, index) => (
                   <GlassCard key={index} className="p-6">
                     <div className="flex items-start gap-4">
                       <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center text-white font-bold flex-shrink-0">
