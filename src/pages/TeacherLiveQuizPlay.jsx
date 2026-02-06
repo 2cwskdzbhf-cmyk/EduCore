@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import { Button } from '@/components/ui/button';
 import GlassCard from '@/components/ui/GlassCard';
-import { ChevronRight, Trophy, Loader2, Clock, X, AlertTriangle } from 'lucide-react';
+import { ChevronRight, Trophy, Loader2, Clock, X, AlertTriangle, CheckCircle2, Circle } from 'lucide-react';
 
 export default function TeacherLiveQuizPlay() {
   const navigate = useNavigate();
@@ -151,11 +151,14 @@ export default function TeacherLiveQuizPlay() {
 
   const prompt = q?.prompt || q?.question || q?.question_text || q?.text || 'Question';
   const answeredCount = answers.length;
+  const answeredPlayerIds = new Set(answers.map(a => a.player_id));
 
   const leaderboard = players
     .slice()
     .sort((a, b) => (b.total_points || 0) - (a.total_points || 0))
     .map((p, i) => ({ ...p, rank: i + 1 }));
+
+  const allAnswered = players.length > 0 && answeredCount >= players.length;
 
   if (showLeaderboard) {
     return (
@@ -227,10 +230,96 @@ export default function TeacherLiveQuizPlay() {
           </div>
         </GlassCard>
 
-        <div className="text-center">
-          <Button onClick={() => setShowLeaderboard(true)} disabled={timeLeft > 0} size="lg" className="px-8 py-6 text-lg">
-            {timeLeft > 0 ? `Wait ${timeLeft}s` : 'Show Results'}
+        {/* Player Progress Grid */}
+        <GlassCard className="p-6 mb-6">
+          <h3 className="text-lg font-semibold text-white mb-4">Player Responses</h3>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+            {players.map((player) => {
+              const hasAnswered = answeredPlayerIds.has(player.id);
+              return (
+                <div
+                  key={player.id}
+                  className={`flex items-center gap-2 p-3 rounded-lg border ${
+                    hasAnswered
+                      ? 'bg-green-500/10 border-green-500/30'
+                      : 'bg-white/5 border-white/10'
+                  }`}
+                >
+                  {hasAnswered ? (
+                    <CheckCircle2 className="w-5 h-5 text-green-400 flex-shrink-0" />
+                  ) : (
+                    <Circle className="w-5 h-5 text-slate-400 flex-shrink-0" />
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-white truncate">
+                      {player.nickname}
+                    </p>
+                    <p className="text-xs text-slate-400">
+                      {player.total_points || 0} pts
+                    </p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </GlassCard>
+
+        {/* Live Leaderboard */}
+        <GlassCard className="p-6 mb-6">
+          <div className="flex items-center gap-2 mb-4">
+            <Trophy className="w-5 h-5 text-amber-400" />
+            <h3 className="text-lg font-semibold text-white">Live Leaderboard</h3>
+          </div>
+          <div className="space-y-2">
+            {leaderboard.slice(0, 10).map((player) => (
+              <div
+                key={player.id}
+                className="flex items-center justify-between bg-white/5 p-3 rounded-lg"
+              >
+                <div className="flex items-center gap-3">
+                  <span
+                    className={`w-8 h-8 rounded-full flex items-center justify-center font-bold ${
+                      player.rank === 1
+                        ? 'bg-amber-500 text-white'
+                        : player.rank === 2
+                        ? 'bg-slate-400 text-white'
+                        : player.rank === 3
+                        ? 'bg-orange-600 text-white'
+                        : 'bg-white/10 text-slate-300'
+                    }`}
+                  >
+                    {player.rank}
+                  </span>
+                  <span className="text-white font-medium">{player.nickname}</span>
+                  {answeredPlayerIds.has(player.id) && (
+                    <CheckCircle2 className="w-4 h-4 text-green-400" />
+                  )}
+                </div>
+                <span className="text-white font-bold">{player.total_points || 0}</span>
+              </div>
+            ))}
+          </div>
+        </GlassCard>
+
+        <div className="flex flex-col sm:flex-row gap-3 justify-center">
+          <Button
+            onClick={() => setShowLeaderboard(true)}
+            disabled={timeLeft > 0 && !allAnswered}
+            size="lg"
+            className="px-8 py-6 text-lg bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600"
+          >
+            {timeLeft > 0 && !allAnswered ? `Wait ${timeLeft}s or all players` : 'Show Results & Next'}
           </Button>
+          {allAnswered && timeLeft > 0 && (
+            <Button
+              onClick={() => setShowLeaderboard(true)}
+              size="lg"
+              variant="outline"
+              className="px-8 py-6 text-lg border-green-500/30 text-green-400 hover:bg-green-500/10"
+            >
+              All Answered - Continue
+            </Button>
+          )}
         </div>
       </div>
     </div>
