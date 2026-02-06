@@ -94,6 +94,19 @@ export default function CreateQuiz() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.email, quizSetId]);
 
+  // --------- VALIDATION HELPERS ----------
+  const validateQuestion = (q) => {
+    if (!q.prompt || !q.prompt.trim()) return 'Question is missing prompt';
+    if (!Array.isArray(q.options) || q.options.length !== 4) return 'Question must have 4 options';
+    if (q.options.some(o => !String(o).trim())) return 'All options must be filled';
+    if (typeof q.correct_index !== 'number' || q.correct_index < 0 || q.correct_index > 3) return 'Invalid correct answer';
+    return null;
+  };
+
+  const sanitizeQuestions = (questionsArray) => {
+    return questionsArray.filter(q => validateQuestion(q) === null);
+  };
+
   // --------- LOAD PERSISTED QUIZ QUESTIONS ----------
   const { data: persistedQuizQuestions = [] } = useQuery({
     queryKey: ['quizQuestions', quizSetId],
@@ -317,19 +330,6 @@ export default function CreateQuiz() {
       toast.error(error.message || 'Failed to start live quiz');
     }
   });
-
-  // --------- VALIDATION HELPERS ----------
-  const validateQuestion = (q) => {
-    if (!q.prompt || !q.prompt.trim()) return 'Question is missing prompt';
-    if (!Array.isArray(q.options) || q.options.length !== 4) return 'Question must have 4 options';
-    if (q.options.some(o => !String(o).trim())) return 'All options must be filled';
-    if (typeof q.correct_index !== 'number' || q.correct_index < 0 || q.correct_index > 3) return 'Invalid correct answer';
-    return null;
-  };
-
-  const sanitizeQuestions = (questionsArray) => {
-    return questionsArray.filter(q => validateQuestion(q) === null);
-  };
 
   const validateAllQuestions = () => {
     if (!quizSet.title?.trim()) {
