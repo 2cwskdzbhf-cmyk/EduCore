@@ -106,7 +106,8 @@ export default function CreateQuiz() {
   const isTrulyEmptyQuestion = (q) => {
     const hasPrompt = !!(q?.prompt && String(q.prompt).trim());
     const hasAnyOption = Array.isArray(q?.options) && q.options.some(o => String(o || '').trim());
-    return !hasPrompt && !hasAnyOption && q?._isDraft !== true;
+    const isDraft = q?._isDraft === true;
+    return !hasPrompt && !hasAnyOption && !isDraft;
   };
 
   // --------- LOAD PERSISTED QUIZ QUESTIONS ----------
@@ -130,7 +131,8 @@ export default function CreateQuiz() {
         const prompt = (qRow.prompt || '').trim();
         const opts = Array.isArray(qRow.options) ? qRow.options : [];
         const anyOpt = opts.some(o => String(o || '').trim());
-        return !prompt && !anyOpt;
+        const isDraft = qRow._isDraft === true;
+        return !prompt && !anyOpt && !isDraft;
       });
 
       if (empties.length) {
@@ -160,12 +162,11 @@ export default function CreateQuiz() {
       image_url: qq.image_url || '',
       option_images: Array.isArray(qq.option_images) ? qq.option_images : ['', '', '', ''],
       _quiz_question_id: qq.id,
-      _order: qq.order ?? 0
+      _order: qq.order ?? 0,
+      _isDraft: qq._isDraft || false
     }));
 
-    // Only remove truly empty placeholders from UI
-    const filtered = mapped.filter(q => !isTrulyEmptyQuestion(q));
-    setQuestions(filtered);
+    setQuestions(mapped);
   }, [quizSetId, persistedQuizQuestions, cleanupTrulyEmptyQuestionsFromDB]);
 
   // --------- SIDEBAR DATA ----------
