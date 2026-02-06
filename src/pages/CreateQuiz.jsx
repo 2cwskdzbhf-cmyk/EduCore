@@ -12,6 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import GlassCard from '@/components/ui/GlassCard';
+import { toast } from 'sonner';
 import {
   ChevronLeft, Plus, Trash2, Save, Play,
   BookOpen, Sparkles, Check, Upload, Database
@@ -109,27 +110,50 @@ export default function CreateQuiz() {
     enabled: !!quizSetId
   });
 
-  // Keep editor UI in sync with database quiz questions
+  // Keep editor UI in sync with database quiz questions, filtering out invalid ones
   useEffect(() => {
     if (!quizSetId) return;
 
-    const mapped = persistedQuizQuestions.map((qq) => ({
-      prompt: qq.prompt || '',
-      question_type: qq.question_type || 'multiple_choice',
-      options: Array.isArray(qq.options) ? qq.options : ['', '', '', ''],
-      correct_index: typeof qq.correct_index === 'number'
-        ? qq.correct_index
-        : 0,
-      correct_answer: qq.correct_answer || '',
-      difficulty: qq.difficulty || 'medium',
-      explanation: qq.explanation || '',
-      tags: qq.tags || [],
-      source_global_id: qq.source_global_id || null,
-      _quiz_question_id: qq.id,
-      _order: qq.order ?? 0
-    }));
+    const mapped = persistedQuizQuestions
+      .map((qq) => ({
+        prompt: qq.prompt || '',
+        question_type: qq.question_type || 'multiple_choice',
+        options: Array.isArray(qq.options) ? qq.options : ['', '', '', ''],
+        correct_index: typeof qq.correct_index === 'number'
+          ? qq.correct_index
+          : 0,
+        correct_answer: qq.correct_answer || '',
+        difficulty: qq.difficulty || 'medium',
+        explanation: qq.explanation || '',
+        tags: qq.tags || [],
+        source_global_id: qq.source_global_id || null,
+        _quiz_question_id: qq.id,
+        _order: qq.order ?? 0
+      }))
+      .filter(q => validateQuestion(q) === null); // Only load valid questions
 
     setQuestions(mapped);
+
+    // Auto-delete invalid questions from database
+    const invalidQuestions = persistedQuizQuestions.filter((qq) => {
+      const mapped = {
+        prompt: qq.prompt || '',
+        options: Array.isArray(qq.options) ? qq.options : ['', '', '', ''],
+        correct_index: qq.correct_index ?? 0
+      };
+      return validateQuestion(mapped) !== null;
+    });
+
+    if (invalidQuestions.length > 0) {
+      console.log('[AUTO_CLEANUP] Deleting', invalidQuestions.length, 'invalid questions');
+      invalidQuestions.forEach(async (qq) => {
+        try {
+          await base44.entities.QuizQuestion.delete(qq.id);
+        } catch (error) {
+          console.error('[AUTO_CLEANUP_ERROR]', error);
+        }
+      });
+    }
   }, [quizSetId, persistedQuizQuestions]);
 
   // --------- SIDEBAR DATA ----------
@@ -149,8 +173,20 @@ export default function CreateQuiz() {
     mutationFn: async ({ status }) => {
       if (!user?.email) throw new Error('Not signed in');
 
+      // Validate before saving
+      if (!validateAllQuestions()) {
+        throw new Error('Quiz validation failed');
+      }
+
       const id = await ensureDraftQuizSet();
       if (!id) throw new Error('Failed to create draft quiz');
+
+      // Filter out invalid questions before saving
+      const validQuestions = questions.filter(q => validateQuestion(q) === null);
+      
+      if (validQuestions.length === 0) {
+        throw new Error('No valid questions to save');
+      }
 
       // Update whichever entity exists
       try {
@@ -158,7 +194,7 @@ export default function CreateQuiz() {
           ...quizSet,
           title: quizSet.title?.trim() || 'Untitled Quiz',
           owner_email: user.email,
-          question_count: questions.length,
+          question_count: validQuestions.length,
           status
         });
       } catch {
@@ -166,7 +202,7 @@ export default function CreateQuiz() {
           ...quizSet,
           title: quizSet.title?.trim() || 'Untitled Quiz',
           owner_email: user.email,
-          question_count: questions.length,
+          question_count: validQuestions.length,
           status
         });
       }
@@ -176,16 +212,16 @@ export default function CreateQuiz() {
       await Promise.all(existing.map((row) => base44.entities.QuizQuestion.delete(row.id)));
 
       await Promise.all(
-        questions.map((q, index) =>
+        validQuestions.map((q, index) =>
           base44.entities.QuizQuestion.create({
             quiz_set_id: id,
             order: index,
-            prompt: q.prompt,
+            prompt: q.prompt.trim(),
             question_type: q.question_type || 'multiple_choice',
-            options: Array.isArray(q.options) ? q.options : ['', '', '', ''],
-            correct_index: typeof q.correct_index === 'number' ? q.correct_index : 0,
+            options: q.options.map(o => String(o).trim()),
+            correct_index: q.correct_index,
             correct_answer:
-              q.correct_answer || (q.options && q.options[q.correct_index]) || '',
+              q.correct_answer || q.options[q.correct_index] || '',
             difficulty: q.difficulty || 'medium',
             explanation: q.explanation || '',
             tags: q.tags || [],
@@ -197,25 +233,26 @@ export default function CreateQuiz() {
       return { id };
     },
     onSuccess: () => {
+      toast.success('Quiz saved successfully');
       queryClient.invalidateQueries(['quizSets']);
       navigate(createPageUrl('QuizLibrary'));
+    },
+    onError: (error) => {
+      toast.error(error.message || 'Failed to save quiz');
+      console.error('[SAVE_ERROR]', error);
     }
   });
 
-  // --------- START LIVE QUIZ (UNCHANGED) ----------
+  // --------- START LIVE QUIZ ----------
   const startLiveQuizMutation = useMutation({
     mutationFn: async () => {
+      // Validate before starting
+      if (!validateAllQuestions()) {
+        throw new Error('Quiz validation failed');
+      }
+
       const urlParams = new URLSearchParams(window.location.search);
       const classId = urlParams.get('classId');
-
-      if (questions.length === 0) throw new Error('No questions to start quiz with');
-
-      const invalidQuestions = questions.filter(q =>
-        !q.prompt || !Array.isArray(q.options) || q.options.length !== 4 || q.options.some(o => !String(o).trim())
-      );
-      if (invalidQuestions.length > 0) {
-        throw new Error(`${invalidQuestions.length} question(s) are incomplete.`);
-      }
 
       // Create session
       const generateCode = () => Math.random().toString(36).substr(2, 6).toUpperCase();
@@ -260,13 +297,48 @@ export default function CreateQuiz() {
       return session;
     },
     onSuccess: (session) => {
+      toast.success('Quiz started! Redirecting to lobby...');
       navigate(createPageUrl(`TeacherLiveQuizLobby?sessionId=${session.id}`));
     },
     onError: (error) => {
-      console.error('[ERROR] Failed to start live quiz:', error);
-      alert('Failed to start live quiz: ' + (error.message || 'Unknown error'));
+      console.error('[START_QUIZ_ERROR]', error);
+      toast.error(error.message || 'Failed to start live quiz');
     }
   });
+
+  // --------- VALIDATION HELPERS ----------
+  const validateQuestion = (q) => {
+    if (!q.prompt || !q.prompt.trim()) return 'Question is missing prompt';
+    if (!Array.isArray(q.options) || q.options.length !== 4) return 'Question must have 4 options';
+    if (q.options.some(o => !String(o).trim())) return 'All options must be filled';
+    if (typeof q.correct_index !== 'number' || q.correct_index < 0 || q.correct_index > 3) return 'Invalid correct answer';
+    return null;
+  };
+
+  const validateAllQuestions = () => {
+    if (!quizSet.title?.trim()) {
+      toast.error('Quiz must have a title');
+      return false;
+    }
+    if (questions.length === 0) {
+      toast.error('Quiz must have at least 1 question');
+      return false;
+    }
+    
+    const errors = [];
+    questions.forEach((q, idx) => {
+      const error = validateQuestion(q);
+      if (error) errors.push(`Question ${idx + 1}: ${error}`);
+    });
+
+    if (errors.length > 0) {
+      toast.error(errors[0]); // Show first error
+      console.error('[VALIDATION_FAILED]', errors);
+      return false;
+    }
+
+    return true;
+  };
 
   // --------- UI HELPERS ----------
   const handleGlobalQuestionBankAdd = () => {
@@ -299,12 +371,23 @@ export default function CreateQuiz() {
     setQuestions(updated);
   };
 
-  const deleteQuestion = (index) => {
-    setQuestions(questions.filter((_, i) => i !== index));
+  const deleteQuestion = async (index) => {
+    const updatedQuestions = questions.filter((_, i) => i !== index);
+    setQuestions(updatedQuestions);
+    
+    // If deleting persisted question, update database immediately
+    if (quizSetId && questions[index]._quiz_question_id) {
+      try {
+        await base44.entities.QuizQuestion.delete(questions[index]._quiz_question_id);
+        queryClient.invalidateQueries(['quizQuestions', quizSetId]);
+      } catch (error) {
+        console.error('[DELETE_ERROR]', error);
+      }
+    }
   };
 
-  const canSave = quizSet.title && questions.length > 0 &&
-    questions.every(q => q.prompt && q.options.every(o => String(o).trim()));
+  const canSave = quizSet.title?.trim() && questions.length > 0 &&
+    questions.every(q => q.prompt?.trim() && q.options?.every(o => String(o).trim()));
 
   // IMPORTANT: Don’t open Global Bank until quizSetId exists (but also ensure it on click)
   const openGlobalBank = async () => {
@@ -407,7 +490,10 @@ export default function CreateQuiz() {
 
                   <div className="space-y-2">
                     <Button
-                      onClick={() => saveQuizMutation.mutate({ status: 'draft' })}
+                      onClick={() => {
+                        if (!validateAllQuestions()) return;
+                        saveQuizMutation.mutate({ status: 'draft' });
+                      }}
                       disabled={!canSave || saveQuizMutation.isPending}
                       className="w-full bg-white/10 hover:bg-white/20"
                     >
@@ -416,7 +502,10 @@ export default function CreateQuiz() {
                     </Button>
 
                     <Button
-                      onClick={() => saveQuizMutation.mutate({ status: 'published' })}
+                      onClick={() => {
+                        if (!validateAllQuestions()) return;
+                        saveQuizMutation.mutate({ status: 'published' });
+                      }}
                       disabled={!canSave || saveQuizMutation.isPending}
                       className="w-full bg-blue-500 hover:bg-blue-600"
                     >
@@ -425,7 +514,10 @@ export default function CreateQuiz() {
                     </Button>
 
                     <Button
-                      onClick={() => startLiveQuizMutation.mutate()}
+                      onClick={() => {
+                        if (!validateAllQuestions()) return;
+                        startLiveQuizMutation.mutate();
+                      }}
                       disabled={!canSave || startLiveQuizMutation.isPending}
                       className="w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 shadow-lg shadow-amber-500/30"
                     >
