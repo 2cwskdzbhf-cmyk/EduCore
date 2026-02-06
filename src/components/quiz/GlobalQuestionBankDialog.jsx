@@ -92,74 +92,55 @@ export default function GlobalQuestionBankDialog({ open, onClose, onAddQuestions
 
   const addQuestionsMutation = useMutation({
     mutationFn: async (picked) => {
+      console.log('[APPLY_START]', {
+        quizSetId,
+        questionCount: picked.length,
+        payloadSize: JSON.stringify(picked).length
+      });
+
       if (!quizSetId) throw new Error('ERROR: quiz_id is missing');
+      if (picked.length === 0) throw new Error('No questions selected');
+      if (picked.length > 50) throw new Error('Cannot add more than 50 questions at once');
 
-      const existingRows = await base44.entities.QuizQuestion.filter({ quiz_set_id: quizSetId });
-      const existingGlobalIds = new Set(existingRows.map(r => r.source_global_id).filter(Boolean));
-      let maxOrder = existingRows.length ? Math.max(...existingRows.map(r => r.order ?? 0)) : -1;
+      // Create timeout promise
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Apply timed out — please try again')), 12000);
+      });
 
-      let created = 0;
-      let skipped = 0;
-      let invalid = 0;
-
-      for (const q of picked) {
-        // Skip duplicates
-        if (existingGlobalIds.has(q.id)) {
-          skipped++;
-          continue;
-        }
-
-        // Validate question
-        const prompt = (q.question_text || q.prompt || '').trim();
-        if (!prompt) {
-          invalid++;
-          console.warn('[SKIP_INVALID] No prompt:', q.id);
-          continue;
-        }
-
-        const opts = Array.isArray(q.options) && q.options.length === 4
-          ? q.options.map(o => String(o).trim())
-          : ['', '', '', ''];
-
-        if (opts.some(o => !o)) {
-          invalid++;
-          console.warn('[SKIP_INVALID] Empty options:', q.id);
-          continue;
-        }
-
-        let correctIndex = typeof q.correct_index === 'number' ? q.correct_index : -1;
-        if (correctIndex < 0 && q.correct_answer) {
-          correctIndex = opts.findIndex(o => 
-            o.toLowerCase() === String(q.correct_answer).trim().toLowerCase()
-          );
-        }
-
-        if (correctIndex < 0 || correctIndex > 3) {
-          invalid++;
-          console.warn('[SKIP_INVALID] Invalid correct_index:', q.id);
-          continue;
-        }
-
-        maxOrder++;
-
-        await base44.entities.QuizQuestion.create({
-          quiz_set_id: quizSetId,
-          order: maxOrder,
-          prompt: prompt,
-          question_type: 'multiple_choice',
-          options: opts,
-          correct_index: correctIndex,
-          correct_answer: q.correct_answer || opts[correctIndex],
+      // Prepare payload for backend function
+      const payload = {
+        quiz_set_id: quizSetId,
+        questions: picked.map(q => ({
+          id: q.id,
+          question_text: q.question_text || q.prompt || '',
+          options: Array.isArray(q.options) ? q.options : [],
+          correct_index: q.correct_index,
+          correct_answer: q.correct_answer || '',
           difficulty: q.difficulty || 'medium',
-          explanation: q.explanation || '',
-          tags: [],
-          source_global_id: q.id
+          explanation: q.explanation || ''
+        }))
+      };
+
+      try {
+        // Race between API call and timeout
+        const result = await Promise.race([
+          base44.functions.invoke('applyGlobalQuestions', payload),
+          timeoutPromise
+        ]);
+
+        if (!result || !result.data) {
+          throw new Error('Invalid response from server');
+        }
+
+        return result.data;
+      } catch (error) {
+        console.error('[APPLY_ERROR]', {
+          message: error.message,
+          quizSetId,
+          questionCount: picked.length
         });
-
-        created++;
+        throw error;
       }
-
-      return { created, skipped, invalid };
     },
     onSuccess: (data) => {
       toast.dismiss();
@@ -201,6 +182,10 @@ export default function GlobalQuestionBankDialog({ open, onClose, onAddQuestions
         selectedCount: selectedQuestions.length
       });
       toast.error(err.message || 'Failed to apply questions');
+    },
+    onSettled: () => {
+      // Always clear loading state
+      toast.dismiss();
     }
   });
 
