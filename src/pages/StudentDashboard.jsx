@@ -9,6 +9,7 @@ import GlassCard, { StatCard } from '@/components/ui/GlassCard';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import PersonalizedLearningPath from '@/components/learning/PersonalizedLearningPath';
 import {
   Target,
   UserPlus,
@@ -21,7 +22,8 @@ import {
   ChevronRight,
   X,
   Loader2,
-  Zap
+  Zap,
+  Brain
 } from 'lucide-react';
 
 export default function StudentDashboard() {
@@ -464,10 +466,27 @@ localStorage.setItem('dismissedLiveQuizSessionId', liveQuizBannerSession.id);  }
           />
         </div>
 
+        {/* Personalized Learning Path */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
+          className="mb-8"
+        >
+          <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2 drop-shadow-lg">
+            <Brain className="w-5 h-5 text-purple-400" />
+            Recommended For You
+          </h2>
+          <PersonalizedLearningPath 
+            studentEmail={user?.email} 
+            classId={enrolledClasses.length > 0 ? enrolledClasses[0].id : null}
+          />
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.4 }}
           className="mb-8"
         >
           <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2 drop-shadow-lg">
@@ -534,7 +553,7 @@ localStorage.setItem('dismissedLiveQuizSessionId', liveQuizBannerSession.id);  }
           className="grid md:grid-cols-1 gap-4 mb-8"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4 }}
+          transition={{ delay: 0.5 }}
         >
           <GlassCard
             className="p-6 cursor-pointer hover:scale-[1.02] bg-slate-950/50 backdrop-blur-xl"
