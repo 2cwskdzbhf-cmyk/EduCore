@@ -10,6 +10,7 @@ import ClassAnalytics from '@/components/analytics/ClassAnalytics';
 import TopicAnalytics from '@/components/analytics/TopicAnalytics';
 import StudentAnalytics from '@/components/analytics/StudentAnalytics';
 import QuestionEffectiveness from '@/components/analytics/QuestionEffectiveness';
+import QuizPerformanceAnalytics from '@/components/analytics/QuizPerformanceAnalytics';
 
 export default function Analytics() {
   const [selectedClass, setSelectedClass] = useState('all');
@@ -163,13 +164,20 @@ export default function Analytics() {
         </Card>
 
         {/* Analytics Tabs */}
-        <Tabs defaultValue="class" className="space-y-6">
+        <Tabs defaultValue="quiz" className="space-y-6">
           <TabsList className="bg-white/5 border border-white/10">
+            <TabsTrigger value="quiz" className="data-[state=active]:bg-purple-500">Quiz Analytics</TabsTrigger>
             <TabsTrigger value="class" className="data-[state=active]:bg-purple-500">Class Performance</TabsTrigger>
             <TabsTrigger value="topic" className="data-[state=active]:bg-purple-500">Topic Analysis</TabsTrigger>
             <TabsTrigger value="student" className="data-[state=active]:bg-purple-500">Student Performance</TabsTrigger>
             <TabsTrigger value="questions" className="data-[state=active]:bg-purple-500">Question Effectiveness</TabsTrigger>
           </TabsList>
+
+          <TabsContent value="quiz">
+            <QuizPerformanceAnalytics 
+              classId={selectedClass === 'all' ? null : selectedClass}
+            />
+          </TabsContent>
 
           <TabsContent value="class">
             <ClassAnalytics 

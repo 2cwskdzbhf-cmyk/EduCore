@@ -54,6 +54,7 @@ import Analytics from './pages/Analytics';
 import AssignmentBuilder from './pages/AssignmentBuilder';
 import AssignmentDue from './pages/AssignmentDue';
 import ClassDetails from './pages/ClassDetails';
+import CreateQuiz from './pages/CreateQuiz';
 import ImportMathsContent from './pages/ImportMathsContent';
 import JoinClass from './pages/JoinClass';
 import Landing from './pages/Landing';
@@ -79,7 +80,6 @@ import TeacherLiveQuizResults from './pages/TeacherLiveQuizResults';
 import TeacherQuestionBuilder from './pages/TeacherQuestionBuilder';
 import TeacherQuestionGenerator from './pages/TeacherQuestionGenerator';
 import Topic from './pages/Topic';
-import CreateQuiz from './pages/CreateQuiz';
 import __Layout from './Layout.jsx';
 
 
@@ -91,6 +91,7 @@ export const PAGES = {
     "AssignmentBuilder": AssignmentBuilder,
     "AssignmentDue": AssignmentDue,
     "ClassDetails": ClassDetails,
+    "CreateQuiz": CreateQuiz,
     "ImportMathsContent": ImportMathsContent,
     "JoinClass": JoinClass,
     "Landing": Landing,
@@ -116,7 +117,6 @@ export const PAGES = {
     "TeacherQuestionBuilder": TeacherQuestionBuilder,
     "TeacherQuestionGenerator": TeacherQuestionGenerator,
     "Topic": Topic,
-    "CreateQuiz": CreateQuiz,
 }
 
 export const pagesConfig = {
