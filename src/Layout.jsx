@@ -28,7 +28,7 @@ export default function Layout({ children, currentPageName }) {
 
   const publicPages = ['Landing'];
   const authOnlyPages = ['Onboarding'];
-  const studentPages = ['StudentDashboard', 'Subject', 'Topic', 'Lesson', 'Quiz', 'AITutor', 'JoinClass'];
+  const studentPages = ['StudentDashboard', 'StudentPortfolio', 'Subject', 'Topic', 'Lesson', 'Quiz', 'AITutor', 'JoinClass', 'StudentClassDetail'];
   const teacherPages = ['TeacherDashboard', 'ClassDetails', 'CreateAssignment', 'QuizLibrary', 'CreateQuiz', 'StartLiveQuiz', 'StudentStats'];
   const adminPages = ['AdminPanel'];
 
@@ -110,6 +110,7 @@ export default function Layout({ children, currentPageName }) {
 
   const studentNav = [
     { name: 'Dashboard', icon: LayoutDashboard, page: 'StudentDashboard' },
+    { name: 'Portfolio', icon: Users, page: 'StudentPortfolio' },
     { name: 'AI Tutor', icon: MessageSquare, page: 'AITutor' },
   ];
 
