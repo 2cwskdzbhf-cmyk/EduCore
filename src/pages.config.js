@@ -68,6 +68,7 @@ import StartLiveQuiz from './pages/StartLiveQuiz';
 import StudentClassDetail from './pages/StudentClassDetail';
 import StudentDashboard from './pages/StudentDashboard';
 import StudentLiveQuizPlay from './pages/StudentLiveQuizPlay';
+import StudentPortfolio from './pages/StudentPortfolio';
 import StudentStats from './pages/StudentStats';
 import Subject from './pages/Subject';
 import TakeAssignment from './pages/TakeAssignment';
@@ -80,7 +81,6 @@ import TeacherLiveQuizResults from './pages/TeacherLiveQuizResults';
 import TeacherQuestionBuilder from './pages/TeacherQuestionBuilder';
 import TeacherQuestionGenerator from './pages/TeacherQuestionGenerator';
 import Topic from './pages/Topic';
-import StudentPortfolio from './pages/StudentPortfolio';
 import __Layout from './Layout.jsx';
 
 
@@ -106,6 +106,7 @@ export const PAGES = {
     "StudentClassDetail": StudentClassDetail,
     "StudentDashboard": StudentDashboard,
     "StudentLiveQuizPlay": StudentLiveQuizPlay,
+    "StudentPortfolio": StudentPortfolio,
     "StudentStats": StudentStats,
     "Subject": Subject,
     "TakeAssignment": TakeAssignment,
@@ -118,7 +119,6 @@ export const PAGES = {
     "TeacherQuestionBuilder": TeacherQuestionBuilder,
     "TeacherQuestionGenerator": TeacherQuestionGenerator,
     "Topic": Topic,
-    "StudentPortfolio": StudentPortfolio,
 }
 
 export const pagesConfig = {

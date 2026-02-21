@@ -344,9 +344,43 @@ export default function CreateQuiz() {
   });
 
   // --------- UI HELPERS ----------
-  const handleGlobalQuestionBankAdd = () => {
-    if (quizSetId) {
-      queryClient.invalidateQueries(['quizQuestions', quizSetId]);
+  const handleGlobalQuestionBankAdd = async (selectedQuestions) => {
+    if (!quizSetId || !selectedQuestions || selectedQuestions.length === 0) {
+      console.error('[APPLY_ERROR] Missing quizSetId or no questions selected');
+      toast.error('Failed to add questions');
+      return;
+    }
+
+    try {
+      console.log(`[APPLY] Adding ${selectedQuestions.length} questions to quiz ${quizSetId}`);
+      
+      // Add each selected question to the quiz
+      for (const question of selectedQuestions) {
+        await base44.entities.QuizQuestion.create({
+          quiz_set_id: quizSetId,
+          order: questions.length,
+          prompt: question.prompt,
+          question_type: question.question_type || 'multiple_choice',
+          options: question.options || ['', '', '', ''],
+          correct_index: question.correct_index || 0,
+          correct_answer: question.correct_answer || '',
+          difficulty: question.difficulty || 'medium',
+          explanation: question.explanation || '',
+          tags: question.tags || [],
+          image_url: question.image_url || '',
+          option_images: question.option_images || ['', '', '', ''],
+          source_global_id: question.id
+        });
+      }
+
+      // Refresh the question list
+      await queryClient.invalidateQueries(['quizQuestions', quizSetId]);
+      toast.success(`Added ${selectedQuestions.length} question${selectedQuestions.length !== 1 ? 's' : ''} to quiz`);
+      
+      console.log('[APPLY_SUCCESS] Questions added successfully');
+    } catch (error) {
+      console.error('[APPLY_ERROR] Failed to add questions:', error);
+      toast.error('Failed to add questions: ' + error.message);
     }
   };
 

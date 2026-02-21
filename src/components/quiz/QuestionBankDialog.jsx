@@ -154,9 +154,21 @@ export default function QuestionBankDialog({ open, onOpenChange, onAddQuestions,
 
   const handleAdd = () => {
     const questionsToAdd = questions.filter(q => selectedQuestions.includes(q.id));
-    onAddQuestions(questionsToAdd);
-    setSelectedQuestions([]);
-    onOpenChange(false);
+    
+    if (questionsToAdd.length === 0) {
+      console.error('[QUESTION_BANK] No questions selected');
+      return;
+    }
+    
+    console.log(`[QUESTION_BANK] Applying ${questionsToAdd.length} questions`, questionsToAdd.map(q => q.id));
+    
+    try {
+      onAddQuestions(questionsToAdd);
+      setSelectedQuestions([]);
+      onOpenChange(false);
+    } catch (error) {
+      console.error('[QUESTION_BANK] Error in handleAdd:', error);
+    }
   };
 
   const handleBulkImport = async (importedQuestions) => {
