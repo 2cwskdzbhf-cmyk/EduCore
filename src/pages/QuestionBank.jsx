@@ -13,6 +13,8 @@ import { Label } from '@/components/ui/label';
 import GlassCard from '@/components/ui/GlassCard';
 import { createPageUrl } from '@/utils';
 import ErrorBoundary from '@/components/ErrorBoundary';
+import CollaborationPanel from '@/components/quiz/CollaborationPanel';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 function QuestionBankContent() {
   const navigate = useNavigate();
@@ -79,7 +81,8 @@ function QuestionBankContent() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900/20 to-slate-900 p-6">
       <div className="max-w-7xl mx-auto">
-        <div className="flex items-center justify-between mb-8">
+        <Tabs defaultValue="questions" className="space-y-6">
+        <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-4">
             <Button
               variant="ghost"
@@ -104,17 +107,26 @@ function QuestionBankContent() {
               </div>
             </div>
           </div>
-          <Button
-            onClick={() => {
-              setEditingQuestion(null);
-              setShowCreateDialog(true);
-            }}
-            className="bg-gradient-to-r from-purple-500 to-blue-500"
-          >
-            <Plus className="w-5 h-5 mr-2" />
-            Create Question
-          </Button>
         </div>
+
+        <TabsList className="bg-white/5 border border-white/10 mb-6">
+          <TabsTrigger value="questions">Questions</TabsTrigger>
+          <TabsTrigger value="collaboration">Collaboration</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="questions" className="space-y-6">
+          <div className="flex justify-end">
+            <Button
+              onClick={() => {
+                setEditingQuestion(null);
+                setShowCreateDialog(true);
+              }}
+              className="bg-gradient-to-r from-purple-500 to-blue-500"
+            >
+              <Plus className="w-5 h-5 mr-2" />
+              Create Question
+            </Button>
+          </div>
 
         <GlassCard className="p-6 mb-6">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
@@ -309,6 +321,12 @@ function QuestionBankContent() {
           topics={topics}
           teacherEmail={user?.email}
         />
+        </TabsContent>
+
+        <TabsContent value="collaboration">
+          <CollaborationPanel teacherEmail={user?.email} />
+        </TabsContent>
+      </Tabs>
       </div>
     </div>
   );

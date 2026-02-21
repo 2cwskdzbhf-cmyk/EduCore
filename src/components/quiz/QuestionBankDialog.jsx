@@ -5,12 +5,14 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
-import { Search, Plus, Filter, Folder, History, Users, Upload, Star, Sparkles, TrendingUp, Calendar, User, AlertCircle, Database } from 'lucide-react';
+import { Search, Plus, Filter, Folder, History, Users, Upload, Star, Sparkles, TrendingUp, Calendar, User, AlertCircle, Database, Share2, MessageSquare } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import FolderManager from './FolderManager';
 import VersionHistoryDialog from './VersionHistoryDialog';
 import BulkImportCSVDialog from './BulkImportCSVDialog';
+import ShareQuestionDialog from './ShareQuestionDialog';
+import RateQuestionDialog from './RateQuestionDialog';
 
 export default function QuestionBankDialog({ open, onOpenChange, onAddQuestions, subjectId, topicId, teacherEmail }) {
   const queryClient = useQueryClient();
@@ -31,6 +33,8 @@ export default function QuestionBankDialog({ open, onOpenChange, onAddQuestions,
   const [showAISuggestions, setShowAISuggestions] = useState(false);
   const [aiSuggestions, setAiSuggestions] = useState(null);
   const [loadingAI, setLoadingAI] = useState(false);
+  const [shareQuestionId, setShareQuestionId] = useState(null);
+  const [rateQuestionId, setRateQuestionId] = useState(null);
 
   const { data: dbStats, isLoading: questionsLoading } = useQuery({
     queryKey: ['questionBankGlobal'],
@@ -464,6 +468,30 @@ Respond in JSON format.`,
                       variant="ghost"
                       onClick={(e) => {
                         e.stopPropagation();
+                        setShareQuestionId(q.id);
+                      }}
+                      className="h-8 w-8 text-slate-400 hover:text-blue-400"
+                      title="Share Question"
+                    >
+                      <Share2 className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setRateQuestionId(q.id);
+                      }}
+                      className="h-8 w-8 text-slate-400 hover:text-yellow-400"
+                      title="Rate Question"
+                    >
+                      <MessageSquare className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={(e) => {
+                        e.stopPropagation();
                         getSimilarQuestions(q.id);
                       }}
                       className="h-8 w-8 text-slate-400 hover:text-purple-400"
@@ -479,6 +507,7 @@ Respond in JSON format.`,
                         setVersionHistoryQuestion(q.id);
                       }}
                       className="h-8 w-8 text-slate-400 hover:text-white"
+                      title="Version History"
                     >
                       <History className="w-4 h-4" />
                     </Button>
@@ -590,6 +619,22 @@ Respond in JSON format.`,
           onImport={handleBulkImport}
           teacherEmail={teacherEmail}
           topicId={subjectId}
+        />
+
+        {/* Share Question Dialog */}
+        <ShareQuestionDialog
+          open={!!shareQuestionId}
+          onOpenChange={(open) => !open && setShareQuestionId(null)}
+          questionId={shareQuestionId}
+          currentCollaborators={questions.find(q => q.id === shareQuestionId)?.collaborator_emails || []}
+        />
+
+        {/* Rate Question Dialog */}
+        <RateQuestionDialog
+          open={!!rateQuestionId}
+          onOpenChange={(open) => !open && setRateQuestionId(null)}
+          questionId={rateQuestionId}
+          teacherEmail={teacherEmail}
         />
 
         <div className="flex justify-between items-center pt-4 border-t border-white/10 mt-4">
