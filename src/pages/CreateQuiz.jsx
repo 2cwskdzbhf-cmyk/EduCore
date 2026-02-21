@@ -478,6 +478,20 @@ export default function CreateQuiz() {
     setShowGlobalQuestionBankDialog(true);
   };
 
+  const updateQuestion = (index, field, value) => {
+    const updated = [...questions];
+    updated[index] = { ...updated[index], [field]: value };
+    setQuestions(updated);
+  };
+
+  const updateOption = (qIndex, optIndex, value) => {
+    const updated = [...questions];
+    const newOptions = [...(updated[qIndex].options || ['', '', '', ''])];
+    newOptions[optIndex] = value;
+    updated[qIndex] = { ...updated[qIndex], options: newOptions };
+    setQuestions(updated);
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900/20 to-slate-900 p-6">
       <div className="max-w-7xl mx-auto">
