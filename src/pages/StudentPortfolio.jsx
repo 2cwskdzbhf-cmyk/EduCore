@@ -21,9 +21,14 @@ import {
   Brain,
   Clock,
   FileText,
-  BarChart3
+  BarChart3,
+  MessageSquare,
+  FolderOpen
 } from 'lucide-react';
 import PersonalizedLearningPath from '@/components/learning/PersonalizedLearningPath';
+import ReflectionsSection from '@/components/portfolio/ReflectionsSection';
+import ProjectsSection from '@/components/portfolio/ProjectsSection';
+import CertificatesSection from '@/components/portfolio/CertificatesSection';
 
 export default function StudentPortfolio() {
   const [selectedPeriod, setSelectedPeriod] = useState('all'); // all, month, week
@@ -282,10 +287,13 @@ export default function StudentPortfolio() {
         <Tabs defaultValue="overview" className="space-y-6">
           <TabsList className="bg-white/5 border border-white/10">
             <TabsTrigger value="overview" className="data-[state=active]:bg-purple-500">Overview</TabsTrigger>
+            <TabsTrigger value="learning" className="data-[state=active]:bg-purple-500">Learning Path</TabsTrigger>
+            <TabsTrigger value="reflections" className="data-[state=active]:bg-purple-500">Reflections</TabsTrigger>
+            <TabsTrigger value="projects" className="data-[state=active]:bg-purple-500">Projects</TabsTrigger>
+            <TabsTrigger value="certificates" className="data-[state=active]:bg-purple-500">Certificates</TabsTrigger>
             <TabsTrigger value="quizzes" className="data-[state=active]:bg-purple-500">Quiz History</TabsTrigger>
             <TabsTrigger value="assignments" className="data-[state=active]:bg-purple-500">Assignments</TabsTrigger>
             <TabsTrigger value="topics" className="data-[state=active]:bg-purple-500">Topic Mastery</TabsTrigger>
-            <TabsTrigger value="learning" className="data-[state=active]:bg-purple-500">Learning Path</TabsTrigger>
           </TabsList>
 
           {/* Overview Tab */}
@@ -509,6 +517,27 @@ export default function StudentPortfolio() {
             <PersonalizedLearningPath 
               studentEmail={user?.email}
               classId={enrolledClasses.length > 0 ? enrolledClasses[0].id : null}
+            />
+          </TabsContent>
+
+          {/* Reflections Tab */}
+          <TabsContent value="reflections">
+            <ReflectionsSection studentEmail={user?.email} />
+          </TabsContent>
+
+          {/* Projects Tab */}
+          <TabsContent value="projects">
+            <ProjectsSection studentEmail={user?.email} />
+          </TabsContent>
+
+          {/* Certificates Tab */}
+          <TabsContent value="certificates">
+            <CertificatesSection 
+              studentEmail={user?.email}
+              studentName={user?.full_name}
+              progress={progress}
+              quizAttempts={quizAttempts}
+              submissions={submissions}
             />
           </TabsContent>
         </Tabs>
