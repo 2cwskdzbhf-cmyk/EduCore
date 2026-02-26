@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
+import { toast } from 'sonner';
 import { Search, Plus, Filter, Folder, History, Users, Upload, Star, Sparkles, TrendingUp, Calendar, User, AlertCircle, Database, Share2, MessageSquare } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -157,10 +158,16 @@ export default function QuestionBankDialog({ open, onOpenChange, onAddQuestions,
   };
 
   const handleAdd = () => {
+    if (selectedQuestions.length === 0) {
+      toast.error('Please select at least one question');
+      return;
+    }
+
     const questionsToAdd = questions.filter(q => selectedQuestions.includes(q.id));
     
     if (questionsToAdd.length === 0) {
       console.error('[QUESTION_BANK] No questions selected');
+      toast.error('Failed to find selected questions');
       return;
     }
     
@@ -168,10 +175,14 @@ export default function QuestionBankDialog({ open, onOpenChange, onAddQuestions,
     
     try {
       onAddQuestions(questionsToAdd);
+      console.log('[QUESTION_BANK] onAddQuestions callback executed');
+      
+      // Reset selection and close dialog
       setSelectedQuestions([]);
       onOpenChange(false);
     } catch (error) {
       console.error('[QUESTION_BANK] Error in handleAdd:', error);
+      toast.error('Error adding questions: ' + error.message);
     }
   };
 
