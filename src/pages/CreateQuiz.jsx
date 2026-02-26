@@ -22,6 +22,7 @@ import BulkImportDialog from '@/components/quiz/BulkImportDialog';
 import GlobalQuestionBankDialog from '@/components/quiz/GlobalQuestionBankDialog';
 import TemplateSelectorDialog from '@/components/quiz/TemplateSelectorDialog';
 import SaveTemplateDialog from '@/components/quiz/SaveTemplateDialog';
+import MaterialQuestionGenerator from '@/components/teacher/MaterialQuestionGenerator';
 
 export default function CreateQuiz() {
   const navigate = useNavigate();
@@ -651,6 +652,14 @@ export default function CreateQuiz() {
                   <FileText className="w-4 h-4 mr-2" />
                   Load Template
                 </Button>
+
+                <MaterialQuestionGenerator
+                  onQuestionsGenerated={(newQuestions) => {
+                    setQuestions(prev => [...prev, ...newQuestions]);
+                    toast.success('Questions added from material!');
+                  }}
+                  topicId={quizSet.topic_id}
+                />
 
                 <Button
                   onClick={() => setShowImportDialog(true)}
