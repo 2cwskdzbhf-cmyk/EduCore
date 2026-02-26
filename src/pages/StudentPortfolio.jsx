@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { motion } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -7,6 +7,12 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Progress } from '@/components/ui/progress';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { toast } from 'sonner';
 import {
   Award,
   TrendingUp,
@@ -21,12 +27,39 @@ import {
   Brain,
   Clock,
   FileText,
-  BarChart3
+  BarChart3,
+  Plus,
+  MessageSquare,
+  Briefcase,
+  Medal,
+  Upload
 } from 'lucide-react';
 import PersonalizedLearningPath from '@/components/learning/PersonalizedLearningPath';
+import ReflectionCard from '@/components/portfolio/ReflectionCard';
+import ProjectCard from '@/components/portfolio/ProjectCard';
 
 export default function StudentPortfolio() {
-  const [selectedPeriod, setSelectedPeriod] = useState('all'); // all, month, week
+  const [selectedPeriod, setSelectedPeriod] = useState('all');
+  const queryClient = useQueryClient();
+
+  // Dialog states
+  const [showReflectionDialog, setShowReflectionDialog] = useState(false);
+  const [showProjectDialog, setShowProjectDialog] = useState(false);
+  const [showAchievementDialog, setShowAchievementDialog] = useState(false);
+  const [showCertificateDialog, setShowCertificateDialog] = useState(false);
+  const [editingReflection, setEditingReflection] = useState(null);
+  const [editingProject, setEditingProject] = useState(null);
+
+  // Form states
+  const [reflectionForm, setReflectionForm] = useState({
+    title: '', content: '', mood: 'learning', learning_goals: [], is_private: true
+  });
+  const [projectForm, setProjectForm] = useState({
+    title: '', description: '', project_type: 'other', skills_demonstrated: [], self_rating: 3
+  });
+  const [achievementForm, setAchievementForm] = useState({
+    title: '', description: '', category: 'other', date_earned: new Date().toISOString().split('T')[0]
+  });
 
   // Fetch current user
   const { data: user } = useQuery({
@@ -80,18 +113,57 @@ export default function StudentPortfolio() {
     queryFn: () => base44.entities.Topic.list()
   });
 
-  // Calculate achievements
-  const achievements = [];
+  // Fetch reflections
+  const { data: reflections = [] } = useQuery({
+    queryKey: ['reflections', user?.email],
+    queryFn: () => base44.entities.StudentReflection.filter({ student_email: user.email }, '-created_date'),
+    enabled: !!user?.email
+  });
+
+  // Fetch projects
+  const { data: projects = [] } = useQuery({
+    queryKey: ['projects', user?.email],
+    queryFn: () => base44.entities.StudentProject.filter({ student_email: user.email }, '-created_date'),
+    enabled: !!user?.email
+  });
+
+  // Fetch custom achievements
+  const { data: customAchievements = [] } = useQuery({
+    queryKey: ['customAchievements', user?.email],
+    queryFn: () => base44.entities.CustomAchievement.filter({ student_email: user.email }, '-date_earned'),
+    enabled: !!user?.email
+  });
+
+  // Fetch certificates
+  const { data: certificates = [] } = useQuery({
+    queryKey: ['certificates', user?.email],
+    queryFn: () => base44.entities.ProgressCertificate.filter({ student_email: user.email }, '-issued_date'),
+    enabled: !!user?.email
+  });
+
+  // Calculate achievements (system + custom)
+  const systemAchievements = [];
   
-  if (quizAttempts.length >= 1) achievements.push({ name: 'First Quiz', icon: Target, color: 'text-blue-400' });
-  if (quizAttempts.length >= 10) achievements.push({ name: 'Quiz Master', icon: Trophy, color: 'text-yellow-400' });
-  if (quizAttempts.length >= 50) achievements.push({ name: 'Quiz Legend', icon: Award, color: 'text-purple-400' });
-  if (progress?.current_streak >= 3) achievements.push({ name: '3 Day Streak', icon: Zap, color: 'text-orange-400' });
-  if (progress?.current_streak >= 7) achievements.push({ name: 'Week Warrior', icon: Star, color: 'text-yellow-400' });
-  if (progress?.accuracy_percent >= 80) achievements.push({ name: 'High Achiever', icon: TrendingUp, color: 'text-green-400' });
+  if (quizAttempts.length >= 1) systemAchievements.push({ name: 'First Quiz', icon: Target, color: 'text-blue-400' });
+  if (quizAttempts.length >= 10) systemAchievements.push({ name: 'Quiz Master', icon: Trophy, color: 'text-yellow-400' });
+  if (quizAttempts.length >= 50) systemAchievements.push({ name: 'Quiz Legend', icon: Award, color: 'text-purple-400' });
+  if (progress?.current_streak >= 3) systemAchievements.push({ name: '3 Day Streak', icon: Zap, color: 'text-orange-400' });
+  if (progress?.current_streak >= 7) systemAchievements.push({ name: 'Week Warrior', icon: Star, color: 'text-yellow-400' });
+  if (progress?.accuracy_percent >= 80) systemAchievements.push({ name: 'High Achiever', icon: TrendingUp, color: 'text-green-400' });
   if (submissions.filter(s => s.status === 'graded' && s.percentage >= 90).length >= 5) {
-    achievements.push({ name: 'Excellence', icon: Award, color: 'text-gold-400' });
+    systemAchievements.push({ name: 'Excellence', icon: Award, color: 'text-gold-400' });
   }
+
+  const achievements = [
+    ...systemAchievements,
+    ...customAchievements.map(a => ({
+      name: a.title,
+      icon: Medal,
+      color: 'text-purple-400',
+      custom: true,
+      description: a.description
+    }))
+  ];
 
   // Calculate topic mastery
   const topicMastery = Object.entries(progress?.topic_mastery || {}).map(([topicId, mastery]) => {
@@ -139,25 +211,159 @@ export default function StudentPortfolio() {
     issueDate: new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
   };
 
-  const generateCertificate = () => {
-    // Simple certificate generation (could be enhanced with canvas or PDF generation)
-    const certificateHTML = `
-      <div style="width: 800px; padding: 60px; border: 10px solid #8b5cf6; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; font-family: Arial, sans-serif; text-align: center;">
-        <h1 style="font-size: 48px; margin-bottom: 20px;">Certificate of Achievement</h1>
-        <p style="font-size: 20px; margin-bottom: 40px;">This is to certify that</p>
-        <h2 style="font-size: 36px; margin-bottom: 40px; border-bottom: 2px solid white; display: inline-block; padding-bottom: 10px;">${certificateData.studentName}</h2>
-        <p style="font-size: 18px; line-height: 1.8; margin-bottom: 40px;">
-          Has successfully completed <strong>${certificateData.totalQuizzes}</strong> quizzes with an average accuracy of <strong>${certificateData.avgAccuracy}%</strong><br/>
-          and submitted <strong>${certificateData.completedAssignments}</strong> assignments, earning <strong>${certificateData.achievements}</strong> achievements
-        </p>
-        <p style="font-size: 16px; margin-top: 60px;">Issued on ${certificateData.issueDate}</p>
-      </div>
-    `;
-    
-    const newWindow = window.open('', '_blank');
-    newWindow.document.write(certificateHTML);
-    newWindow.document.close();
-    newWindow.print();
+  // Mutations
+  const createReflectionMutation = useMutation({
+    mutationFn: (data) => base44.entities.StudentReflection.create({ ...data, student_email: user.email }),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['reflections']);
+      setShowReflectionDialog(false);
+      setReflectionForm({ title: '', content: '', mood: 'learning', learning_goals: [], is_private: true });
+      toast.success('Reflection saved!');
+    }
+  });
+
+  const updateReflectionMutation = useMutation({
+    mutationFn: ({ id, data }) => base44.entities.StudentReflection.update(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['reflections']);
+      setShowReflectionDialog(false);
+      setEditingReflection(null);
+      toast.success('Reflection updated!');
+    }
+  });
+
+  const deleteReflectionMutation = useMutation({
+    mutationFn: (id) => base44.entities.StudentReflection.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['reflections']);
+      toast.success('Reflection deleted');
+    }
+  });
+
+  const createProjectMutation = useMutation({
+    mutationFn: (data) => base44.entities.StudentProject.create({ ...data, student_email: user.email }),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['projects']);
+      setShowProjectDialog(false);
+      setProjectForm({ title: '', description: '', project_type: 'other', skills_demonstrated: [], self_rating: 3 });
+      toast.success('Project added!');
+    }
+  });
+
+  const deleteProjectMutation = useMutation({
+    mutationFn: (id) => base44.entities.StudentProject.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['projects']);
+      toast.success('Project deleted');
+    }
+  });
+
+  const createAchievementMutation = useMutation({
+    mutationFn: (data) => base44.entities.CustomAchievement.create({ ...data, student_email: user.email }),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['customAchievements']);
+      setShowAchievementDialog(false);
+      setAchievementForm({ title: '', description: '', category: 'other', date_earned: new Date().toISOString().split('T')[0] });
+      toast.success('Achievement added!');
+    }
+  });
+
+  const generateCertificateMutation = useMutation({
+    mutationFn: async (certificateType) => {
+      let data = {};
+      switch (certificateType) {
+        case 'overall_progress':
+          data = {
+            totalQuizzes,
+            totalAssignments: completedAssignments,
+            avgAccuracy: Math.round(avgAccuracy),
+            stats: {
+              'Total Questions': totalQuestions,
+              'Correct Answers': totalCorrect,
+              'Current Streak': progress?.current_streak || 0
+            }
+          };
+          break;
+        case 'accuracy_milestone':
+          data = {
+            accuracy: Math.round(avgAccuracy),
+            quizCount: totalQuizzes,
+            milestoneValue: Math.round(avgAccuracy)
+          };
+          break;
+        case 'streak_milestone':
+          data = {
+            streakDays: progress?.current_streak || 0,
+            milestoneValue: progress?.current_streak || 0
+          };
+          break;
+        default:
+          data = { totalQuizzes, avgAccuracy: Math.round(avgAccuracy) };
+      }
+
+      const response = await base44.functions.invoke('generateCertificate', {
+        certificateType,
+        data
+      });
+
+      return response.data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries(['certificates']);
+      
+      // Download PDF
+      const link = document.createElement('a');
+      link.href = `data:application/pdf;base64,${data.pdf}`;
+      link.download = data.filename;
+      link.click();
+      
+      toast.success('Certificate generated!');
+      setShowCertificateDialog(false);
+    },
+    onError: (error) => {
+      toast.error('Failed to generate certificate: ' + error.message);
+    }
+  });
+
+  // Handlers
+  const handleSaveReflection = () => {
+    if (!reflectionForm.title || !reflectionForm.content) {
+      toast.error('Please fill in title and content');
+      return;
+    }
+    if (editingReflection) {
+      updateReflectionMutation.mutate({ id: editingReflection.id, data: reflectionForm });
+    } else {
+      createReflectionMutation.mutate(reflectionForm);
+    }
+  };
+
+  const handleEditReflection = (reflection) => {
+    setEditingReflection(reflection);
+    setReflectionForm({
+      title: reflection.title,
+      content: reflection.content,
+      mood: reflection.mood,
+      learning_goals: reflection.learning_goals || [],
+      is_private: reflection.is_private
+    });
+    setShowReflectionDialog(true);
+  };
+
+  const handleSaveProject = () => {
+    if (!projectForm.title || !projectForm.description) {
+      toast.error('Please fill in title and description');
+      return;
+    }
+    createProjectMutation.mutate(projectForm);
+  };
+
+  const handleSaveAchievement = () => {
+    if (!achievementForm.title || !achievementForm.description) {
+      toast.error('Please fill in title and description');
+      return;
+    }
+    createAchievementMutation.mutate(achievementForm);
   };
 
   if (!user) {
@@ -183,7 +389,7 @@ export default function StudentPortfolio() {
               <p className="text-slate-400">Track your learning journey and achievements</p>
             </div>
             <Button 
-              onClick={generateCertificate}
+              onClick={() => setShowCertificateDialog(true)}
               className="bg-gradient-to-r from-purple-500 to-blue-500"
             >
               <Download className="w-4 h-4 mr-2" />
@@ -282,10 +488,12 @@ export default function StudentPortfolio() {
         <Tabs defaultValue="overview" className="space-y-6">
           <TabsList className="bg-white/5 border border-white/10">
             <TabsTrigger value="overview" className="data-[state=active]:bg-purple-500">Overview</TabsTrigger>
+            <TabsTrigger value="learning" className="data-[state=active]:bg-purple-500">Learning Path</TabsTrigger>
+            <TabsTrigger value="reflections" className="data-[state=active]:bg-purple-500">Reflections</TabsTrigger>
+            <TabsTrigger value="projects" className="data-[state=active]:bg-purple-500">Projects</TabsTrigger>
             <TabsTrigger value="quizzes" className="data-[state=active]:bg-purple-500">Quiz History</TabsTrigger>
             <TabsTrigger value="assignments" className="data-[state=active]:bg-purple-500">Assignments</TabsTrigger>
             <TabsTrigger value="topics" className="data-[state=active]:bg-purple-500">Topic Mastery</TabsTrigger>
-            <TabsTrigger value="learning" className="data-[state=active]:bg-purple-500">Learning Path</TabsTrigger>
           </TabsList>
 
           {/* Overview Tab */}
@@ -511,7 +719,342 @@ export default function StudentPortfolio() {
               classId={enrolledClasses.length > 0 ? enrolledClasses[0].id : null}
             />
           </TabsContent>
+
+          {/* Reflections Tab */}
+          <TabsContent value="reflections">
+            <Card className="bg-white/5 border-white/10 mb-4">
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-white flex items-center gap-2">
+                    <MessageSquare className="w-5 h-5" />
+                    My Learning Reflections
+                  </CardTitle>
+                  <Button onClick={() => { setEditingReflection(null); setShowReflectionDialog(true); }} className="bg-purple-500">
+                    <Plus className="w-4 h-4 mr-2" />
+                    New Reflection
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="grid gap-4">
+                  {reflections.map(reflection => (
+                    <ReflectionCard
+                      key={reflection.id}
+                      reflection={reflection}
+                      onEdit={handleEditReflection}
+                      onDelete={(id) => deleteReflectionMutation.mutate(id)}
+                    />
+                  ))}
+                  {reflections.length === 0 && (
+                    <div className="text-center py-12 text-slate-400">
+                      <MessageSquare className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                      <p>No reflections yet. Start documenting your learning journey!</p>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Projects Tab */}
+          <TabsContent value="projects">
+            <Card className="bg-white/5 border-white/10 mb-4">
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-white flex items-center gap-2">
+                    <Briefcase className="w-5 h-5" />
+                    My Projects & Work
+                  </CardTitle>
+                  <div className="flex gap-2">
+                    <Button onClick={() => setShowAchievementDialog(true)} variant="outline">
+                      <Medal className="w-4 h-4 mr-2" />
+                      Add Achievement
+                    </Button>
+                    <Button onClick={() => setShowProjectDialog(true)} className="bg-purple-500">
+                      <Plus className="w-4 h-4 mr-2" />
+                      New Project
+                    </Button>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="grid md:grid-cols-2 gap-4">
+                  {projects.map(project => (
+                    <ProjectCard
+                      key={project.id}
+                      project={project}
+                      onEdit={(proj) => { setEditingProject(proj); setShowProjectDialog(true); }}
+                      onDelete={(id) => deleteProjectMutation.mutate(id)}
+                    />
+                  ))}
+                </div>
+                {projects.length === 0 && (
+                  <div className="text-center py-12 text-slate-400">
+                    <Briefcase className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                    <p>No projects yet. Showcase your work and achievements!</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
         </Tabs>
+
+        {/* Reflection Dialog */}
+        <Dialog open={showReflectionDialog} onOpenChange={setShowReflectionDialog}>
+          <DialogContent className="bg-slate-900 border-white/10 text-white max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>{editingReflection ? 'Edit Reflection' : 'New Reflection'}</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <Label>Title</Label>
+                <Input
+                  value={reflectionForm.title}
+                  onChange={(e) => setReflectionForm({...reflectionForm, title: e.target.value})}
+                  placeholder="What did you learn today?"
+                  className="bg-white/5 border-white/10"
+                />
+              </div>
+              <div>
+                <Label>How are you feeling about this learning?</Label>
+                <Select value={reflectionForm.mood} onValueChange={(v) => setReflectionForm({...reflectionForm, mood: v})}>
+                  <SelectTrigger className="bg-white/5 border-white/10">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="confident">Confident</SelectItem>
+                    <SelectItem value="learning">Still Learning</SelectItem>
+                    <SelectItem value="challenged">Challenged</SelectItem>
+                    <SelectItem value="confused">Confused</SelectItem>
+                    <SelectItem value="excited">Excited</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Reflection</Label>
+                <Textarea
+                  value={reflectionForm.content}
+                  onChange={(e) => setReflectionForm({...reflectionForm, content: e.target.value})}
+                  placeholder="Write about your learning experience..."
+                  className="bg-white/5 border-white/10 min-h-32"
+                />
+              </div>
+              <div>
+                <Label>Learning Goals (comma-separated)</Label>
+                <Input
+                  value={reflectionForm.learning_goals.join(', ')}
+                  onChange={(e) => setReflectionForm({...reflectionForm, learning_goals: e.target.value.split(',').map(g => g.trim()).filter(Boolean)})}
+                  placeholder="Master fractions, Improve speed"
+                  className="bg-white/5 border-white/10"
+                />
+              </div>
+              <div className="flex items-center justify-between pt-4">
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={reflectionForm.is_private}
+                    onChange={(e) => setReflectionForm({...reflectionForm, is_private: e.target.checked})}
+                    className="rounded"
+                  />
+                  Keep private (only you can see this)
+                </label>
+                <Button onClick={handleSaveReflection} disabled={createReflectionMutation.isPending || updateReflectionMutation.isPending}>
+                  Save Reflection
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Project Dialog */}
+        <Dialog open={showProjectDialog} onOpenChange={setShowProjectDialog}>
+          <DialogContent className="bg-slate-900 border-white/10 text-white max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Add Project</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <Label>Project Title</Label>
+                <Input
+                  value={projectForm.title}
+                  onChange={(e) => setProjectForm({...projectForm, title: e.target.value})}
+                  placeholder="My Amazing Project"
+                  className="bg-white/5 border-white/10"
+                />
+              </div>
+              <div>
+                <Label>Project Type</Label>
+                <Select value={projectForm.project_type} onValueChange={(v) => setProjectForm({...projectForm, project_type: v})}>
+                  <SelectTrigger className="bg-white/5 border-white/10">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="research">Research</SelectItem>
+                    <SelectItem value="creative">Creative</SelectItem>
+                    <SelectItem value="practical">Practical</SelectItem>
+                    <SelectItem value="presentation">Presentation</SelectItem>
+                    <SelectItem value="experiment">Experiment</SelectItem>
+                    <SelectItem value="other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Description</Label>
+                <Textarea
+                  value={projectForm.description}
+                  onChange={(e) => setProjectForm({...projectForm, description: e.target.value})}
+                  placeholder="Describe your project..."
+                  className="bg-white/5 border-white/10 min-h-24"
+                />
+              </div>
+              <div>
+                <Label>Skills Demonstrated (comma-separated)</Label>
+                <Input
+                  value={projectForm.skills_demonstrated.join(', ')}
+                  onChange={(e) => setProjectForm({...projectForm, skills_demonstrated: e.target.value.split(',').map(s => s.trim()).filter(Boolean)})}
+                  placeholder="Problem solving, Creativity, Research"
+                  className="bg-white/5 border-white/10"
+                />
+              </div>
+              <div>
+                <Label>Self-Rating: {projectForm.self_rating}/5</Label>
+                <input
+                  type="range"
+                  min="1"
+                  max="5"
+                  value={projectForm.self_rating}
+                  onChange={(e) => setProjectForm({...projectForm, self_rating: Number(e.target.value)})}
+                  className="w-full"
+                />
+              </div>
+              <div className="flex justify-end pt-4">
+                <Button onClick={handleSaveProject} disabled={createProjectMutation.isPending}>
+                  Add Project
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Achievement Dialog */}
+        <Dialog open={showAchievementDialog} onOpenChange={setShowAchievementDialog}>
+          <DialogContent className="bg-slate-900 border-white/10 text-white">
+            <DialogHeader>
+              <DialogTitle>Add Custom Achievement</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <Label>Achievement Title</Label>
+                <Input
+                  value={achievementForm.title}
+                  onChange={(e) => setAchievementForm({...achievementForm, title: e.target.value})}
+                  placeholder="First Place in Science Fair"
+                  className="bg-white/5 border-white/10"
+                />
+              </div>
+              <div>
+                <Label>Category</Label>
+                <Select value={achievementForm.category} onValueChange={(v) => setAchievementForm({...achievementForm, category: v})}>
+                  <SelectTrigger className="bg-white/5 border-white/10">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="competition">Competition</SelectItem>
+                    <SelectItem value="certification">Certification</SelectItem>
+                    <SelectItem value="extracurricular">Extracurricular</SelectItem>
+                    <SelectItem value="community">Community Service</SelectItem>
+                    <SelectItem value="leadership">Leadership</SelectItem>
+                    <SelectItem value="other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Description</Label>
+                <Textarea
+                  value={achievementForm.description}
+                  onChange={(e) => setAchievementForm({...achievementForm, description: e.target.value})}
+                  placeholder="What did you achieve?"
+                  className="bg-white/5 border-white/10"
+                />
+              </div>
+              <div>
+                <Label>Date Earned</Label>
+                <Input
+                  type="date"
+                  value={achievementForm.date_earned}
+                  onChange={(e) => setAchievementForm({...achievementForm, date_earned: e.target.value})}
+                  className="bg-white/5 border-white/10"
+                />
+              </div>
+              <div className="flex justify-end pt-4">
+                <Button onClick={handleSaveAchievement} disabled={createAchievementMutation.isPending}>
+                  Add Achievement
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Certificate Dialog */}
+        <Dialog open={showCertificateDialog} onOpenChange={setShowCertificateDialog}>
+          <DialogContent className="bg-slate-900 border-white/10 text-white">
+            <DialogHeader>
+              <DialogTitle>Generate Certificate</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-3">
+              <p className="text-slate-400 text-sm">Choose a milestone to celebrate:</p>
+              
+              <Button
+                variant="outline"
+                className="w-full justify-start"
+                onClick={() => generateCertificateMutation.mutate('overall_progress')}
+                disabled={generateCertificateMutation.isPending}
+              >
+                <Award className="w-5 h-5 mr-3" />
+                <div className="text-left">
+                  <div className="font-semibold">Overall Progress</div>
+                  <div className="text-xs text-slate-400">{totalQuizzes} quizzes, {Math.round(avgAccuracy)}% accuracy</div>
+                </div>
+              </Button>
+
+              {avgAccuracy >= 70 && (
+                <Button
+                  variant="outline"
+                  className="w-full justify-start"
+                  onClick={() => generateCertificateMutation.mutate('accuracy_milestone')}
+                  disabled={generateCertificateMutation.isPending}
+                >
+                  <Target className="w-5 h-5 mr-3" />
+                  <div className="text-left">
+                    <div className="font-semibold">Accuracy Milestone</div>
+                    <div className="text-xs text-slate-400">Achieved {Math.round(avgAccuracy)}% accuracy</div>
+                  </div>
+                </Button>
+              )}
+
+              {progress?.current_streak >= 3 && (
+                <Button
+                  variant="outline"
+                  className="w-full justify-start"
+                  onClick={() => generateCertificateMutation.mutate('streak_milestone')}
+                  disabled={generateCertificateMutation.isPending}
+                >
+                  <Zap className="w-5 h-5 mr-3" />
+                  <div className="text-left">
+                    <div className="font-semibold">Streak Achievement</div>
+                    <div className="text-xs text-slate-400">{progress.current_streak} days in a row</div>
+                  </div>
+                </Button>
+              )}
+
+              <div className="pt-4 border-t border-white/10">
+                <p className="text-xs text-slate-400">
+                  Previous certificates: {certificates.length}
+                </p>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );

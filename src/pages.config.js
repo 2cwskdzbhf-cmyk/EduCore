@@ -66,21 +66,21 @@ import QuestionBank from './pages/QuestionBank';
 import QuizLibrary from './pages/QuizLibrary';
 import StartLiveQuiz from './pages/StartLiveQuiz';
 import StudentClassDetail from './pages/StudentClassDetail';
-import StudentDashboard from './pages/StudentDashboard';
 import StudentLiveQuizPlay from './pages/StudentLiveQuizPlay';
-import StudentPortfolio from './pages/StudentPortfolio';
 import StudentStats from './pages/StudentStats';
 import Subject from './pages/Subject';
 import TakeAssignment from './pages/TakeAssignment';
 import TeacherAssignmentLibrary from './pages/TeacherAssignmentLibrary';
 import TeacherClassDetail from './pages/TeacherClassDetail';
-import TeacherDashboard from './pages/TeacherDashboard';
 import TeacherLiveQuizLobby from './pages/TeacherLiveQuizLobby';
 import TeacherLiveQuizPlay from './pages/TeacherLiveQuizPlay';
 import TeacherLiveQuizResults from './pages/TeacherLiveQuizResults';
 import TeacherQuestionBuilder from './pages/TeacherQuestionBuilder';
 import TeacherQuestionGenerator from './pages/TeacherQuestionGenerator';
 import Topic from './pages/Topic';
+import TeacherDashboard from './pages/TeacherDashboard';
+import StudentDashboard from './pages/StudentDashboard';
+import StudentPortfolio from './pages/StudentPortfolio';
 import __Layout from './Layout.jsx';
 
 
@@ -104,21 +104,21 @@ export const PAGES = {
     "QuizLibrary": QuizLibrary,
     "StartLiveQuiz": StartLiveQuiz,
     "StudentClassDetail": StudentClassDetail,
-    "StudentDashboard": StudentDashboard,
     "StudentLiveQuizPlay": StudentLiveQuizPlay,
-    "StudentPortfolio": StudentPortfolio,
     "StudentStats": StudentStats,
     "Subject": Subject,
     "TakeAssignment": TakeAssignment,
     "TeacherAssignmentLibrary": TeacherAssignmentLibrary,
     "TeacherClassDetail": TeacherClassDetail,
-    "TeacherDashboard": TeacherDashboard,
     "TeacherLiveQuizLobby": TeacherLiveQuizLobby,
     "TeacherLiveQuizPlay": TeacherLiveQuizPlay,
     "TeacherLiveQuizResults": TeacherLiveQuizResults,
     "TeacherQuestionBuilder": TeacherQuestionBuilder,
     "TeacherQuestionGenerator": TeacherQuestionGenerator,
     "Topic": Topic,
+    "TeacherDashboard": TeacherDashboard,
+    "StudentDashboard": StudentDashboard,
+    "StudentPortfolio": StudentPortfolio,
 }
 
 export const pagesConfig = {
