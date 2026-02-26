@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import PersonalizedLearningPath from '@/components/learning/PersonalizedLearningPath';
+import AILearningResources from '@/components/student/AILearningResources';
 import {
   Target,
   UserPlus,
@@ -466,7 +467,7 @@ localStorage.setItem('dismissedLiveQuizSessionId', liveQuizBannerSession.id);  }
           />
         </div>
 
-        {/* Personalized Learning Path */}
+        {/* Personalized Learning Path & AI Resources */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -477,10 +478,13 @@ localStorage.setItem('dismissedLiveQuizSessionId', liveQuizBannerSession.id);  }
             <Brain className="w-5 h-5 text-purple-400" />
             Recommended For You
           </h2>
-          <PersonalizedLearningPath 
-            studentEmail={user?.email} 
-            classId={enrolledClasses.length > 0 ? enrolledClasses[0].id : null}
-          />
+          <div className="grid md:grid-cols-2 gap-6">
+            <PersonalizedLearningPath 
+              studentEmail={user?.email} 
+              classId={enrolledClasses.length > 0 ? enrolledClasses[0].id : null}
+            />
+            <AILearningResources studentEmail={user?.email} />
+          </div>
         </motion.div>
 
         <motion.div
