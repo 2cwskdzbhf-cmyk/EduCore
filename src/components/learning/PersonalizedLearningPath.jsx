@@ -22,6 +22,7 @@ import {
   Zap
 } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
+import ResourceSuggestions from '@/components/analytics/ResourceSuggestions';
 
 export default function PersonalizedLearningPath({ studentEmail, classId }) {
   const navigate = useNavigate();
@@ -39,6 +40,16 @@ export default function PersonalizedLearningPath({ studentEmail, classId }) {
     queryKey: ['topicProgress', studentEmail, selectedTopic],
     queryFn: () => LearningPathEngine.trackProgress(studentEmail, selectedTopic),
     enabled: !!selectedTopic
+  });
+
+  // Fetch student progress for weak areas
+  const { data: studentProgress } = useQuery({
+    queryKey: ['studentProgress', studentEmail],
+    queryFn: async () => {
+      const progressList = await base44.entities.StudentProgress.filter({ student_email: studentEmail });
+      return progressList[0] || null;
+    },
+    enabled: !!studentEmail
   });
 
   if (isLoading) {
