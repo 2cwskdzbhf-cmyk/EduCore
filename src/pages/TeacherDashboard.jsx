@@ -323,6 +323,29 @@ export default function TeacherDashboard() {
           />
         </div>
 
+        {/* AI Teaching Assistant */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+          className="mb-8"
+        >
+          <Link to={createPageUrl('TeacherAIAssistant')}>
+            <GlassCard className="p-6 hover:scale-[1.02] bg-gradient-to-br from-purple-500/20 to-blue-500/20 border-purple-500/30">
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center shadow-lg shadow-purple-500/30">
+                  <Sparkles className="w-7 h-7 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-white mb-1">AI Teaching Assistant</h3>
+                  <p className="text-sm text-slate-300">Generate diverse questions, analyze performance, and get insights</p>
+                </div>
+                <ChevronRight className="w-6 h-6 text-slate-400 ml-auto" />
+              </div>
+            </GlassCard>
+          </Link>
+        </motion.div>
+
         {/* Notifications */}
         {user && (
           <div className="mb-8">
