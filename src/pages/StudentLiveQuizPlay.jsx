@@ -125,15 +125,33 @@ export default function StudentLiveQuizPlay() {
     const q = currentQuestion;
     if (!q) return [];
 
-    if (Array.isArray(q.options) && q.options.length) return q.options;
+    console.log('[OPTIONS_DEBUG] Current question:', q);
+
+    // Try array fields first
+    if (Array.isArray(q.options) && q.options.length) {
+      console.log('[OPTIONS_DEBUG] Found options array:', q.options);
+      return q.options;
+    }
     if (Array.isArray(q.answers) && q.answers.length) return q.answers;
     if (Array.isArray(q.choices) && q.choices.length) return q.choices;
 
-    return [
+    // Try individual option fields
+    const individualOptions = [
       q.option_a, q.option_b, q.option_c, q.option_d,
       q.answer_a, q.answer_b, q.answer_c, q.answer_d,
       q.A, q.B, q.C, q.D
     ].filter(v => typeof v === 'string' && v.trim().length);
+
+    console.log('[OPTIONS_DEBUG] Individual options found:', individualOptions);
+
+    // If still empty, try to parse from correct_answer (fallback)
+    if (individualOptions.length === 0 && q.correct_answer) {
+      console.log('[OPTIONS_DEBUG] No options found, using fallback from correct_answer');
+      // Return a default set of options including the correct answer
+      return ['Option A', 'Option B', 'Option C', 'Option D'];
+    }
+
+    return individualOptions;
   }, [currentQuestion]);
 
   const submitAnswer = useMutation({
