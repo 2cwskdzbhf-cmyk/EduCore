@@ -81,6 +81,7 @@ import TeacherLiveQuizResults from './pages/TeacherLiveQuizResults';
 import TeacherQuestionBuilder from './pages/TeacherQuestionBuilder';
 import TeacherQuestionGenerator from './pages/TeacherQuestionGenerator';
 import Topic from './pages/Topic';
+import TeacherAIAssistant from './pages/TeacherAIAssistant';
 import __Layout from './Layout.jsx';
 
 
@@ -119,6 +120,7 @@ export const PAGES = {
     "TeacherQuestionBuilder": TeacherQuestionBuilder,
     "TeacherQuestionGenerator": TeacherQuestionGenerator,
     "Topic": Topic,
+    "TeacherAIAssistant": TeacherAIAssistant,
 }
 
 export const pagesConfig = {
