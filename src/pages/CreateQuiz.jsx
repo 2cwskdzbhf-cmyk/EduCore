@@ -143,9 +143,11 @@ export default function CreateQuiz() {
     }
   }, [quizSetId]);
 
-  // Keep editor UI in sync with DB, but DO NOT auto-delete partially-filled questions
+  // Keep editor UI in sync with DB ONLY on initial load, not on every change
+  const [hasLoadedInitialQuestions, setHasLoadedInitialQuestions] = useState(false);
+  
   useEffect(() => {
-    if (!quizSetId) return;
+    if (!quizSetId || hasLoadedInitialQuestions) return;
 
     cleanupTrulyEmptyQuestionsFromDB();
 
@@ -167,7 +169,10 @@ export default function CreateQuiz() {
     }));
 
     setQuestions(mapped);
-  }, [quizSetId, persistedQuizQuestions, cleanupTrulyEmptyQuestionsFromDB]);
+    setHasLoadedInitialQuestions(true);
+    
+    console.log('[INITIAL_LOAD] Loaded', mapped.length, 'questions from DB');
+  }, [quizSetId, persistedQuizQuestions, cleanupTrulyEmptyQuestionsFromDB, hasLoadedInitialQuestions]);
 
   // --------- SIDEBAR DATA ----------
   const { data: subjects = [] } = useQuery({
@@ -371,9 +376,12 @@ export default function CreateQuiz() {
       }));
 
       // IMMEDIATELY UPDATE LOCAL STATE (this makes the UI update instantly)
-      setQuestions(prev => [...prev, ...newQuestions]);
+      setQuestions(prev => {
+        const updated = [...prev, ...newQuestions];
+        console.log('[APPLY_SUCCESS] Questions state updated. Old count:', prev.length, 'New count:', updated.length);
+        return updated;
+      });
       
-      console.log('[APPLY_SUCCESS] Questions added to local state');
       toast.success(`Added ${selectedQuestions.length} question${selectedQuestions.length !== 1 ? 's' : ''}`);
       
     } catch (error) {
@@ -682,6 +690,7 @@ export default function CreateQuiz() {
                 <BookOpen className="w-12 h-12 text-slate-400 mx-auto mb-4" />
                 <h3 className="text-white font-semibold mb-2">No questions yet</h3>
                 <p className="text-slate-400 text-sm mb-4">Add questions manually or import from a lesson</p>
+                <p className="text-xs text-slate-500 mt-2">Questions count: {questions.length}</p>
               </GlassCard>
             ) : (
               <div className="space-y-4">
