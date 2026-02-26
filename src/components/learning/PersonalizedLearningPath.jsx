@@ -247,6 +247,16 @@ export default function PersonalizedLearningPath({ studentEmail, classId }) {
           </CardContent>
         </Card>
       )}
+
+      {/* AI Resource Suggestions */}
+      {studentProgress?.weak_areas && studentProgress.weak_areas.length > 0 && (
+        <ResourceSuggestions
+          studentEmail={studentEmail}
+          topicId={studentProgress.weak_areas[0]}
+          weakSkills={studentProgress.weak_skills || []}
+          currentPerformance={studentProgress.accuracy_percent || 0}
+        />
+      )}
     </div>
   );
 }
