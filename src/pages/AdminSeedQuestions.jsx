@@ -296,6 +296,25 @@ export default function AdminSeedQuestions() {
                   </Button>
                   <Button
                     size="sm"
+                    onClick={async () => {
+                      setImporting(true);
+                      setResult(null);
+                      try {
+                        const response = await base44.functions.invoke('seedAlgebraQuestions', {});
+                        setResult({ success: true, message: `✅ Algebra seed: ${response.data.created} created, ${response.data.skipped} skipped (${response.data.total_attempted} total)` });
+                      } catch (error) {
+                        setResult({ success: false, message: `Algebra seed failed: ${error.message}` });
+                      } finally {
+                        setImporting(false);
+                      }
+                    }}
+                    disabled={importing}
+                    className="bg-gradient-to-r from-blue-500 to-purple-500"
+                  >
+                    {importing ? 'Seeding...' : '📐 Seed Algebra (Y7-11, 100+ Qs)'}
+                  </Button>
+                  <Button
+                    size="sm"
                     variant="outline"
                     onClick={loadSampleData}
                     className="border-purple-500/30 text-purple-400 hover:bg-purple-500/10"
