@@ -10,19 +10,16 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
+
 import GlassCard from '@/components/ui/GlassCard';
 import { toast } from 'sonner';
 import {
   ChevronLeft, Plus, Trash2, Save, Play,
-  BookOpen, Sparkles, Check, Upload, Database, FileText, Image
+  BookOpen, Check, Database, FileText, Image, Zap
 } from 'lucide-react';
 
-import BulkImportDialog from '@/components/quiz/BulkImportDialog';
 import GlobalQuestionBankDialog from '@/components/quiz/GlobalQuestionBankDialog';
-import TemplateSelectorDialog from '@/components/quiz/TemplateSelectorDialog';
 import SaveTemplateDialog from '@/components/quiz/SaveTemplateDialog';
-import MaterialQuestionGenerator from '@/components/teacher/MaterialQuestionGenerator';
 
 export default function CreateQuiz() {
   const navigate = useNavigate();
@@ -42,10 +39,7 @@ export default function CreateQuiz() {
   const [questions, setQuestions] = useState([]);
   const [editingIndex, setEditingIndex] = useState(null);
 
-  const [showImportDialog, setShowImportDialog] = useState(false);
-  const [showBulkImportDialog, setShowBulkImportDialog] = useState(false);
   const [showGlobalQuestionBankDialog, setShowGlobalQuestionBankDialog] = useState(false);
-  const [showTemplateSelectorDialog, setShowTemplateSelectorDialog] = useState(false);
   const [showSaveTemplateDialog, setShowSaveTemplateDialog] = useState(false);
 
   const [quizSetId, setQuizSetId] = useState(null);
@@ -592,8 +586,7 @@ export default function CreateQuiz() {
                     <Button
                       onClick={() => setShowSaveTemplateDialog(true)}
                       disabled={!quizSet.title?.trim() || questions.filter(q => !isTrulyEmptyQuestion(q)).length === 0}
-                      variant="outline"
-                      className="w-full border-purple-500/30 text-purple-300 hover:bg-purple-500/10"
+                      className="w-full bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/40 text-purple-300"
                     >
                       <FileText className="w-4 h-4 mr-2" />
                       Save as Template
@@ -605,7 +598,7 @@ export default function CreateQuiz() {
                         saveQuizMutation.mutate({ status: 'draft' });
                       }}
                       disabled={!canSave || saveQuizMutation.isPending}
-                      className="w-full bg-white/10 hover:bg-white/20"
+                      className="w-full bg-white/10 hover:bg-white/20 border border-white/20 text-slate-300"
                     >
                       <Save className="w-4 h-4 mr-2" />
                       Save Draft
@@ -617,7 +610,7 @@ export default function CreateQuiz() {
                         saveQuizMutation.mutate({ status: 'published' });
                       }}
                       disabled={!canSave || saveQuizMutation.isPending}
-                      className="w-full bg-blue-500 hover:bg-blue-600"
+                      className="w-full bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 shadow-lg shadow-blue-500/30"
                     >
                       <Check className="w-4 h-4 mr-2" />
                       Save to Library
@@ -631,8 +624,8 @@ export default function CreateQuiz() {
                       disabled={!canSave || startLiveQuizMutation.isPending}
                       className="w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 shadow-lg shadow-amber-500/30"
                     >
-                      <Play className="w-4 h-4 mr-2" />
-                      Start Quiz
+                      <Zap className="w-4 h-4 mr-2" />
+                      Start Live Quiz
                     </Button>
                   </div>
                 </div>
@@ -645,49 +638,15 @@ export default function CreateQuiz() {
               <h3 className="text-xl font-bold text-white">Questions</h3>
               <div className="flex flex-wrap gap-2">
                 <Button
-                  onClick={() => setShowTemplateSelectorDialog(true)}
-                  variant="outline"
-                  className="border-purple-500/30 text-purple-300 hover:bg-purple-500/10"
-                >
-                  <FileText className="w-4 h-4 mr-2" />
-                  Load Template
-                </Button>
-
-                <MaterialQuestionGenerator
-                  onQuestionsGenerated={(newQuestions) => {
-                    setQuestions(prev => [...prev, ...newQuestions]);
-                    toast.success('Questions added from material!');
-                  }}
-                  topicId={quizSet.topic_id}
-                />
-
-                <Button
-                  onClick={() => setShowImportDialog(true)}
-                  disabled={!quizSet.topic_id}
-                  className="bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/50"
-                >
-                  <Sparkles className="w-4 h-4 mr-2" />
-                  AI Generate
-                </Button>
-
-                <Button
-                  onClick={() => setShowBulkImportDialog(true)}
-                  className="bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500/50"
-                >
-                  <Upload className="w-4 h-4 mr-2" />
-                  Bulk Import
-                </Button>
-
-                <Button
                   onClick={openGlobalBank}
                   disabled={!user?.email}
-                  className="bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/50"
+                  className="bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/50 text-emerald-300"
                 >
                   <Database className="w-4 h-4 mr-2" />
                   Global Bank
                 </Button>
 
-                <Button onClick={addManualQuestion} className="bg-gradient-to-r from-purple-500 to-blue-500">
+                <Button onClick={addManualQuestion} className="bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 shadow-lg shadow-purple-500/30">
                   <Plus className="w-4 h-4 mr-2" />
                   Add Question
                 </Button>
@@ -825,24 +784,11 @@ export default function CreateQuiz() {
               </div>
             )}
 
-            <BulkImportDialog
-              open={showBulkImportDialog}
-              onOpenChange={setShowBulkImportDialog}
-              onImport={() => {}}
-            />
-
             <GlobalQuestionBankDialog
               open={showGlobalQuestionBankDialog}
               onClose={() => setShowGlobalQuestionBankDialog(false)}
               onAddQuestions={handleGlobalQuestionBankAdd}
               quizSetId={quizSetId}
-            />
-
-            <TemplateSelectorDialog
-              open={showTemplateSelectorDialog}
-              onClose={() => setShowTemplateSelectorDialog(false)}
-              onSelectTemplate={handleTemplateSelect}
-              userEmail={user?.email}
             />
 
             <SaveTemplateDialog
@@ -852,11 +798,7 @@ export default function CreateQuiz() {
               userEmail={user?.email}
             />
 
-            <Dialog open={showImportDialog} onOpenChange={setShowImportDialog}>
-              <DialogContent className="bg-slate-900 border-white/10 text-white">
-                <div className="text-slate-300">AI dialog not included in this snippet.</div>
-              </DialogContent>
-            </Dialog>
+
           </div>
         </div>
       </div>
