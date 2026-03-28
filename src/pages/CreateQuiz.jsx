@@ -90,19 +90,22 @@ export default function CreateQuiz() {
 
   // --------- VALIDATION (STRICT, ONLY FOR SAVE/START) ----------
   const validateQuestionStrict = (q) => {
-    if (!q?.prompt || !q.prompt.trim()) return 'Question is missing prompt';
-    const isShortAnswer = q.question_type === 'short_answer';
-    if (isShortAnswer) {
-      // Short answer just needs a correct_answer
-      if (!q.correct_answer && !q.options?.[0]) return 'Question is missing correct answer';
-      return null;
-    }
-    // MCQ validation
-    if (!Array.isArray(q.options) || q.options.length < 2) return 'Question must have options';
-    const realOptions = q.options.filter(o => String(o || '').trim() && String(o || '').trim() !== '—');
-    if (realOptions.length < 2) return 'Question must have at least 2 real options';
-    if (typeof q.correct_index !== 'number' || q.correct_index < 0) return 'Invalid correct answer';
-    return null;
+  if (!q?.prompt || !q.prompt.trim()) return 'Question is missing prompt';
+  const type = q.question_type || 'multiple_choice';
+  if (type === 'short_answer') {
+  if (!q.correct_answer && !q.options?.[0]) return 'Question is missing correct answer';
+  return null;
+  }
+  if (type === 'written') {
+  if (!q.answer_keywords || q.answer_keywords.length === 0) return 'Written question needs at least one keyword';
+  return null;
+  }
+  // MCQ / true_false validation
+  const opts = q.options || [];
+  const realOptions = opts.filter(o => String(o || '').trim() && String(o || '').trim() !== '—');
+  if (realOptions.length < 2) return 'Question must have at least 2 options';
+  if (typeof q.correct_index !== 'number' || q.correct_index < 0) return 'Invalid correct answer';
+  return null;
   };
 
   // Only remove truly empty placeholders (prompt empty AND all options empty AND not a draft)
@@ -259,18 +262,20 @@ export default function CreateQuiz() {
 
       await Promise.all(
         validQuestions.map((q, index) => {
-          const isShortAnswer = q.question_type === 'short_answer';
-          const cleanOptions = isShortAnswer
+          const type = q.question_type || 'multiple_choice';
+          const isTextType = type === 'short_answer' || type === 'written';
+          const cleanOptions = isTextType
             ? []
             : (q.options || []).filter(o => String(o || '').trim() && String(o || '').trim() !== '—');
           return base44.entities.QuizQuestion.create({
             quiz_set_id: id,
             order: index,
             prompt: q.prompt,
-            question_type: q.question_type || 'multiple_choice',
+            question_type: type,
             options: cleanOptions,
-            correct_index: q.correct_index ?? 0,
-            correct_answer: isShortAnswer ? (q.correct_answer || q.options?.[0] || '') : (cleanOptions[q.correct_index] || q.correct_answer || ''),
+            correct_index: isTextType ? 0 : (q.correct_index ?? 0),
+            correct_answer: isTextType ? (q.correct_answer || '') : (cleanOptions[q.correct_index] || q.correct_answer || ''),
+            answer_keywords: type === 'written' ? (q.answer_keywords || []) : [],
             difficulty: q.difficulty || 'medium',
             explanation: q.explanation || '',
             tags: q.tags || [],
@@ -305,17 +310,19 @@ export default function CreateQuiz() {
 
       // Prepare the valid questions with full data embedded in the session
       const usable = questions.filter(q => !isTrulyEmptyQuestion(q)).map((q, i) => {
-        const isShortAnswer = q.question_type === 'short_answer';
-        const cleanOptions = isShortAnswer
+        const type = q.question_type || 'multiple_choice';
+        const isTextType = type === 'short_answer' || type === 'written';
+        const cleanOptions = isTextType
           ? []
           : (q.options || []).filter(o => String(o || '').trim() && String(o || '').trim() !== '—');
         return {
           order: i,
           prompt: q.prompt,
-          question_type: isShortAnswer ? 'short_answer' : 'multiple_choice',
+          question_type: type,
           options: cleanOptions,
-          correct_index: q.correct_index ?? 0,
-          correct_answer: isShortAnswer ? (q.correct_answer || q.options?.[0] || '') : (cleanOptions[q.correct_index] || q.correct_answer || ''),
+          correct_index: isTextType ? 0 : (q.correct_index ?? 0),
+          correct_answer: isTextType ? (q.correct_answer || '') : (cleanOptions[q.correct_index] || q.correct_answer || ''),
+          answer_keywords: type === 'written' ? (q.answer_keywords || []) : [],
           difficulty: q.difficulty || 'medium',
           explanation: q.explanation || '',
           image_url: q.image_url || '',
@@ -662,49 +669,117 @@ export default function CreateQuiz() {
                           ) : (
                             /* Expanded editing view */
                             <>
+                              {/* Question type selector */}
+                              <div className="mb-3">
+                                <Select
+                                  value={q.question_type || 'multiple_choice'}
+                                  onValueChange={(v) => updateQuestion(index, 'question_type', v)}
+                                >
+                                  <SelectTrigger className="w-48 bg-white/5 border-white/10 text-white text-xs">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="multiple_choice">Multiple Choice</SelectItem>
+                                    <SelectItem value="true_false">True / False</SelectItem>
+                                    <SelectItem value="short_answer">Short Answer</SelectItem>
+                                    <SelectItem value="written">Written Answer</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+
                               <Textarea
                                 value={q.prompt || ''}
                                 onChange={(e) => updateQuestion(index, 'prompt', e.target.value)}
                                 placeholder="Enter question text..."
-                                className="mb-2 bg-white/5 border-white/10 text-white"
+                                className="mb-3 bg-white/5 border-white/10 text-white"
                                 rows={2}
                                 autoFocus
                               />
 
-                              {q.image_url && (
-                                <img src={q.image_url} alt="Question" className="w-full max-w-md h-32 object-cover rounded-lg mb-3" />
+                              {/* MCQ / True-False options */}
+                              {(!q.question_type || q.question_type === 'multiple_choice' || q.question_type === 'true_false') && (
+                                <>
+                                  <div className="grid grid-cols-2 gap-2 mb-3">
+                                    {(q.question_type === 'true_false'
+                                      ? ['True', 'False']
+                                      : (q.options || ['', '', '', ''])
+                                    ).map((opt, i) => (
+                                      <Input
+                                        key={i}
+                                        value={String(opt || '')}
+                                        onChange={(e) => updateOption(index, i, e.target.value)}
+                                        placeholder={q.question_type === 'true_false' ? opt : `Option ${i + 1}`}
+                                        readOnly={q.question_type === 'true_false'}
+                                        className={`bg-white/5 border-white/10 text-white ${q.correct_index === i ? 'ring-2 ring-green-500' : ''}`}
+                                      />
+                                    ))}
+                                  </div>
+                                  <Select
+                                    value={String(q.correct_index ?? 0)}
+                                    onValueChange={(v) => updateQuestion(index, 'correct_index', Number(v))}
+                                  >
+                                    <SelectTrigger className="w-44 bg-white/5 border-white/10 text-white mb-3">
+                                      <SelectValue placeholder="Correct answer" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {(q.question_type === 'true_false'
+                                        ? ['True', 'False']
+                                        : (q.options || ['', '', '', ''])
+                                      ).map((opt, i) => (
+                                        <SelectItem key={i} value={String(i)}>
+                                          {opt || `Option ${i + 1}`}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                </>
                               )}
 
-                              <div className="grid grid-cols-2 gap-2 mb-3">
-                                {q.options?.map((opt, i) => (
-                                  <div key={i} className="relative">
-                                    {q.option_images?.[i] && (
-                                      <img src={q.option_images[i]} alt={`Option ${i + 1}`} className="w-full h-16 object-cover rounded mb-2" />
-                                    )}
-                                    <Input
-                                      value={String(opt || '')}
-                                      onChange={(e) => updateOption(index, i, e.target.value)}
-                                      placeholder={`Option ${i + 1}`}
-                                      className={`bg-white/5 border-white/10 text-white ${q.correct_index === i ? 'ring-2 ring-green-500' : ''}`}
-                                    />
-                                  </div>
-                                ))}
-                              </div>
+                              {/* Short answer */}
+                              {q.question_type === 'short_answer' && (
+                                <div className="mb-3">
+                                  <Label className="text-slate-400 text-xs mb-1 block">Correct Answer</Label>
+                                  <Input
+                                    value={q.correct_answer || ''}
+                                    onChange={(e) => updateQuestion(index, 'correct_answer', e.target.value)}
+                                    placeholder="The exact correct answer…"
+                                    className="bg-white/5 border-white/10 text-white"
+                                  />
+                                </div>
+                              )}
+
+                              {/* Written answer — keywords */}
+                              {q.question_type === 'written' && (
+                                <div className="mb-3 p-3 rounded-xl bg-amber-500/10 border border-amber-500/30">
+                                  <Label className="text-amber-300 text-xs mb-1 block font-semibold">
+                                    Required Keywords (hidden from students)
+                                  </Label>
+                                  <p className="text-xs text-slate-400 mb-2">
+                                    Students must include ALL of these words in their answer to get it correct. Separate with commas.
+                                  </p>
+                                  <Input
+                                    value={(q.answer_keywords || []).join(', ')}
+                                    onChange={(e) => {
+                                      const keywords = e.target.value.split(',').map(k => k.trim()).filter(Boolean);
+                                      updateQuestion(index, 'answer_keywords', keywords);
+                                    }}
+                                    placeholder="e.g. photosynthesis, chlorophyll, sunlight"
+                                    className="bg-white/5 border-amber-500/30 text-white placeholder:text-slate-500"
+                                  />
+                                  {(q.answer_keywords || []).length > 0 && (
+                                    <div className="flex flex-wrap gap-1 mt-2">
+                                      {q.answer_keywords.map((kw, ki) => (
+                                        <span key={ki} className="text-xs px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                                          {kw}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              )}
 
                               <div className="flex items-center gap-2 mb-2 flex-wrap">
-                                <Select value={String(q.correct_index)} onValueChange={(v) => updateQuestion(index, 'correct_index', Number(v))}>
-                                  <SelectTrigger className="w-40 bg-white/5 border-white/10 text-white">
-                                    <SelectValue placeholder="Correct answer" />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="0">Option 1</SelectItem>
-                                    <SelectItem value="1">Option 2</SelectItem>
-                                    <SelectItem value="2">Option 3</SelectItem>
-                                    <SelectItem value="3">Option 4</SelectItem>
-                                  </SelectContent>
-                                </Select>
-
-                                <Select value={q.difficulty} onValueChange={(v) => updateQuestion(index, 'difficulty', v)}>
+                                <Select value={q.difficulty || 'medium'} onValueChange={(v) => updateQuestion(index, 'difficulty', v)}>
                                   <SelectTrigger className="w-32 bg-white/5 border-white/10 text-white">
                                     <SelectValue />
                                   </SelectTrigger>

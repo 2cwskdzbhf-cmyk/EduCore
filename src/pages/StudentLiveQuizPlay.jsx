@@ -165,7 +165,12 @@ export default function StudentLiveQuizPlay() {
       let isCorrect = false;
       let correctIndex = currentQuestion.correct_index ?? 0;
 
-      if (isTextType) {
+      if (type === 'written') {
+        // Must contain ALL keywords (case-insensitive)
+        const keywords = Array.isArray(currentQuestion.answer_keywords) ? currentQuestion.answer_keywords : [];
+        const submitted = String(submittedText || '').toLowerCase();
+        isCorrect = keywords.length > 0 && keywords.every(kw => submitted.includes(kw.toLowerCase().trim()));
+      } else if (type === 'short_answer') {
         const correct = String(currentQuestion.correct_answer || '').toLowerCase().trim();
         const submitted = String(submittedText || '').toLowerCase().trim();
         isCorrect = submitted.length > 0 && correct.length > 0 && submitted === correct;
