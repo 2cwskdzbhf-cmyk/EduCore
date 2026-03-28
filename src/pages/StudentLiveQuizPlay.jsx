@@ -2,8 +2,10 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import GlassCard from '@/components/ui/GlassCard';
-import { Loader2, Clock, CheckCircle2, Zap, XCircle, Trophy, TrendingUp } from 'lucide-react';
+import { Loader2, Clock, CheckCircle2, Zap, XCircle, Trophy, TrendingUp, Send } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export default function StudentLiveQuizPlay() {
@@ -13,6 +15,7 @@ export default function StudentLiveQuizPlay() {
 
   const [user, setUser] = useState(null);
   const [selected, setSelected] = useState(null);
+  const [textAnswer, setTextAnswer] = useState('');
   const [timeLeft, setTimeLeft] = useState(15);
   const [answerResult, setAnswerResult] = useState(null);
   const [showScoreboard, setShowScoreboard] = useState(false);
@@ -109,6 +112,7 @@ export default function StudentLiveQuizPlay() {
   useEffect(() => {
     if (!session?.question_started_at) return;
     setSelected(null);
+    setTextAnswer('');
     setAnswerResult(null);
     setShowScoreboard(false);
 
@@ -121,42 +125,29 @@ export default function StudentLiveQuizPlay() {
     return () => clearInterval(i);
   }, [session?.question_started_at]);
 
+  const isTextAnswerType = ['short_answer', 'written'].includes(currentQuestion?.question_type);
+
   const options = useMemo(() => {
     const q = currentQuestion;
     if (!q) return [];
+    if (['short_answer', 'written'].includes(q.question_type)) return [];
 
-    console.log('[OPTIONS_DEBUG] Current question:', q);
-
-    // Try array fields first
-    if (Array.isArray(q.options) && q.options.length) {
-      console.log('[OPTIONS_DEBUG] Found options array:', q.options);
-      return q.options;
-    }
+    if (Array.isArray(q.options) && q.options.length) return q.options;
     if (Array.isArray(q.answers) && q.answers.length) return q.answers;
     if (Array.isArray(q.choices) && q.choices.length) return q.choices;
 
-    // Try individual option fields
     const individualOptions = [
       q.option_a, q.option_b, q.option_c, q.option_d,
-      q.answer_a, q.answer_b, q.answer_c, q.answer_d,
-      q.A, q.B, q.C, q.D
     ].filter(v => typeof v === 'string' && v.trim().length);
-
-    console.log('[OPTIONS_DEBUG] Individual options found:', individualOptions);
-
-    // If still empty, try to parse from correct_answer (fallback)
-    if (individualOptions.length === 0 && q.correct_answer) {
-      console.log('[OPTIONS_DEBUG] No options found, using fallback from correct_answer');
-      // Return a default set of options including the correct answer
-      return ['Option A', 'Option B', 'Option C', 'Option D'];
-    }
 
     return individualOptions;
   }, [currentQuestion]);
 
   const submitAnswer = useMutation({
-    mutationFn: async (optionIndex) => {
+    mutationFn: async (optionIndexOrText) => {
       if (!player || !session || !currentQuestion) return;
+      const optionIndex = typeof optionIndexOrText === 'number' ? optionIndexOrText : -1;
+      const submittedText = typeof optionIndexOrText === 'string' ? optionIndexOrText : null;
 
       const existing = await base44.entities.LiveQuizAnswer.filter({
         session_id: sessionId,
@@ -169,12 +160,18 @@ export default function StudentLiveQuizPlay() {
       const responseTimeMs = Date.now() - startedAt;
 
       // Determine correct answer
-      const correctIndex = currentQuestion.correct_index ?? 
-                          currentQuestion.correctIndex ?? 
-                          currentQuestion.correct_answer ?? 
-                          currentQuestion.answer ?? 
-                          0;
-      const isCorrect = optionIndex === correctIndex;
+      const type = currentQuestion.question_type || 'multiple_choice';
+      const isTextType = type === 'short_answer' || type === 'written';
+      let isCorrect = false;
+      let correctIndex = currentQuestion.correct_index ?? 0;
+
+      if (isTextType) {
+        const correct = String(currentQuestion.correct_answer || '').toLowerCase().trim();
+        const submitted = String(submittedText || '').toLowerCase().trim();
+        isCorrect = submitted.length > 0 && correct.length > 0 && submitted === correct;
+      } else {
+        isCorrect = optionIndex === correctIndex;
+      }
 
       // Calculate points (base points * time multiplier)
       const basePoints = 500;
@@ -188,8 +185,8 @@ export default function StudentLiveQuizPlay() {
         player_id: player.id,
         question_id: currentQuestion.id ?? null,
         question_index: idx,
-        selected_option: optionIndex,
-        selected_option_index: optionIndex,
+        selected_option: isTextType ? submittedText : optionIndex,
+        selected_option_index: isTextType ? -1 : optionIndex,
         is_correct: isCorrect,
         points_awarded: pointsAwarded,
         response_time_ms: responseTimeMs,
@@ -301,7 +298,15 @@ export default function StudentLiveQuizPlay() {
         )}
 
         <GlassCard className="p-8 mb-6 text-center">
+          {currentQuestion?.image_url && currentQuestion?.question_type === 'diagram' && (
+            <img src={currentQuestion.image_url} alt="Diagram" className="max-h-52 object-contain rounded-lg mx-auto mb-4" />
+          )}
           <h2 className="text-3xl font-bold text-white">{prompt}</h2>
+          {currentQuestion?.question_type && (
+            <span className="inline-block mt-2 text-xs px-2 py-0.5 rounded-full bg-white/10 text-slate-400 capitalize">
+              {currentQuestion.question_type.replace('_', ' ')}
+            </span>
+          )}
         </GlassCard>
 
         <AnimatePresence mode="wait">
@@ -387,42 +392,85 @@ export default function StudentLiveQuizPlay() {
                 )}
               </GlassCard>
             </motion.div>
+          ) : isTextAnswerType ? (
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+              <GlassCard className="p-6">
+                {currentQuestion?.image_url && (
+                  <img src={currentQuestion.image_url} alt="Question" className="w-full max-h-48 object-contain rounded-lg mb-4" />
+                )}
+                {currentQuestion?.question_type === 'written' ? (
+                  <Textarea
+                    value={textAnswer}
+                    onChange={e => setTextAnswer(e.target.value)}
+                    placeholder="Write your answer here…"
+                    className="bg-white/5 border-white/10 text-white mb-4"
+                    rows={4}
+                    disabled={selected !== null}
+                  />
+                ) : (
+                  <Input
+                    value={textAnswer}
+                    onChange={e => setTextAnswer(e.target.value)}
+                    placeholder="Type your answer…"
+                    className="bg-white/5 border-white/10 text-white mb-4 text-lg h-14"
+                    disabled={selected !== null}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter' && textAnswer.trim() && selected === null) {
+                        setSelected(0);
+                        submitAnswer.mutate(textAnswer.trim());
+                      }
+                    }}
+                  />
+                )}
+                <Button
+                  onClick={() => { setSelected(0); submitAnswer.mutate(textAnswer.trim()); }}
+                  disabled={!textAnswer.trim() || selected !== null}
+                  className="w-full bg-gradient-to-r from-purple-500 to-blue-500 h-12 text-lg"
+                >
+                  <Send className="w-5 h-5 mr-2" /> Submit Answer
+                </Button>
+              </GlassCard>
+            </motion.div>
           ) : options.length ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {options.map((opt, i) => {
-                const isSelected = selected === i;
-                const isCorrect = answerResult?.correctIndex === i;
-                const showCorrect = answerResult && isCorrect;
-                const showIncorrect = answerResult && isSelected && !isCorrect;
+            <>
+              {currentQuestion?.image_url && (
+                <GlassCard className="p-4 mb-4">
+                  <img src={currentQuestion.image_url} alt="Diagram" className="w-full max-h-48 object-contain rounded-lg" />
+                </GlassCard>
+              )}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {options.map((opt, i) => {
+                  const isSelected = selected === i;
+                  const isCorrect = answerResult?.correctIndex === i;
+                  const showCorrect = answerResult && isCorrect;
+                  const showIncorrect = answerResult && isSelected && !isCorrect;
 
-                return (
-                  <motion.div
-                    key={i}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: i * 0.1 }}
-                  >
-                    <Button
-                     onClick={() => {
-                       setSelected(i);
-                       submitAnswer.mutate(i);
-                     }}
-                     disabled={selected !== null}
-                     className={`h-20 text-lg w-full transition-all relative ${
-                       showCorrect ? 'bg-emerald-500 hover:bg-emerald-600 border-2 border-emerald-400 animate-pulse' :
-                       showIncorrect ? 'bg-red-500 hover:bg-red-600 border-2 border-red-400 animate-shake' :
-                       isSelected ? 'bg-purple-500 hover:bg-purple-600 opacity-70' : ''
-                     }`}
-                     variant={isSelected || showCorrect || showIncorrect ? 'default' : 'outline'}
+                  return (
+                    <motion.div
+                      key={i}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: i * 0.1 }}
                     >
-                     {opt}
-                     {showCorrect && <CheckCircle2 className="absolute right-3 top-1/2 -translate-y-1/2 w-6 h-6" />}
-                     {showIncorrect && <XCircle className="absolute right-3 top-1/2 -translate-y-1/2 w-6 h-6" />}
-                    </Button>
-                  </motion.div>
-                );
-              })}
-            </div>
+                      <Button
+                       onClick={() => { setSelected(i); submitAnswer.mutate(i); }}
+                       disabled={selected !== null}
+                       className={`h-20 text-lg w-full transition-all relative ${
+                         showCorrect ? 'bg-emerald-500 hover:bg-emerald-600 border-2 border-emerald-400 animate-pulse' :
+                         showIncorrect ? 'bg-red-500 hover:bg-red-600 border-2 border-red-400 animate-shake' :
+                         isSelected ? 'bg-purple-500 hover:bg-purple-600 opacity-70' : ''
+                       }`}
+                       variant={isSelected || showCorrect || showIncorrect ? 'default' : 'outline'}
+                      >
+                       {opt}
+                       {showCorrect && <CheckCircle2 className="absolute right-3 top-1/2 -translate-y-1/2 w-6 h-6" />}
+                       {showIncorrect && <XCircle className="absolute right-3 top-1/2 -translate-y-1/2 w-6 h-6" />}
+                      </Button>
+                    </motion.div>
+                  );
+                })}
+              </div>
+            </>
           ) : (
             <GlassCard className="p-6 text-center">
               <p className="text-white">No options available</p>
