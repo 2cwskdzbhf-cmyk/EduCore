@@ -335,45 +335,9 @@ export default function CreateQuiz() {
   });
 
   // --------- UI HELPERS ----------
-  const handleGlobalQuestionBankAdd = async (selectedQuestions) => {
-    if (!quizSetId || !selectedQuestions || selectedQuestions.length === 0) {
-      console.error('[APPLY_ERROR] Missing quizSetId or no questions selected');
-      toast.error('No questions selected');
-      return;
-    }
-
-    try {
-      console.log(`[APPLY] Adding ${selectedQuestions.length} questions to quiz ${quizSetId}`);
-      
-      // Map selected questions to the format needed for local state
-      const newQuestions = selectedQuestions.map((question, idx) => ({
-        prompt: question.prompt,
-        question_type: question.question_type || 'multiple_choice',
-        options: question.options || ['', '', '', ''],
-        correct_index: question.correct_index || 0,
-        correct_answer: question.correct_answer || '',
-        difficulty: question.difficulty || 'medium',
-        explanation: question.explanation || '',
-        tags: question.tags || [],
-        image_url: question.image_url || '',
-        option_images: question.option_images || ['', '', '', ''],
-        source_global_id: question.id,
-        _isDraft: false
-      }));
-
-      // IMMEDIATELY UPDATE LOCAL STATE (this makes the UI update instantly)
-      setQuestions(prev => {
-        const updated = [...prev, ...newQuestions];
-        console.log('[APPLY_SUCCESS] Questions state updated. Old count:', prev.length, 'New count:', updated.length);
-        return updated;
-      });
-      
-      toast.success(`Added ${selectedQuestions.length} question${selectedQuestions.length !== 1 ? 's' : ''}`);
-      
-    } catch (error) {
-      console.error('[APPLY_ERROR] Failed to add questions:', error);
-      toast.error('Failed to add questions: ' + error.message);
-    }
+  const handleGlobalQuestionBankAdd = (mappedQuestions) => {
+    if (!Array.isArray(mappedQuestions) || mappedQuestions.length === 0) return;
+    setQuestions(prev => [...prev, ...mappedQuestions]);
   };
 
   const addManualQuestion = () => {
@@ -461,12 +425,7 @@ export default function CreateQuiz() {
     questions.filter(q => !isTrulyEmptyQuestion(q)).length > 0 &&
     questions.filter(q => !isTrulyEmptyQuestion(q)).every(q => !validateQuestionStrict(q));
 
-  const openGlobalBank = async () => {
-    const id = await ensureDraftQuizSet();
-    if (!id) {
-      toast.error('Quiz not ready yet. Please try again.');
-      return;
-    }
+  const openGlobalBank = () => {
     setShowGlobalQuestionBankDialog(true);
   };
 

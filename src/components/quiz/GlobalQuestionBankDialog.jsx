@@ -1,536 +1,299 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Dialog, DialogContent, DialogHeader } from '@/components/ui/dialog';
+import { useQuery } from '@tanstack/react-query';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import {
-  BookOpen, Search, Filter, X, ArrowLeft,
-  Database, FolderOpen, ChevronRight
-} from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Label } from '@/components/ui/label';
+import { Search, X, Check, Sparkles, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
 
 export default function GlobalQuestionBankDialog({ open, onClose, onAddQuestions, quizSetId }) {
-  const queryClient = useQueryClient();
+  const [yearGroup, setYearGroup] = useState('all');
+  const [difficulty, setDifficulty] = useState('all');
+  const [search, setSearch] = useState('');
+  const [selected, setSelected] = useState([]);
 
-  const [screen, setScreen] = useState('subject'); // subject | topics | subtopics | filter | questions
-  const [selectedSubject, setSelectedSubject] = useState(null);
-  const [selectedTopic, setSelectedTopic] = useState(null);
-  const [selectedSubtopic, setSelectedSubtopic] = useState(null);
-
-  const [selectedYearGroup, setSelectedYearGroup] = useState('all');
-  const [selectedDifficulty, setSelectedDifficulty] = useState('all');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedQuestions, setSelectedQuestions] = useState([]);
-  const [lastApplyResult, setLastApplyResult] = useState(null);
-
-  // Debug
+  // Reset on open
   useEffect(() => {
-    if (open) console.log('[GlobalBank] quizSetId:', quizSetId);
-  }, [open, quizSetId]);
+    if (open) {
+      setSelected([]);
+      setSearch('');
+    }
+  }, [open]);
 
-  const resetState = () => {
-    setScreen('subject');
-    setSelectedSubject(null);
-    setSelectedTopic(null);
-    setSelectedSubtopic(null);
-    setSelectedYearGroup('all');
-    setSelectedDifficulty('all');
-    setSearchQuery('');
-    setSelectedQuestions([]);
-  };
-
-  const close = () => {
-    resetState();
-    onClose?.();
-  };
-
-  // ✅ Fix: only close when user closes
-  const onOpenChange = (nextOpen) => {
-    if (!nextOpen) close();
-  };
-
-  const { data: subjects = [], isLoading: loadingSubjects } = useQuery({
-    queryKey: ['subjects'],
-    queryFn: () => base44.entities.Subject.list('order', 100),
+  const { data: globalQuestions = [], isLoading } = useQuery({
+    queryKey: ['globalQuestions', yearGroup, difficulty],
+    queryFn: async () => {
+      const filters = {};
+      if (yearGroup !== 'all') filters.year_group = Number(yearGroup);
+      if (difficulty !== 'all') filters.difficulty = difficulty;
+      return base44.entities.GlobalQuestion.filter(filters, '-created_date', 500);
+    },
     enabled: open
   });
 
-  const { data: topics = [], isLoading: loadingTopics } = useQuery({
-    queryKey: ['topics', selectedSubject?.id],
-    queryFn: () => base44.entities.Topic.filter({ subject_id: selectedSubject.id }),
-    enabled: open && !!selectedSubject
-  });
+  const filtered = useMemo(() => {
+    if (!search.trim()) return globalQuestions;
+    const q = search.toLowerCase();
+    return globalQuestions.filter(x => (x.question_text || '').toLowerCase().includes(q));
+  }, [globalQuestions, search]);
 
-  const { data: subtopics = [], isLoading: loadingSubtopics } = useQuery({
-    queryKey: ['subtopics', selectedTopic?.id],
-    queryFn: () => base44.entities.Subtopic.filter({ topic_id: selectedTopic.id }),
-    enabled: open && !!selectedTopic
-  });
-
-  const { data: questions = [], isLoading: loadingQuestions } = useQuery({
-    queryKey: ['questions', selectedSubtopic?.id, selectedYearGroup, selectedDifficulty],
-    queryFn: async () => {
-      if (selectedSubtopic?.id === '__global__') return []; // skip — we'll use globalQuestions only
-      const filters = { subtopic_id: selectedSubtopic.id };
-      if (selectedYearGroup !== 'all') filters.year_group = Number(selectedYearGroup);
-      if (selectedDifficulty !== 'all') filters.difficulty = selectedDifficulty;
-      return base44.entities.Question.filter(filters);
-    },
-    enabled: open && screen === 'questions' && !!selectedSubtopic && selectedYearGroup !== 'all' && selectedDifficulty !== 'all'
-  });
-
-  // Also load global questions for the filter screen so teachers can use them
-  const { data: globalQuestions = [], isLoading: loadingGlobal } = useQuery({
-    queryKey: ['globalQuestionsForPicker', selectedYearGroup, selectedDifficulty],
-    queryFn: async () => {
-      const filters = {};
-      if (selectedYearGroup !== 'all') filters.year_group = Number(selectedYearGroup);
-      if (selectedDifficulty !== 'all') filters.difficulty = selectedDifficulty;
-      return base44.entities.GlobalQuestion.filter(filters, '-created_date', 500);
-    },
-    enabled: open && screen === 'questions' && selectedYearGroup !== 'all' && selectedDifficulty !== 'all'
-  });
-
-  // Merge: show subtopic questions first, then global questions not already in subtopic list
-  const combinedQuestions = [
-    ...questions,
-    ...globalQuestions.filter(gq => !questions.find(q => q.id === gq.id))
-  ];
-
-  const filteredQuestions = useMemo(() => {
-    const source = combinedQuestions;
-    if (!source?.length) return [];
-    if (!searchQuery) return source;
-    const q = searchQuery.toLowerCase();
-    return source.filter(x => (x.question_text || '').toLowerCase().includes(q));
-  }, [combinedQuestions, searchQuery]);
-
-  const addQuestionsMutation = useMutation({
-    mutationFn: async (picked) => {
-      console.log('[APPLY_START]', {
-        quizSetId,
-        questionCount: picked.length,
-        payloadSize: JSON.stringify(picked).length
-      });
-
-      if (!quizSetId) throw new Error('ERROR: quiz_id is missing');
-      if (picked.length === 0) throw new Error('No questions selected');
-      if (picked.length > 50) throw new Error('Cannot add more than 50 questions at once');
-
-      // Create timeout promise
-      const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('Apply timed out — please try again')), 12000);
-      });
-
-      // Prepare payload for backend function
-      const payload = {
-        quiz_set_id: quizSetId,
-        questions: picked.map(q => ({
-          id: q.id,
-          question_text: q.question_text || q.prompt || '',
-          options: Array.isArray(q.choices) ? q.choices : Array.isArray(q.options) ? q.options : [],
-          correct_index: q.correct_index ?? (q.choices ? q.choices.indexOf(q.correct_answer) : -1),
-          correct_answer: q.correct_answer || '',
-          difficulty: q.difficulty || 'medium',
-          explanation: q.explanation || ''
-        }))
-      };
-
-      try {
-        // Race between API call and timeout
-        const result = await Promise.race([
-          base44.functions.invoke('applyGlobalQuestions', payload),
-          timeoutPromise
-        ]);
-
-        if (!result || !result.data) {
-          throw new Error('Invalid response from server');
-        }
-
-        return result.data;
-      } catch (error) {
-        console.error('[APPLY_ERROR]', {
-          message: error.message,
-          quizSetId,
-          questionCount: picked.length
-        });
-        throw error;
-      }
-    },
-    onSuccess: (data) => {
-      toast.dismiss();
-      
-      let message = `Added ${data.created} questions`;
-      if (data.skipped > 0) message += ` (${data.skipped} duplicates skipped)`;
-      if (data.invalid > 0) message += ` (${data.invalid} invalid skipped)`;
-      
-      toast.success(message);
-      
-      console.log('[APPLY_SUCCESS]', {
-        createdCount: data.created,
-        skippedDuplicateCount: data.skipped,
-        invalidCount: data.invalid,
-        total: data.created + data.skipped + data.invalid
-      });
-      
-      setLastApplyResult({
-        created: data.created,
-        skipped: data.skipped,
-        invalid: data.invalid || 0,
-        timestamp: new Date().toISOString()
-      });
-
-      queryClient.invalidateQueries(['quizQuestions', quizSetId]);
-      queryClient.refetchQueries(['quizQuestions', quizSetId]);
-      onAddQuestions?.(data.created);
-
-      setSelectedQuestions([]);
-      close();
-    },
-    onError: (err) => {
-      toast.dismiss();
-      console.error('[APPLY_ERROR] Failed to add questions:', err);
-      console.error('[APPLY_ERROR] Error details:', {
-        message: err.message,
-        stack: err.stack,
-        quizSetId,
-        selectedCount: selectedQuestions.length
-      });
-      toast.error(err.message || 'Failed to apply questions');
-    },
-    onSettled: () => {
-      // Always clear loading state
-      toast.dismiss();
-    }
-  });
-
-  const handleApplyFilters = () => {
-    if (selectedYearGroup === 'all' || selectedDifficulty === 'all') {
-      toast.error('Pick Year Group and Difficulty');
-      return;
-    }
-    setScreen('questions');
-  };
-
-  // Allow jumping straight to global questions without going through subtopic hierarchy
-  const jumpToGlobal = () => {
-    setSelectedSubject({ name: 'Global Library' });
-    setSelectedTopic({ name: 'All Topics' });
-    setSelectedSubtopic({ name: 'All', id: '__global__' });
-    setScreen('filter');
-  };
-
-  const toggleQuestion = (question) => {
-    setSelectedQuestions(prev =>
-      prev.find(q => q.id === question.id)
-        ? prev.filter(q => q.id !== question.id)
-        : [...prev, question]
+  const toggle = (q) => {
+    setSelected(prev =>
+      prev.find(x => x.id === q.id) ? prev.filter(x => x.id !== q.id) : [...prev, q]
     );
   };
 
-  const selectAll = () => setSelectedQuestions(filteredQuestions);
-  const clear = () => setSelectedQuestions([]);
+  const isSelected = (q) => !!selected.find(x => x.id === q.id);
 
-  const apply = () => {
-    console.log('=== APPLY_CLICKED ===');
-    console.log('selectedQuestionIds:', selectedQuestions.map(q => q.id));
-    console.log('selected count:', selectedQuestions.length);
-    console.log('currentQuizId:', quizSetId);
-    console.log('==================');
-    
-    if (!selectedQuestions.length) {
-      toast.error('No questions selected');
-      console.error('[APPLY_ERROR] No questions selected');
+  const handleApply = () => {
+    if (!selected.length) {
+      toast.error('Select at least one question');
       return;
     }
-    
-    if (!quizSetId) {
-      toast.error('ERROR: quiz_id is missing');
-      console.error('[APPLY_ERROR] Missing quiz_id', {
-        quizSetId,
-        selectedQuestions: selectedQuestions.length
-      });
-      return;
-    }
-    
-    toast.loading(`Applying ${selectedQuestions.length} questions...`);
-    addQuestionsMutation.mutate(selectedQuestions);
+
+    // Map GlobalQuestion fields → QuizQuestion format and pass directly to parent
+    const mapped = selected.map(q => {
+      const choices = q.choices || q.options || [];
+      let correctIndex = typeof q.correct_index === 'number' ? q.correct_index : -1;
+      if (correctIndex < 0 && q.correct_answer && choices.length) {
+        correctIndex = choices.findIndex(c =>
+          String(c).toLowerCase().trim() === String(q.correct_answer).toLowerCase().trim()
+        );
+      }
+      return {
+        prompt: q.question_text || '',
+        question_type: 'multiple_choice',
+        options: choices.length === 4 ? choices : [...choices, ...Array(4 - choices.length).fill('')],
+        correct_index: Math.max(0, correctIndex),
+        correct_answer: q.correct_answer || (choices[correctIndex] ?? ''),
+        difficulty: q.difficulty || 'medium',
+        explanation: q.explanation || '',
+        tags: q.tags || [],
+        image_url: '',
+        option_images: ['', '', '', ''],
+        source_global_id: q.id,
+        _isDraft: false
+      };
+    });
+
+    onAddQuestions?.(mapped);
+    toast.success(`Added ${mapped.length} question${mapped.length !== 1 ? 's' : ''}`);
+    onClose?.();
   };
 
-  const back = () => {
-    if (screen === 'topics') {
-      setScreen('subject'); setSelectedSubject(null);
-    } else if (screen === 'subtopics') {
-      setScreen('topics'); setSelectedTopic(null);
-    } else if (screen === 'filter') {
-      setScreen('subtopics'); setSelectedSubtopic(null);
-    } else if (screen === 'questions') {
-      setScreen('filter'); setSelectedQuestions([]);
-    }
+  const difficultyColor = {
+    easy: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
+    medium: 'bg-amber-500/20 text-amber-300 border-amber-500/30',
+    hard: 'bg-red-500/20 text-red-300 border-red-500/30',
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[95vw] max-h-[95vh] h-[95vh] p-0 gap-0 bg-gradient-to-br from-slate-900 via-purple-900/20 to-slate-900 border-white/10 flex flex-col">
-        <DialogHeader className="border-b border-white/10 px-6 py-4 flex-shrink-0">
-          <div className="absolute top-2 right-2 bg-slate-800/90 border border-white/20 rounded-lg px-3 py-2 text-xs z-50 space-y-1">
-            <div className="text-slate-300"><b>Quiz ID:</b> {quizSetId || <span className="text-red-400 font-bold">MISSING</span>}</div>
-            <div className="text-slate-300"><b>Selected:</b> {selectedQuestions.length}</div>
-            {lastApplyResult && (
-              <div className="text-slate-300 border-t border-white/10 pt-1 mt-1">
-                <b>Last Apply:</b> {lastApplyResult.created} added
-                {lastApplyResult.skipped > 0 && ` / ${lastApplyResult.skipped} dup`}
-                {lastApplyResult.invalid > 0 && ` / ${lastApplyResult.invalid} invalid`}
-              </div>
-            )}
-          </div>
-
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3 flex-1">
-              {screen !== 'subject' && (
-                <Button variant="ghost" size="icon" onClick={back} className="text-slate-400 hover:text-white">
-                  <ArrowLeft className="w-5 h-5" />
-                </Button>
-              )}
-              <div className="flex items-center gap-2 text-sm text-slate-400">
-                <Database className="w-5 h-5 text-purple-400" />
-                <span className={screen === 'subject' ? 'text-white font-semibold' : ''}>Subject</span>
-                {selectedSubject && (<><ChevronRight className="w-4 h-4" /><span>{selectedSubject.name}</span></>)}
-                {selectedTopic && (<><ChevronRight className="w-4 h-4" /><span>{selectedTopic.name}</span></>)}
-                {selectedSubtopic && (<><ChevronRight className="w-4 h-4" /><span className="text-white">{selectedSubtopic.name}</span></>)}
-              </div>
+    <Dialog open={open} onOpenChange={(v) => !v && onClose?.()}>
+      <DialogContent className="max-w-3xl max-h-[92vh] p-0 gap-0 bg-slate-950/95 backdrop-blur-2xl border border-white/10 flex flex-col overflow-hidden rounded-2xl">
+        
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-white/10">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center">
+              <Sparkles className="w-5 h-5 text-white" />
             </div>
-
-            <Button variant="ghost" size="icon" onClick={close} className="text-slate-400 hover:text-white ml-2">
-              <X className="w-5 h-5" />
-            </Button>
-          </div>
-        </DialogHeader>
-
-        <div className="flex-1 overflow-y-auto p-6 relative">
-          {screen === 'subject' && (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {/* Global Library shortcut */}
-              <Card className="p-6 bg-gradient-to-br from-purple-500/20 to-blue-500/20 border-purple-500/30 hover:from-purple-500/30 hover:to-blue-500/30 cursor-pointer"
-                onClick={jumpToGlobal}>
-                <div className="flex items-center gap-4">
-                  <div className="w-14 h-14 rounded-xl bg-purple-500/30 flex items-center justify-center">
-                    <Database className="w-7 h-7 text-purple-300" />
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-lg text-white">Global Library</h3>
-                    <p className="text-sm text-purple-300">109+ algebra questions Y7–11</p>
-                  </div>
-                </div>
-              </Card>
-              {subjects.map(subject => (
-                <Card key={subject.id} className="p-6 bg-white/5 border-white/10 hover:bg-white/10 cursor-pointer"
-                  onClick={() => { setSelectedSubject(subject); setScreen('topics'); }}>
-                  <div className="flex items-center gap-4">
-                    <div className="w-14 h-14 rounded-xl bg-blue-500/20 flex items-center justify-center">
-                      <BookOpen className="w-7 h-7 text-blue-400" />
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-lg text-white">{subject.name}</h3>
-                      <p className="text-sm text-slate-400">Click to browse</p>
-                    </div>
-                  </div>
-                </Card>
-              ))}
-              {!loadingSubjects && subjects.length === 0 && (
-                <div className="text-slate-400">No subjects found</div>
-              )}
-            </div>
-          )}
-
-          {screen === 'topics' && (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {topics.map(topic => (
-                <Card key={topic.id} className="p-6 bg-white/5 border-white/10 hover:bg-white/10 cursor-pointer"
-                  onClick={() => { setSelectedTopic(topic); setScreen('subtopics'); }}>
-                  <div className="flex items-center gap-4">
-                    <div className="w-14 h-14 rounded-xl bg-purple-500/20 flex items-center justify-center">
-                      <FolderOpen className="w-7 h-7 text-purple-400" />
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-lg text-white">{topic.name}</h3>
-                      <p className="text-sm text-slate-400">Click to view subtopics</p>
-                    </div>
-                  </div>
-                </Card>
-              ))}
-              {!loadingTopics && topics.length === 0 && (
-                <div className="text-slate-400">No topics found</div>
-              )}
-            </div>
-          )}
-
-          {screen === 'subtopics' && (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {subtopics.map(subtopic => (
-                <Card key={subtopic.id} className="p-6 bg-white/5 border-white/10 hover:bg-white/10 cursor-pointer"
-                  onClick={() => { setSelectedSubtopic(subtopic); setScreen('filter'); }}>
-                  <div className="flex items-center gap-4">
-                    <div className="w-14 h-14 rounded-xl bg-emerald-500/20 flex items-center justify-center">
-                      <BookOpen className="w-7 h-7 text-emerald-400" />
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-lg text-white">{subtopic.name}</h3>
-                      <p className="text-sm text-slate-400">Click to filter questions</p>
-                    </div>
-                  </div>
-                </Card>
-              ))}
-              {!loadingSubtopics && subtopics.length === 0 && (
-                <div className="text-slate-400">No subtopics found</div>
-              )}
-            </div>
-          )}
-
-          {screen === 'filter' && (
-            <div className="max-w-2xl mx-auto space-y-6 bg-white/5 border border-white/10 rounded-xl p-6">
-              <div>
-                <Label className="text-slate-300 mb-2 block">Year Group *</Label>
-                <Select value={selectedYearGroup} onValueChange={setSelectedYearGroup}>
-                  <SelectTrigger className="bg-white/5 border-white/10 text-white"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="7">Year 7</SelectItem>
-                    <SelectItem value="8">Year 8</SelectItem>
-                    <SelectItem value="9">Year 9</SelectItem>
-                    <SelectItem value="10">Year 10</SelectItem>
-                    <SelectItem value="11">Year 11</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
-                <Label className="text-slate-300 mb-2 block">Difficulty *</Label>
-                <Select value={selectedDifficulty} onValueChange={setSelectedDifficulty}>
-                  <SelectTrigger className="bg-white/5 border-white/10 text-white"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="easy">Easy</SelectItem>
-                    <SelectItem value="medium">Medium</SelectItem>
-                    <SelectItem value="hard">Hard</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <Button
-                onClick={handleApplyFilters}
-                disabled={selectedYearGroup === 'all' || selectedDifficulty === 'all'}
-                className="w-full bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600"
-                size="lg"
-              >
-                <Filter className="w-5 h-5 mr-2" />
-                Show Questions
-              </Button>
-            </div>
-          )}
-
-          {screen === 'questions' && (
             <div>
-              <div className="mb-4 flex items-center justify-between">
-                <div className="flex gap-2">
-                  <Badge className="bg-blue-500/20 text-blue-300">Year {selectedYearGroup}</Badge>
-                  <Badge className="bg-purple-500/20 text-purple-300">{selectedDifficulty}</Badge>
-                </div>
-
-                <div className="flex gap-2">
-                  <Button variant="outline" size="sm" onClick={selectAll} className="bg-white/5 border-white/10 text-slate-300 hover:bg-white/10">
-                    Select All ({filteredQuestions.length})
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={clear} className="bg-white/5 border-white/10 text-slate-300 hover:bg-white/10">
-                    Clear
-                  </Button>
-                </div>
-              </div>
-
-              <div className="relative mb-4">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-                <Input
-                  placeholder="Search questions..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10 bg-white/5 border-white/10 text-white"
-                />
-              </div>
-
-              {(loadingQuestions || loadingGlobal) ? (
-                <div className="text-slate-400 flex items-center gap-2 py-4">
-                  <div className="w-4 h-4 border-2 border-purple-400 border-t-transparent rounded-full animate-spin" />
-                  Loading questions…
-                </div>
-              ) : filteredQuestions.length === 0 ? (
-                <div className="text-slate-400 py-4">No questions found for these filters.</div>
-              ) : (
-                <div className="space-y-3">
-                  {filteredQuestions.map((q, idx) => {
-                    const isSel = !!selectedQuestions.find(x => x.id === q.id);
-                    const isGlobal = !!q.seed_key; // GlobalQuestion has seed_key
-                    const choices = q.choices || q.options || [];
-                    return (
-                      <Card
-                        key={q.id}
-                        className={`p-4 bg-white/5 border-white/10 cursor-pointer transition-all relative ${isSel ? 'ring-2 ring-purple-500 bg-purple-500/5' : 'hover:bg-white/10'}`}
-                        onClick={() => toggleQuestion(q)}
-                      >
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="flex-1 min-w-0">
-                            <div className="flex flex-wrap gap-1.5 mb-2">
-                              {isGlobal && (
-                                <Badge className="bg-blue-500/20 text-blue-300 text-xs">Global Library</Badge>
-                              )}
-                              <Badge className="bg-slate-500/20 text-slate-300 text-xs">{q.difficulty}</Badge>
-                              <Badge className="bg-slate-500/20 text-slate-300 text-xs">{q.question_type === 'mcq' ? 'MCQ' : q.question_type}</Badge>
-                            </div>
-                            <div className="text-white font-medium text-sm leading-snug mb-2">
-                              {idx + 1}. {q.question_text}
-                            </div>
-                            {choices.length > 0 && (
-                              <div className="grid grid-cols-2 gap-1 mt-1">
-                                {choices.map((c, ci) => (
-                                  <div key={ci} className={`text-xs px-2 py-1 rounded ${c === q.correct_answer ? 'bg-emerald-500/20 text-emerald-300' : 'bg-white/5 text-slate-400'}`}>
-                                    {String.fromCharCode(65+ci)}. {c}
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                          <Badge className={`pointer-events-none flex-shrink-0 mt-1 ${isSel ? 'bg-purple-500/30 text-purple-100' : 'bg-white/10 text-slate-400'}`}>
-                            {isSel ? '✓ Selected' : 'Select'}
-                          </Badge>
-                        </div>
-                      </Card>
-                    );
-                  })}
-                </div>
-              )}
+              <h2 className="text-lg font-bold text-white">Global Question Bank</h2>
+              <p className="text-xs text-slate-400">{globalQuestions.length} questions available</p>
             </div>
-            )}
-            </div>
+          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-white transition-colors p-1">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
 
-            {/* Sticky Apply Button Footer - only visible on questions screen */}
-            {screen === 'questions' && (
-            <div className="sticky bottom-0 left-0 right-0 z-50 bg-slate-900/95 backdrop-blur-xl border-t border-white/10 px-6 py-4 flex items-center justify-between gap-4 flex-shrink-0">
-            <Badge variant="outline" className="text-sm text-purple-300 border-purple-400 pointer-events-none">
-              {selectedQuestions.length} selected
-            </Badge>
-            <Button
-              onClick={apply}
-              disabled={!selectedQuestions.length || addQuestionsMutation.isPending || !quizSetId}
-              className="bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 shadow-lg shadow-purple-500/50"
-              size="lg"
+        {/* Filters */}
+        <div className="px-6 py-3 border-b border-white/10 flex gap-3 items-center flex-wrap">
+          <div className="relative flex-1 min-w-[180px]">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <Input
+              placeholder="Search questions..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-9 h-9 bg-white/5 border-white/10 text-white placeholder:text-slate-500 text-sm"
+            />
+          </div>
+
+          <Select value={yearGroup} onValueChange={setYearGroup}>
+            <SelectTrigger className="w-32 h-9 bg-white/5 border-white/10 text-white text-sm">
+              <SelectValue placeholder="Year" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Years</SelectItem>
+              <SelectItem value="7">Year 7</SelectItem>
+              <SelectItem value="8">Year 8</SelectItem>
+              <SelectItem value="9">Year 9</SelectItem>
+              <SelectItem value="10">Year 10</SelectItem>
+              <SelectItem value="11">Year 11</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Select value={difficulty} onValueChange={setDifficulty}>
+            <SelectTrigger className="w-32 h-9 bg-white/5 border-white/10 text-white text-sm">
+              <SelectValue placeholder="Difficulty" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Levels</SelectItem>
+              <SelectItem value="easy">Easy</SelectItem>
+              <SelectItem value="medium">Medium</SelectItem>
+              <SelectItem value="hard">Hard</SelectItem>
+            </SelectContent>
+          </Select>
+
+          {selected.length > 0 && (
+            <button
+              onClick={() => setSelected([])}
+              className="text-xs text-slate-400 hover:text-white transition-colors"
             >
-              {addQuestionsMutation.isPending ? 'Adding...' : `Apply (${selectedQuestions.length})`}
-            </Button>
+              Clear ({selected.length})
+            </button>
+          )}
+        </div>
+
+        {/* Question List */}
+        <div className="flex-1 overflow-y-auto px-6 py-4 space-y-2">
+          {isLoading ? (
+            <div className="flex items-center justify-center py-16 gap-3 text-slate-400">
+              <div className="w-5 h-5 border-2 border-purple-400 border-t-transparent rounded-full animate-spin" />
+              Loading questions…
             </div>
+          ) : filtered.length === 0 ? (
+            <div className="text-center py-16 text-slate-500">No questions match your filters</div>
+          ) : (
+            filtered.map((q) => {
+              const choices = q.choices || q.options || [];
+              const sel = isSelected(q);
+              return (
+                <button
+                  key={q.id}
+                  onClick={() => toggle(q)}
+                  className={cn(
+                    "w-full text-left rounded-xl border p-4 transition-all duration-150 group",
+                    sel
+                      ? "bg-purple-500/15 border-purple-500/50 ring-1 ring-purple-500/40"
+                      : "bg-white/3 border-white/8 hover:bg-white/8 hover:border-white/20"
+                  )}
+                >
+                  <div className="flex items-start gap-3">
+                    {/* Checkbox */}
+                    <div className={cn(
+                      "w-5 h-5 rounded-md border-2 flex items-center justify-center flex-shrink-0 mt-0.5 transition-all",
+                      sel ? "bg-purple-500 border-purple-500" : "border-white/20 group-hover:border-white/40"
+                    )}>
+                      {sel && <Check className="w-3 h-3 text-white" />}
+                    </div>
+
+                    <div className="flex-1 min-w-0">
+                      {/* Meta badges */}
+                      <div className="flex flex-wrap gap-1.5 mb-2">
+                        {q.year_group && (
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30">
+                            Year {q.year_group}
+                          </span>
+                        )}
+                        {q.difficulty && (
+                          <span className={cn("text-xs px-2 py-0.5 rounded-full border", difficultyColor[q.difficulty] || difficultyColor.medium)}>
+                            {q.difficulty}
+                          </span>
+                        )}
+                        {q.topic_name && (
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-slate-500/20 text-slate-400 border border-slate-500/20">
+                            {q.topic_name}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Question text */}
+                      <p className="text-white text-sm font-medium leading-snug mb-3">
+                        {q.question_text}
+                      </p>
+
+                      {/* Answer choices */}
+                      {choices.length > 0 && (
+                        <div className="grid grid-cols-2 gap-1.5">
+                          {choices.map((c, ci) => {
+                            const isCorrect = c === q.correct_answer ||
+                              ci === q.correct_index ||
+                              (typeof q.correct_index === 'number' && ci === q.correct_index);
+                            return (
+                              <div
+                                key={ci}
+                                className={cn(
+                                  "text-xs px-2.5 py-1.5 rounded-lg flex items-center gap-1.5",
+                                  isCorrect
+                                    ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
+                                    : "bg-white/5 text-slate-400 border border-white/5"
+                                )}
+                              >
+                                <span className="font-bold text-slate-500">{String.fromCharCode(65 + ci)}.</span>
+                                {c}
+                                {isCorrect && <Check className="w-3 h-3 ml-auto flex-shrink-0" />}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+
+                      {/* Explanation */}
+                      {q.explanation && (
+                        <p className="text-xs text-slate-500 mt-2 italic leading-snug">
+                          💡 {q.explanation}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </button>
+              );
+            })
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="px-6 py-4 border-t border-white/10 flex items-center justify-between gap-4 bg-slate-950/50">
+          <div className="text-sm text-slate-400">
+            {selected.length > 0 ? (
+              <span className="text-purple-300 font-medium">{selected.length} selected</span>
+            ) : (
+              <span>Click questions to select</span>
             )}
-            </DialogContent>
-            </Dialog>
+            {filtered.length > 0 && (
+              <button
+                onClick={() => setSelected(filtered)}
+                className="ml-3 text-xs text-slate-500 hover:text-slate-300 transition-colors underline"
+              >
+                Select all {filtered.length}
+              </button>
+            )}
+          </div>
+
+          <div className="flex gap-2">
+            <Button
+              variant="ghost"
+              onClick={onClose}
+              className="text-slate-400 hover:text-white"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleApply}
+              disabled={!selected.length}
+              className="bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 shadow-lg shadow-purple-500/30 gap-2"
+            >
+              <ChevronRight className="w-4 h-4" />
+              Add {selected.length > 0 ? selected.length : ''} Questions
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
