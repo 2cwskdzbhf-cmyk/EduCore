@@ -76,11 +76,16 @@ Deno.serve(async (req) => {
     const now = new Date().toISOString();
 
     // ✅ Prefer questions already stored on session
-    let questions =
-      normalizeQuestions(session.questions) ||
-      normalizeQuestions(session.questions_json) ||
-      normalizeQuestions(session.quiz_questions) ||
-      normalizeQuestions(session.items);
+    let questions = [
+      session.questions,
+      session.questions_json,
+      session.quiz_questions,
+      session.items,
+    ].reduce((acc, raw) => {
+      if (acc.length) return acc;
+      const parsed = normalizeQuestions(raw);
+      return parsed.length ? parsed : acc;
+    }, []);
 
     // ✅ If not present, discover them in DB (works for manual-xxxx too)
     if (!questions || !questions.length) {
