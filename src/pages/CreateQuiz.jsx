@@ -91,9 +91,17 @@ export default function CreateQuiz() {
   // --------- VALIDATION (STRICT, ONLY FOR SAVE/START) ----------
   const validateQuestionStrict = (q) => {
     if (!q?.prompt || !q.prompt.trim()) return 'Question is missing prompt';
-    if (!Array.isArray(q.options) || q.options.length !== 4) return 'Question must have 4 options';
-    if (q.options.some(o => !String(o || '').trim())) return 'All options must be filled';
-    if (typeof q.correct_index !== 'number' || q.correct_index < 0 || q.correct_index > 3) return 'Invalid correct answer';
+    const isShortAnswer = q.question_type === 'short_answer';
+    if (isShortAnswer) {
+      // Short answer just needs a correct_answer
+      if (!q.correct_answer && !q.options?.[0]) return 'Question is missing correct answer';
+      return null;
+    }
+    // MCQ validation
+    if (!Array.isArray(q.options) || q.options.length < 2) return 'Question must have options';
+    const realOptions = q.options.filter(o => String(o || '').trim() && String(o || '').trim() !== '—');
+    if (realOptions.length < 2) return 'Question must have at least 2 real options';
+    if (typeof q.correct_index !== 'number' || q.correct_index < 0) return 'Invalid correct answer';
     return null;
   };
 
@@ -250,23 +258,27 @@ export default function CreateQuiz() {
       await Promise.all(existing.map((row) => base44.entities.QuizQuestion.delete(row.id)));
 
       await Promise.all(
-        validQuestions.map((q, index) =>
-          base44.entities.QuizQuestion.create({
+        validQuestions.map((q, index) => {
+          const isShortAnswer = q.question_type === 'short_answer';
+          const cleanOptions = isShortAnswer
+            ? []
+            : (q.options || []).filter(o => String(o || '').trim() && String(o || '').trim() !== '—');
+          return base44.entities.QuizQuestion.create({
             quiz_set_id: id,
             order: index,
             prompt: q.prompt,
             question_type: q.question_type || 'multiple_choice',
-            options: q.options,
-            correct_index: q.correct_index,
-            correct_answer: q.correct_answer || q.options[q.correct_index] || '',
+            options: cleanOptions,
+            correct_index: q.correct_index ?? 0,
+            correct_answer: isShortAnswer ? (q.correct_answer || q.options?.[0] || '') : (cleanOptions[q.correct_index] || q.correct_answer || ''),
             difficulty: q.difficulty || 'medium',
             explanation: q.explanation || '',
             tags: q.tags || [],
             source_global_id: q.source_global_id || null,
             image_url: q.image_url || '',
             option_images: Array.isArray(q.option_images) ? q.option_images : ['', '', '', '']
-          })
-        )
+          });
+        })
       );
 
       return { id };
@@ -292,17 +304,23 @@ export default function CreateQuiz() {
       const classId = urlParams.get('classId');
 
       // Prepare the valid questions with full data embedded in the session
-      const usable = questions.filter(q => !isTrulyEmptyQuestion(q)).map((q, i) => ({
-        order: i,
-        prompt: q.prompt,
-        question_type: q.question_type || 'multiple_choice',
-        options: q.options,
-        correct_index: q.correct_index,
-        correct_answer: q.options[q.correct_index] || '',
-        difficulty: q.difficulty || 'medium',
-        explanation: q.explanation || '',
-        image_url: q.image_url || '',
-      }));
+      const usable = questions.filter(q => !isTrulyEmptyQuestion(q)).map((q, i) => {
+        const isShortAnswer = q.question_type === 'short_answer';
+        const cleanOptions = isShortAnswer
+          ? []
+          : (q.options || []).filter(o => String(o || '').trim() && String(o || '').trim() !== '—');
+        return {
+          order: i,
+          prompt: q.prompt,
+          question_type: isShortAnswer ? 'short_answer' : 'multiple_choice',
+          options: cleanOptions,
+          correct_index: q.correct_index ?? 0,
+          correct_answer: isShortAnswer ? (q.correct_answer || q.options?.[0] || '') : (cleanOptions[q.correct_index] || q.correct_answer || ''),
+          difficulty: q.difficulty || 'medium',
+          explanation: q.explanation || '',
+          image_url: q.image_url || '',
+        };
+      });
 
       if (usable.length === 0) throw new Error('No valid questions to start the quiz');
 
@@ -630,11 +648,11 @@ export default function CreateQuiz() {
                               <p className="text-white font-medium truncate group-hover:text-purple-300 transition-colors">
                                 {q.prompt || <span className="text-slate-500 italic">Click to edit question...</span>}
                               </p>
-                              {q.options?.filter(o => o?.trim()).length > 0 && (
+                              {q.options?.filter(o => o?.trim() && o.trim() !== '—').length > 0 && (
                                 <div className="flex gap-2 mt-1 flex-wrap">
-                                  {q.options.map((opt, i) => (
-                                    <span key={i} className={`text-xs px-2 py-0.5 rounded ${q.correct_index === i ? 'bg-green-500/20 text-green-300 border border-green-500/30' : 'bg-white/5 text-slate-400'}`}>
-                                      {opt || '—'}
+                                  {q.options.filter(o => o?.trim() && o.trim() !== '—').map((opt, i) => (
+                                    <span key={i} className={`text-xs px-2 py-0.5 rounded ${q.options.indexOf(opt) === q.correct_index ? 'bg-green-500/20 text-green-300 border border-green-500/30' : 'bg-white/5 text-slate-400'}`}>
+                                      {opt}
                                     </span>
                                   ))}
                                 </div>
