@@ -18,12 +18,13 @@ export default function GlobalQuestionBankDialog({ open, onClose, onAddQuestions
   const [subtopic, setSubtopic] = useState(null); // child GlobalTopic
   const [yearGroup, setYearGroup] = useState('all');
   const [difficulty, setDifficulty] = useState('all');
+  const [questionType, setQuestionType] = useState('all');
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState([]);
 
   // Reset on open
   useEffect(() => {
-    if (open) { setScreen('subjects'); setSubject(null); setTopic(null); setSubtopic(null); setSelected([]); setSearch(''); }
+    if (open) { setScreen('subjects'); setSubject(null); setTopic(null); setSubtopic(null); setSelected([]); setSearch(''); setQuestionType('all'); }
   }, [open]);
 
   // Subjects (static — just Maths for now, but extensible)
@@ -68,10 +69,22 @@ export default function GlobalQuestionBankDialog({ open, onClose, onAddQuestions
   });
 
   const filtered = useMemo(() => {
-    if (!search.trim()) return questions;
-    const q = search.toLowerCase();
-    return questions.filter(x => (x.question_text || '').toLowerCase().includes(q));
-  }, [questions, search]);
+    let result = questions;
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      result = result.filter(x => (x.question_text || '').toLowerCase().includes(q));
+    }
+    if (questionType !== 'all') {
+      result = result.filter(x => {
+        const qt = x.question_type || 'mcq';
+        if (questionType === 'mcq') return qt === 'mcq' || qt === 'multiple_choice';
+        if (questionType === 'true_false') return qt === 'true_false';
+        if (questionType === 'written') return qt === 'short' || qt === 'short_answer' || qt === 'written' || qt === 'written_answer' || qt === 'numeric';
+        return true;
+      });
+    }
+    return result;
+  }, [questions, search, questionType]);
 
   const toggle = (q) => setSelected(prev =>
     prev.find(x => x.id === q.id) ? prev.filter(x => x.id !== q.id) : [...prev, q]
@@ -238,6 +251,15 @@ export default function GlobalQuestionBankDialog({ open, onClose, onAddQuestions
                     <SelectItem value="easy">Easy</SelectItem>
                     <SelectItem value="medium">Medium</SelectItem>
                     <SelectItem value="hard">Hard</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select value={questionType} onValueChange={setQuestionType}>
+                  <SelectTrigger className="w-32 h-8 bg-white/5 border-white/10 text-white text-xs"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Types</SelectItem>
+                    <SelectItem value="mcq">Multiple Choice</SelectItem>
+                    <SelectItem value="true_false">True / False</SelectItem>
+                    <SelectItem value="written">Written Answer</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

@@ -356,6 +356,21 @@ export default function AdminSeedQuestions() {
                   </Button>
                   <Button
                     size="sm"
+                    onClick={async () => {
+                      setImporting(true); setResult(null);
+                      try {
+                        const r = await base44.functions.invoke('seedMassiveQuestionBank', {});
+                        setResult({ success: true, message: `✅ Massive Bank: ${r.data.created} created, ${r.data.skipped} skipped (${r.data.total} total)` });
+                      } catch (e) { setResult({ success: false, message: `Massive seed failed: ${e.message}` }); }
+                      finally { setImporting(false); }
+                    }}
+                    disabled={importing}
+                    className="bg-gradient-to-r from-violet-600 to-indigo-600"
+                  >
+                    🚀 Massive Seed (300+ T/F, Written, MCQ)
+                  </Button>
+                  <Button
+                    size="sm"
                     variant="outline"
                     onClick={loadSampleData}
                     className="border-purple-500/30 text-purple-400 hover:bg-purple-500/10"
