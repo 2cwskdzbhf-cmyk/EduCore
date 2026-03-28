@@ -380,6 +380,38 @@ export default function AdminSeedQuestions() {
                 </div>
               </div>
 
+              {/* Per-Subtopic Seeding */}
+              <div className="mt-4 p-4 rounded-xl bg-white/5 border border-white/10">
+                <p className="text-sm text-slate-400 mb-3">
+                  <span className="text-white font-semibold">30 Questions Per Subtopic</span> — adds MCQ, True/False and Written questions for every subtopic:
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    { label: '✏️ Algebra Subtopics', fn: 'seedSubtopicQuestionsAlgebra', color: 'from-blue-500 to-purple-500' },
+                    { label: '🔢 Number Subtopics', fn: 'seedSubtopicQuestionsNumber', color: 'from-emerald-500 to-teal-500' },
+                    { label: '📐 Geometry Subtopics', fn: 'seedSubtopicQuestionsGeometry', color: 'from-orange-500 to-amber-500' },
+                    { label: '📊 Statistics Subtopics', fn: 'seedSubtopicQuestionsStats', color: 'from-pink-500 to-rose-500' },
+                  ].map(({ label, fn, color }) => (
+                    <Button
+                      key={fn}
+                      size="sm"
+                      onClick={async () => {
+                        setImporting(true); setResult(null);
+                        try {
+                          const r = await base44.functions.invoke(fn, {});
+                          setResult({ success: true, message: `✅ ${label}: ${r.data.created} created, ${r.data.skipped} skipped` });
+                        } catch (e) { setResult({ success: false, message: `${label} failed: ${e.message}` }); }
+                        finally { setImporting(false); }
+                      }}
+                      disabled={importing}
+                      className={`bg-gradient-to-r ${color} text-xs`}
+                    >
+                      {importing ? '...' : label}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+
               {/* Assign Subtopics Section */}
               <div className="mt-4 p-4 rounded-xl bg-white/5 border border-white/10">
                 <p className="text-sm text-slate-400 mb-3">
