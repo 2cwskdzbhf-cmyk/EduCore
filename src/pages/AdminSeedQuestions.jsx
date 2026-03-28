@@ -365,6 +365,38 @@ export default function AdminSeedQuestions() {
                 </div>
               </div>
 
+              {/* Assign Subtopics Section */}
+              <div className="mt-4 p-4 rounded-xl bg-white/5 border border-white/10">
+                <p className="text-sm text-slate-400 mb-3">
+                  <span className="text-white font-semibold">Step 2:</span> After seeding questions, assign them to subtopics so they appear in the Global Question Bank browser:
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    { label: '📐 Assign Algebra Subtopics', fn: 'assignAlgebraSubtopics', color: 'from-blue-500 to-purple-500' },
+                    { label: '🔢 Assign Number Subtopics', fn: 'assignNumberSubtopics', color: 'from-emerald-500 to-teal-500' },
+                    { label: '📏 Assign Geometry Subtopics', fn: 'assignGeometrySubtopics', color: 'from-orange-500 to-amber-500' },
+                    { label: '📊 Assign Statistics Subtopics', fn: 'assignStatisticsSubtopics', color: 'from-pink-500 to-rose-500' },
+                  ].map(({ label, fn, color }) => (
+                    <Button
+                      key={fn}
+                      size="sm"
+                      onClick={async () => {
+                        setImporting(true); setResult(null);
+                        try {
+                          const r = await base44.functions.invoke(fn, {});
+                          setResult({ success: true, message: `✅ ${label.replace(/^[^\s]+ /, '')}: ${r.data.subtopicsCreated} subtopics, ${r.data.questionsUpdated} questions assigned` });
+                        } catch (e) { setResult({ success: false, message: `${label} failed: ${e.message}` }); }
+                        finally { setImporting(false); }
+                      }}
+                      disabled={importing}
+                      className={`bg-gradient-to-r ${color} text-xs`}
+                    >
+                      {importing ? '...' : label}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+
               <Textarea
                 value={jsonText}
                 onChange={(e) => setJsonText(e.target.value)}
