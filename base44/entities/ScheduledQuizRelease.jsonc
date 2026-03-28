@@ -1,0 +1,68 @@
+{
+  "name": "ScheduledQuizRelease",
+  "type": "object",
+  "properties": {
+    "teacher_email": {
+      "type": "string",
+      "description": "Teacher who scheduled the quiz"
+    },
+    "quiz_id": {
+      "type": "string",
+      "description": "Reference to Quiz"
+    },
+    "class_id": {
+      "type": "string",
+      "description": "Reference to Class"
+    },
+    "assignment_title": {
+      "type": "string",
+      "description": "Assignment title for students"
+    },
+    "scheduled_release_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the quiz should be released"
+    },
+    "assignment_type": {
+      "type": "string",
+      "enum": [
+        "quiz",
+        "homework",
+        "classwork",
+        "assessment"
+      ],
+      "default": "quiz",
+      "description": "Type of assignment"
+    },
+    "notify_students": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether to send push notifications when released"
+    },
+    "notification_sent": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether notification has been sent"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "scheduled",
+        "released",
+        "cancelled"
+      ],
+      "default": "scheduled",
+      "description": "Current status of the scheduled release"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Optional notes for students"
+    }
+  },
+  "required": [
+    "teacher_email",
+    "quiz_id",
+    "class_id",
+    "scheduled_release_date"
+  ]
+}
