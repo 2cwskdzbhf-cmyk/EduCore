@@ -798,6 +798,17 @@ export default function CreateQuiz() {
                             From Global Bank
                           </Badge>
                         )}
+
+                        <div className="flex justify-end mt-3 pt-3 border-t border-white/10">
+                          <Button
+                            size="sm"
+                            className="bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white"
+                            onClick={() => setEditingIndex(null)}
+                          >
+                            <Check className="w-4 h-4 mr-1" />
+                            Done
+                          </Button>
+                        </div>
                       </div>
 
                       <Button
