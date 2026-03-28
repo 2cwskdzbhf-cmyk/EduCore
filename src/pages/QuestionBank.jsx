@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Plus, Search, Filter, Edit, Trash2, BookOpen } from 'lucide-react';
+import { ArrowLeft, Plus, Search, Filter, Edit, Trash2, BookOpen, Globe, CheckCircle2, ChevronDown, ChevronUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -14,6 +14,7 @@ import GlassCard from '@/components/ui/GlassCard';
 import { createPageUrl } from '@/utils';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import CollaborationPanel from '@/components/quiz/CollaborationPanel';
+import GlobalLibraryBrowser from '@/components/quiz/GlobalLibraryBrowser';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 function QuestionBankContent() {
@@ -110,7 +111,11 @@ function QuestionBankContent() {
         </div>
 
         <TabsList className="bg-white/5 border border-white/10 mb-6">
-          <TabsTrigger value="questions">Questions</TabsTrigger>
+          <TabsTrigger value="questions">My Questions</TabsTrigger>
+          <TabsTrigger value="global">
+            <Globe className="w-4 h-4 mr-1" />
+            Global Library
+          </TabsTrigger>
           <TabsTrigger value="collaboration">Collaboration</TabsTrigger>
         </TabsList>
 
@@ -321,6 +326,10 @@ function QuestionBankContent() {
           topics={topics}
           teacherEmail={user?.email}
         />
+        </TabsContent>
+
+        <TabsContent value="global">
+          <GlobalLibraryBrowser />
         </TabsContent>
 
         <TabsContent value="collaboration">

@@ -75,6 +75,7 @@ export default function GlobalQuestionBankDialog({ open, onClose, onAddQuestions
   const { data: questions = [], isLoading: loadingQuestions } = useQuery({
     queryKey: ['questions', selectedSubtopic?.id, selectedYearGroup, selectedDifficulty],
     queryFn: async () => {
+      if (selectedSubtopic?.id === '__global__') return []; // skip — we'll use globalQuestions only
       const filters = { subtopic_id: selectedSubtopic.id };
       if (selectedYearGroup !== 'all') filters.year_group = Number(selectedYearGroup);
       if (selectedDifficulty !== 'all') filters.difficulty = selectedDifficulty;
@@ -83,12 +84,31 @@ export default function GlobalQuestionBankDialog({ open, onClose, onAddQuestions
     enabled: open && screen === 'questions' && !!selectedSubtopic && selectedYearGroup !== 'all' && selectedDifficulty !== 'all'
   });
 
+  // Also load global questions for the filter screen so teachers can use them
+  const { data: globalQuestions = [], isLoading: loadingGlobal } = useQuery({
+    queryKey: ['globalQuestionsForPicker', selectedYearGroup, selectedDifficulty],
+    queryFn: async () => {
+      const filters = {};
+      if (selectedYearGroup !== 'all') filters.year_group = Number(selectedYearGroup);
+      if (selectedDifficulty !== 'all') filters.difficulty = selectedDifficulty;
+      return base44.entities.GlobalQuestion.filter(filters, '-created_date', 500);
+    },
+    enabled: open && screen === 'questions' && selectedYearGroup !== 'all' && selectedDifficulty !== 'all'
+  });
+
+  // Merge: show subtopic questions first, then global questions not already in subtopic list
+  const combinedQuestions = [
+    ...questions,
+    ...globalQuestions.filter(gq => !questions.find(q => q.id === gq.id))
+  ];
+
   const filteredQuestions = useMemo(() => {
-    if (!questions?.length) return [];
-    if (!searchQuery) return questions;
+    const source = combinedQuestions;
+    if (!source?.length) return [];
+    if (!searchQuery) return source;
     const q = searchQuery.toLowerCase();
-    return questions.filter(x => (x.question_text || '').toLowerCase().includes(q));
-  }, [questions, searchQuery]);
+    return source.filter(x => (x.question_text || '').toLowerCase().includes(q));
+  }, [combinedQuestions, searchQuery]);
 
   const addQuestionsMutation = useMutation({
     mutationFn: async (picked) => {
@@ -113,8 +133,8 @@ export default function GlobalQuestionBankDialog({ open, onClose, onAddQuestions
         questions: picked.map(q => ({
           id: q.id,
           question_text: q.question_text || q.prompt || '',
-          options: Array.isArray(q.options) ? q.options : [],
-          correct_index: q.correct_index,
+          options: Array.isArray(q.choices) ? q.choices : Array.isArray(q.options) ? q.options : [],
+          correct_index: q.correct_index ?? (q.choices ? q.choices.indexOf(q.correct_answer) : -1),
           correct_answer: q.correct_answer || '',
           difficulty: q.difficulty || 'medium',
           explanation: q.explanation || ''
@@ -195,6 +215,14 @@ export default function GlobalQuestionBankDialog({ open, onClose, onAddQuestions
       return;
     }
     setScreen('questions');
+  };
+
+  // Allow jumping straight to global questions without going through subtopic hierarchy
+  const jumpToGlobal = () => {
+    setSelectedSubject({ name: 'Global Library' });
+    setSelectedTopic({ name: 'All Topics' });
+    setSelectedSubtopic({ name: 'All', id: '__global__' });
+    setScreen('filter');
   };
 
   const toggleQuestion = (question) => {
@@ -287,6 +315,19 @@ export default function GlobalQuestionBankDialog({ open, onClose, onAddQuestions
         <div className="flex-1 overflow-y-auto p-6 relative">
           {screen === 'subject' && (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {/* Global Library shortcut */}
+              <Card className="p-6 bg-gradient-to-br from-purple-500/20 to-blue-500/20 border-purple-500/30 hover:from-purple-500/30 hover:to-blue-500/30 cursor-pointer"
+                onClick={jumpToGlobal}>
+                <div className="flex items-center gap-4">
+                  <div className="w-14 h-14 rounded-xl bg-purple-500/30 flex items-center justify-center">
+                    <Database className="w-7 h-7 text-purple-300" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-lg text-white">Global Library</h3>
+                    <p className="text-sm text-purple-300">109+ algebra questions Y7–11</p>
+                  </div>
+                </div>
+              </Card>
               {subjects.map(subject => (
                 <Card key={subject.id} className="p-6 bg-white/5 border-white/10 hover:bg-white/10 cursor-pointer"
                   onClick={() => { setSelectedSubject(subject); setScreen('topics'); }}>
@@ -419,26 +460,49 @@ export default function GlobalQuestionBankDialog({ open, onClose, onAddQuestions
                 />
               </div>
 
-              {loadingQuestions ? (
-                <div className="text-slate-400">Loading questions…</div>
+              {(loadingQuestions || loadingGlobal) ? (
+                <div className="text-slate-400 flex items-center gap-2 py-4">
+                  <div className="w-4 h-4 border-2 border-purple-400 border-t-transparent rounded-full animate-spin" />
+                  Loading questions…
+                </div>
               ) : filteredQuestions.length === 0 ? (
-                <div className="text-slate-400">No questions found.</div>
+                <div className="text-slate-400 py-4">No questions found for these filters.</div>
               ) : (
-                <div className="space-y-4">
+                <div className="space-y-3">
                   {filteredQuestions.map((q, idx) => {
                     const isSel = !!selectedQuestions.find(x => x.id === q.id);
+                    const isGlobal = !!q.seed_key; // GlobalQuestion has seed_key
+                    const choices = q.choices || q.options || [];
                     return (
                       <Card
                         key={q.id}
-                        className={`p-5 bg-white/5 border-white/10 cursor-pointer transition-all relative ${isSel ? 'ring-2 ring-purple-500' : 'hover:bg-white/10'}`}
+                        className={`p-4 bg-white/5 border-white/10 cursor-pointer transition-all relative ${isSel ? 'ring-2 ring-purple-500 bg-purple-500/5' : 'hover:bg-white/10'}`}
                         onClick={() => toggleQuestion(q)}
                       >
                         <div className="flex items-start justify-between gap-3">
-                          <div className="text-white font-medium flex-1">
-                            {idx + 1}. {q.question_text}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex flex-wrap gap-1.5 mb-2">
+                              {isGlobal && (
+                                <Badge className="bg-blue-500/20 text-blue-300 text-xs">Global Library</Badge>
+                              )}
+                              <Badge className="bg-slate-500/20 text-slate-300 text-xs">{q.difficulty}</Badge>
+                              <Badge className="bg-slate-500/20 text-slate-300 text-xs">{q.question_type === 'mcq' ? 'MCQ' : q.question_type}</Badge>
+                            </div>
+                            <div className="text-white font-medium text-sm leading-snug mb-2">
+                              {idx + 1}. {q.question_text}
+                            </div>
+                            {choices.length > 0 && (
+                              <div className="grid grid-cols-2 gap-1 mt-1">
+                                {choices.map((c, ci) => (
+                                  <div key={ci} className={`text-xs px-2 py-1 rounded ${c === q.correct_answer ? 'bg-emerald-500/20 text-emerald-300' : 'bg-white/5 text-slate-400'}`}>
+                                    {String.fromCharCode(65+ci)}. {c}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
                           </div>
-                          <Badge className={`pointer-events-none flex-shrink-0 ${isSel ? 'bg-purple-500/30 text-purple-100' : 'bg-white/10 text-slate-200'}`}>
-                            {isSel ? 'Selected' : 'Tap to select'}
+                          <Badge className={`pointer-events-none flex-shrink-0 mt-1 ${isSel ? 'bg-purple-500/30 text-purple-100' : 'bg-white/10 text-slate-400'}`}>
+                            {isSel ? '✓ Selected' : 'Select'}
                           </Badge>
                         </div>
                       </Card>
