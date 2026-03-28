@@ -82,12 +82,13 @@ export default function GlobalQuestionBankDialog({ open, onClose, onAddQuestions
     if (!selected.length) { toast.error('Select at least one question'); return; }
 
     const mapped = selected.map(q => {
-      const choices = Array.isArray(q.choices) ? q.choices : [];
-      const isMCQ = q.question_type === 'mcq' && choices.length > 0;
+      // Support both old GlobalQuestion schema (choices) and new seeds (options)
+      const rawChoices = Array.isArray(q.choices) && q.choices.length > 0 ? q.choices
+        : Array.isArray(q.options) && q.options.length > 0 ? q.options : [];
+      const isMCQ = (q.question_type === 'mcq' || q.question_type === 'multiple_choice') && rawChoices.length > 0;
 
       if (isMCQ) {
-        // Pad choices to 4 if needed
-        const opts = choices.length >= 4 ? choices.slice(0, 4) : [...choices, ...Array(4 - choices.length).fill('—')];
+        const opts = rawChoices.length >= 4 ? rawChoices.slice(0, 4) : [...rawChoices, ...Array(4 - rawChoices.length).fill('—')];
         let correctIndex = typeof q.correct_index === 'number' ? q.correct_index : -1;
         if (correctIndex < 0 && q.correct_answer) {
           correctIndex = opts.findIndex(c => String(c).toLowerCase().trim() === String(q.correct_answer).toLowerCase().trim());
@@ -107,7 +108,6 @@ export default function GlobalQuestionBankDialog({ open, onClose, onAddQuestions
           _isDraft: false
         };
       } else {
-        // Non-MCQ (numeric/short) — use short_answer type with 4 placeholder options
         return {
           prompt: q.question_text || '',
           question_type: 'short_answer',
@@ -259,8 +259,15 @@ export default function GlobalQuestionBankDialog({ open, onClose, onAddQuestions
               ) : (
                 <div className="space-y-2">
                   {filtered.map(q => {
-                    const choices = Array.isArray(q.choices) ? q.choices : [];
+                    // Support both choices (old schema) and options (new seeds)
+                    const displayChoices = Array.isArray(q.choices) && q.choices.length > 0 ? q.choices
+                      : Array.isArray(q.options) && q.options.length > 0 ? q.options : [];
                     const sel = isSelected(q);
+                    const typeLabel = q.question_type === 'mcq' ? 'MCQ'
+                      : q.question_type === 'multiple_choice' ? 'MCQ'
+                      : q.question_type === 'numeric' ? 'Numeric'
+                      : q.question_type === 'short' ? 'Short'
+                      : q.question_type?.replace('_', ' ') || 'MCQ';
                     return (
                       <button key={q.id} onClick={() => toggle(q)}
                         className={cn(
@@ -281,17 +288,17 @@ export default function GlobalQuestionBankDialog({ open, onClose, onAddQuestions
                             <div className="flex flex-wrap gap-1.5 mb-1.5">
                               {q.year_group && <span className="text-xs px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300">Y{q.year_group}</span>}
                               {q.difficulty && <span className={cn("text-xs px-2 py-0.5 rounded-full", diffBadge[q.difficulty] || diffBadge.medium)}>{q.difficulty}</span>}
-                              <span className="text-xs px-2 py-0.5 rounded-full bg-slate-700/60 text-slate-400">{q.question_type === 'mcq' ? 'MCQ' : q.question_type}</span>
+                              <span className="text-xs px-2 py-0.5 rounded-full bg-slate-700/60 text-slate-400">{typeLabel}</span>
                             </div>
 
                             {/* Question */}
                             <p className="text-white text-sm font-medium leading-snug mb-2">{q.question_text}</p>
 
-                            {/* MCQ choices */}
-                            {choices.length > 0 ? (
+                            {/* Answer choices */}
+                            {displayChoices.length > 0 ? (
                               <div className="grid grid-cols-2 gap-1.5">
-                                {choices.map((c, ci) => {
-                                  const isCorrect = ci === q.correct_index || c === q.correct_answer;
+                                {displayChoices.map((c, ci) => {
+                                  const isCorrect = ci === q.correct_index || String(c).toLowerCase().trim() === String(q.correct_answer).toLowerCase().trim();
                                   return (
                                     <div key={ci} className={cn("text-xs px-2.5 py-1.5 rounded-lg flex items-center gap-1.5",
                                       isCorrect ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30" : "bg-white/5 text-slate-400 border border-white/5"
@@ -304,7 +311,7 @@ export default function GlobalQuestionBankDialog({ open, onClose, onAddQuestions
                                 })}
                               </div>
                             ) : (
-                              // Short/numeric answer
+                              // Short/numeric/written answer
                               <div className="text-xs px-2.5 py-1.5 rounded-lg bg-emerald-500/15 text-emerald-300 border border-emerald-500/25 inline-flex items-center gap-1.5">
                                 <Check className="w-3 h-3" /> Answer: {q.correct_answer}
                               </div>
