@@ -657,130 +657,143 @@ export default function CreateQuiz() {
               <GlassCard className="p-12 text-center">
                 <BookOpen className="w-12 h-12 text-slate-400 mx-auto mb-4" />
                 <h3 className="text-white font-semibold mb-2">No questions yet</h3>
-                <p className="text-slate-400 text-sm mb-4">Add questions manually or import from a lesson</p>
-                <p className="text-xs text-slate-500 mt-2">Questions count: {questions.length}</p>
+                <p className="text-slate-400 text-sm mb-4">Add questions manually or import from the global bank</p>
               </GlassCard>
             ) : (
               <div className="space-y-4">
-                {questions.map((q, index) => (
-                  <GlassCard key={index} className="p-6">
-                    <div className="flex items-start gap-4">
-                      <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center text-white font-bold flex-shrink-0">
-                        {index + 1}
-                      </div>
+                {questions.map((q, index) => {
+                  const isEditing = editingIndex === index;
+                  return (
+                    <GlassCard key={index} className="p-6">
+                      <div className="flex items-start gap-4">
+                        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center text-white font-bold flex-shrink-0 mt-1">
+                          {index + 1}
+                        </div>
 
-                      <div className="flex-1">
-                        <Textarea
-                          value={q.prompt || ''}
-                          onChange={(e) => updateQuestion(index, 'prompt', e.target.value)}
-                          placeholder="Enter question text..."
-                          className="mb-2 bg-white/5 border-white/10 text-white"
-                          rows={2}
-                        />
-
-                        {q.image_url && (
-                          <img src={q.image_url} alt="Question" className="w-full max-w-md h-32 object-cover rounded-lg mb-3" />
-                        )}
-
-                        <div className="grid grid-cols-2 gap-2 mb-3">
-                          {q.options?.map((opt, i) => (
-                            <div key={i} className="relative">
-                              {q.option_images?.[i] && (
-                                <img src={q.option_images[i]} alt={`Option ${i + 1}`} className="w-full h-16 object-cover rounded mb-2" />
+                        <div className="flex-1 min-w-0">
+                          {/* Collapsed view */}
+                          {!isEditing ? (
+                            <button
+                              className="w-full text-left group"
+                              onClick={() => setEditingIndex(index)}
+                            >
+                              <p className="text-white font-medium truncate group-hover:text-purple-300 transition-colors">
+                                {q.prompt || <span className="text-slate-500 italic">Click to edit question...</span>}
+                              </p>
+                              {q.options?.filter(o => o?.trim()).length > 0 && (
+                                <div className="flex gap-2 mt-1 flex-wrap">
+                                  {q.options.map((opt, i) => (
+                                    <span key={i} className={`text-xs px-2 py-0.5 rounded ${q.correct_index === i ? 'bg-green-500/20 text-green-300 border border-green-500/30' : 'bg-white/5 text-slate-400'}`}>
+                                      {opt || '—'}
+                                    </span>
+                                  ))}
+                                </div>
                               )}
-                              <Input
-                                value={String(opt || '')}
-                                onChange={(e) => updateOption(index, i, e.target.value)}
-                                placeholder={`Option ${i + 1}`}
-                                className={`bg-white/5 border-white/10 text-white ${q.correct_index === i ? 'ring-2 ring-green-500' : ''}`}
+                              <p className="text-xs text-purple-400 mt-1">Click to edit</p>
+                            </button>
+                          ) : (
+                            /* Expanded editing view */
+                            <>
+                              <Textarea
+                                value={q.prompt || ''}
+                                onChange={(e) => updateQuestion(index, 'prompt', e.target.value)}
+                                placeholder="Enter question text..."
+                                className="mb-2 bg-white/5 border-white/10 text-white"
+                                rows={2}
+                                autoFocus
                               />
-                            </div>
-                          ))}
+
+                              {q.image_url && (
+                                <img src={q.image_url} alt="Question" className="w-full max-w-md h-32 object-cover rounded-lg mb-3" />
+                              )}
+
+                              <div className="grid grid-cols-2 gap-2 mb-3">
+                                {q.options?.map((opt, i) => (
+                                  <div key={i} className="relative">
+                                    {q.option_images?.[i] && (
+                                      <img src={q.option_images[i]} alt={`Option ${i + 1}`} className="w-full h-16 object-cover rounded mb-2" />
+                                    )}
+                                    <Input
+                                      value={String(opt || '')}
+                                      onChange={(e) => updateOption(index, i, e.target.value)}
+                                      placeholder={`Option ${i + 1}`}
+                                      className={`bg-white/5 border-white/10 text-white ${q.correct_index === i ? 'ring-2 ring-green-500' : ''}`}
+                                    />
+                                  </div>
+                                ))}
+                              </div>
+
+                              <div className="flex items-center gap-2 mb-2 flex-wrap">
+                                <Select value={String(q.correct_index)} onValueChange={(v) => updateQuestion(index, 'correct_index', Number(v))}>
+                                  <SelectTrigger className="w-40 bg-white/5 border-white/10 text-white">
+                                    <SelectValue placeholder="Correct answer" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="0">Option 1</SelectItem>
+                                    <SelectItem value="1">Option 2</SelectItem>
+                                    <SelectItem value="2">Option 3</SelectItem>
+                                    <SelectItem value="3">Option 4</SelectItem>
+                                  </SelectContent>
+                                </Select>
+
+                                <Select value={q.difficulty} onValueChange={(v) => updateQuestion(index, 'difficulty', v)}>
+                                  <SelectTrigger className="w-32 bg-white/5 border-white/10 text-white">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="easy">Easy</SelectItem>
+                                    <SelectItem value="medium">Medium</SelectItem>
+                                    <SelectItem value="hard">Hard</SelectItem>
+                                  </SelectContent>
+                                </Select>
+
+                                <label className="cursor-pointer">
+                                  <input
+                                    type="file"
+                                    accept="image/*"
+                                    className="hidden"
+                                    onChange={(e) => handleImageUpload(e.target.files[0], index)}
+                                    disabled={uploadingImage}
+                                  />
+                                  <div className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-medium bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/40 text-purple-300 cursor-pointer transition-colors">
+                                    <Image className="w-3 h-3" />
+                                    {uploadingImage ? 'Uploading...' : q.image_url ? 'Change Image' : 'Add Image'}
+                                  </div>
+                                </label>
+                              </div>
+
+                              {q.source_global_id && (
+                                <Badge className="bg-blue-500/20 text-blue-200 border border-blue-500/30 mb-2">
+                                  From Global Bank
+                                </Badge>
+                              )}
+
+                              <div className="flex justify-end mt-3 pt-3 border-t border-white/10">
+                                <Button
+                                  size="sm"
+                                  className="bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white"
+                                  onClick={() => setEditingIndex(null)}
+                                >
+                                  <Check className="w-4 h-4 mr-1" />
+                                  Done
+                                </Button>
+                              </div>
+                            </>
+                          )}
                         </div>
 
-                        <div className="flex items-center gap-2 mb-2">
-                          <Select value={String(q.correct_index)} onValueChange={(v) => updateQuestion(index, 'correct_index', Number(v))}>
-                            <SelectTrigger className="w-40 bg-white/5 border-white/10 text-white">
-                              <SelectValue placeholder="Correct answer" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="0">Option 1</SelectItem>
-                              <SelectItem value="1">Option 2</SelectItem>
-                              <SelectItem value="2">Option 3</SelectItem>
-                              <SelectItem value="3">Option 4</SelectItem>
-                            </SelectContent>
-                          </Select>
-
-                          <Select value={q.difficulty} onValueChange={(v) => updateQuestion(index, 'difficulty', v)}>
-                            <SelectTrigger className="w-32 bg-white/5 border-white/10 text-white">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="easy">Easy</SelectItem>
-                              <SelectItem value="medium">Medium</SelectItem>
-                              <SelectItem value="hard">Hard</SelectItem>
-                            </SelectContent>
-                          </Select>
-
-                          <label className="cursor-pointer">
-                            <input
-                              type="file"
-                              accept="image/*"
-                              className="hidden"
-                              onChange={(e) => handleImageUpload(e.target.files[0], index)}
-                              disabled={uploadingImage}
-                            />
-                            <Button variant="outline" size="sm" disabled={uploadingImage}>
-                              <Image className="w-3 h-3 mr-1" />
-                              {q.image_url ? 'Change' : 'Add'} Image
-                            </Button>
-                          </label>
-
-                          {q.options?.map((_, i) => (
-                            <label key={i} className="cursor-pointer">
-                              <input
-                                type="file"
-                                accept="image/*"
-                                className="hidden"
-                                onChange={(e) => handleImageUpload(e.target.files[0], index, i)}
-                                disabled={uploadingImage}
-                              />
-                              <Button variant="ghost" size="sm" disabled={uploadingImage}>
-                                <Image className="w-3 h-3" />
-                              </Button>
-                            </label>
-                          ))}
-                        </div>
-
-                        {q.source_global_id && (
-                          <Badge className="bg-blue-500/20 text-blue-200 border border-blue-500/30">
-                            From Global Bank
-                          </Badge>
-                        )}
-
-                        <div className="flex justify-end mt-3 pt-3 border-t border-white/10">
-                          <Button
-                            size="sm"
-                            className="bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white"
-                            onClick={() => setEditingIndex(null)}
-                          >
-                            <Check className="w-4 h-4 mr-1" />
-                            Done
-                          </Button>
-                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => deleteQuestion(index)}
+                          className="text-slate-400 hover:text-red-300 flex-shrink-0"
+                        >
+                          <Trash2 className="w-5 h-5" />
+                        </Button>
                       </div>
-
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => deleteQuestion(index)}
-                        className="text-slate-400 hover:text-red-300"
-                      >
-                        <Trash2 className="w-5 h-5" />
-                      </Button>
-                    </div>
-                  </GlassCard>
-                ))}
+                    </GlassCard>
+                  );
+                })}
               </div>
             )}
 
