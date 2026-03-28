@@ -117,8 +117,6 @@ export default function Layout({ children, currentPageName }) {
   const teacherNav = [
     { name: 'Dashboard', icon: LayoutDashboard, page: 'TeacherDashboard' },
     { name: 'Classes', icon: Users, page: 'TeacherDashboard' },
-    { name: 'Question Bank', icon: BookOpen, page: 'QuestionBank' },
-    { name: 'Library', icon: ClipboardList, page: 'TeacherAssignmentLibrary' },
     { name: 'Analytics', icon: BarChart3, page: 'Analytics' },
   ];
 
