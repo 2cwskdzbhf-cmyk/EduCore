@@ -102,27 +102,27 @@ return localStorage.getItem('dismissedLiveQuizSessionId') || null;  });
       if (enrolledClasses.length === 0) return null;
 
       const classIds = enrolledClasses.map(c => c.id);
-      const allSessions = await base44.entities.LiveQuizSession.filter(
-        {
-          class_id: { $in: classIds },
-     status: { $in: ['lobby'] }
-        },
-        '-created_date'
-      );
-
+      const teacherEmails = [...new Set(enrolledClasses.map(c => c.teacher_email).filter(Boolean))];
       const now = Date.now();
       const ONE_HOUR_MS = 60 * 60 * 1000;
 
-      // Filter ended/stale
+      // Fetch by class_id AND by teacher host_email (covers sessions created without a class_id)
+      const [byClass, byTeacher] = await Promise.all([
+        base44.entities.LiveQuizSession.filter({ class_id: { $in: classIds } }, '-created_date').catch(() => []),
+        teacherEmails.length > 0
+          ? base44.entities.LiveQuizSession.filter({ host_email: { $in: teacherEmails } }, '-created_date').catch(() => [])
+          : Promise.resolve([])
+      ]);
+
+      const allSessions = [...byClass, ...byTeacher];
+
+      // Filter: only lobby/live, not ended, not stale
       const filtered = allSessions.filter(s => {
         if (!s) return false;
         if (s.ended_at) return false;
         if (s.status !== 'lobby' && s.status !== 'live') return false;
-
         const createdAt = s.created_date ? new Date(s.created_date).getTime() : 0;
-        if (!createdAt) return false;
-        if (now - createdAt > ONE_HOUR_MS) return false;
-
+        if (!createdAt || now - createdAt > ONE_HOUR_MS) return false;
         return true;
       });
 
@@ -131,35 +131,25 @@ return localStorage.getItem('dismissedLiveQuizSessionId') || null;  });
       for (const s of filtered) {
         if (!byId.has(s.id)) byId.set(s.id, s);
       }
-      const unique = Array.from(byId.values());
 
-      // Keep newest session per class_id
-      const newestPerClass = new Map();
-      for (const s of unique) {
-        const existing = newestPerClass.get(s.class_id);
-        if (!existing) {
-          newestPerClass.set(s.class_id, s);
-        } else {
-          const a = new Date(existing.created_date).getTime();
-          const b = new Date(s.created_date).getTime();
-          if (b > a) newestPerClass.set(s.class_id, s);
-        }
-      }
-
-      const candidates = Array.from(newestPerClass.values()).sort(
+      const candidates = Array.from(byId.values()).sort(
         (a, b) => new Date(b.created_date).getTime() - new Date(a.created_date).getTime()
       );
 
-      // Show only the newest overall
       return candidates[0] || null;
     },
     enabled: enrolledClasses.length > 0,
-    refetchInterval: 5000
+    refetchInterval: 4000
   });
 
   const sessionClass = useMemo(() => {
     if (!liveQuizBannerSession) return null;
-    return enrolledClasses.find(c => c.id === liveQuizBannerSession.class_id) || null;
+    // Match by class_id, or fall back to matching by teacher email
+    return (
+      enrolledClasses.find(c => c.id === liveQuizBannerSession.class_id) ||
+      enrolledClasses.find(c => c.teacher_email === liveQuizBannerSession.host_email) ||
+      null
+    );
   }, [liveQuizBannerSession, enrolledClasses]);
 
   const showLiveQuizBanner =

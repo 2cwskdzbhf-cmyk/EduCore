@@ -220,22 +220,9 @@ export default function TeacherLiveQuizLobby() {
   /* ---------------- START QUIZ ---------------- */
   const startMutation = useMutation({
     mutationFn: async () => {
-      if (questions.length === 0) {
-        throw new Error('This quiz genuinely has no questions (after all lookup attempts).');
-      }
-
-      const now = new Date().toISOString();
-      const firstQuestion = questions[0];
-
-      await base44.entities.LiveQuizSession.update(sessionId, {
-        status: 'live',
-        current_question_index: 0,
-        question_started_at: now,
-        started_at: now,
-        questions_json: JSON.stringify(questions),
-        current_question: firstQuestion,
-        current_question_id: firstQuestion?.id || null
-      });
+      const res = await base44.functions.invoke('updateLiveQuizSession', { sessionId, action: 'start' });
+      if (res.data?.error) throw new Error(res.data.error);
+      return res.data?.session;
     },
     onSuccess: () => {
       leavingForPlayRef.current = true;
@@ -261,7 +248,7 @@ export default function TeacherLiveQuizLobby() {
     );
   }
 
-  const joinCode = session.id.substring(0, 6).toUpperCase();
+  const joinCode = session.join_code || session.id.substring(0, 6).toUpperCase();
 
   return (
     <div className="min-h-screen p-6 bg-gradient-to-br from-slate-900 via-purple-900/20 to-slate-900">
@@ -314,7 +301,7 @@ export default function TeacherLiveQuizLobby() {
 
           <Button
             onClick={() => startMutation.mutate()}
-            disabled={players.length === 0 || questions.length === 0 || startMutation.isPending}
+            disabled={startMutation.isPending}
             className="bg-gradient-to-r from-emerald-500 to-teal-500 px-10"
           >
             {startMutation.isPending ? (
@@ -322,7 +309,7 @@ export default function TeacherLiveQuizLobby() {
             ) : (
               <Play className="w-4 h-4 mr-2" />
             )}
-            Start Quiz ({questions.length} questions)
+            Start Quiz ({players.length} player{players.length !== 1 ? 's' : ''} ready)
           </Button>
         </GlassCard>
 

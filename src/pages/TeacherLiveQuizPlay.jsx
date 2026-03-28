@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { base44 } from '@/api/base44Client';
+
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
@@ -105,14 +106,8 @@ export default function TeacherLiveQuizPlay() {
 
   const nextQuestionMutation = useMutation({
     mutationFn: async () => {
-      const res = await fetch('/functions/updateLiveQuizSession', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sessionId, action: 'nextQuestion' })
-      });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json?.error || 'Failed to advance');
-      return json.session;
+      const res = await base44.functions.invoke('updateLiveQuizSession', { sessionId, action: 'nextQuestion' });
+      return res.data?.session;
     },
     onSuccess: (s) => {
       if (s?.status === 'ended') {
@@ -126,11 +121,7 @@ export default function TeacherLiveQuizPlay() {
 
   const endNowMutation = useMutation({
     mutationFn: async () => {
-      await fetch('/functions/updateLiveQuizSession', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sessionId, action: 'end' })
-      });
+      await base44.functions.invoke('updateLiveQuizSession', { sessionId, action: 'end' });
     },
     onSuccess: () => navigate(createPageUrl('TeacherDashboard'))
   });

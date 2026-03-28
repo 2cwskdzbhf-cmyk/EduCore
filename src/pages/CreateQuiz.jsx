@@ -291,22 +291,30 @@ export default function CreateQuiz() {
       const urlParams = new URLSearchParams(window.location.search);
       const classId = urlParams.get('classId');
 
-      const generateCode = () => Math.random().toString(36).substr(2, 6).toUpperCase();
-      let joinCode = generateCode();
-      for (let attempts = 0; attempts < 10; attempts++) {
-        const existing = await base44.entities.LiveQuizSession.filter({ join_code: joinCode });
-        if (existing.length === 0) break;
-        joinCode = generateCode();
-      }
+      // Prepare the valid questions with full data embedded in the session
+      const usable = questions.filter(q => !isTrulyEmptyQuestion(q)).map((q, i) => ({
+        order: i,
+        prompt: q.prompt,
+        question_type: q.question_type || 'multiple_choice',
+        options: q.options,
+        correct_index: q.correct_index,
+        correct_answer: q.options[q.correct_index] || '',
+        difficulty: q.difficulty || 'medium',
+        explanation: q.explanation || '',
+        image_url: q.image_url || '',
+      }));
+
+      if (usable.length === 0) throw new Error('No valid questions to start the quiz');
 
       const session = await base44.entities.LiveQuizSession.create({
-        class_id: classId,
+        class_id: classId || '',
         host_email: user.email,
-        live_quiz_set_id: 'manual-' + Date.now(),
+        live_quiz_set_id: quizSet.title || 'manual-quiz',
         status: 'lobby',
         current_question_index: -1,
         player_count: 0,
-        join_code: joinCode,
+        // Embed questions directly so lobby & player screens can find them instantly
+        questions_json: JSON.stringify(usable),
         settings: {
           time_per_question: quizSet.time_limit_per_question,
           base_points: 500,
@@ -314,27 +322,10 @@ export default function CreateQuiz() {
         }
       });
 
-      const usable = questions.filter(q => !isTrulyEmptyQuestion(q));
-
-      for (let i = 0; i < usable.length; i++) {
-        const q = usable[i];
-        await base44.entities.LiveQuizQuestion.create({
-          live_quiz_set_id: session.id,
-          order: i,
-          prompt: q.prompt,
-          correct_answer: q.options[q.correct_index],
-          allowed_forms: ['exact'],
-          difficulty: q.difficulty || 'medium',
-          explanation: q.explanation || '',
-          type: 'multiple_choice',
-          hint: ''
-        });
-      }
-
       return session;
     },
     onSuccess: (session) => {
-      toast.success('Quiz started! Redirecting to lobby...');
+      toast.success('Quiz lobby created! Share the join code with your students.');
       navigate(createPageUrl(`TeacherLiveQuizLobby?sessionId=${session.id}`));
     },
     onError: (error) => {
