@@ -25,21 +25,6 @@ export default function StudentLiveQuizPlay() {
     base44.auth.me().then(setUser);
   }, []);
 
-  // Track total quiz time
-  useEffect(() => {
-    if (session?.status === 'live' && session?.started_at && !quizStartTime) {
-      setQuizStartTime(new Date(session.started_at).getTime());
-    }
-  }, [session?.status, session?.started_at, quizStartTime]);
-
-  useEffect(() => {
-    if (!quizStartTime) return;
-    const interval = setInterval(() => {
-      setTotalQuizTime(Math.floor((Date.now() - quizStartTime) / 1000));
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [quizStartTime]);
-
   const { data: sessionRaw } = useQuery({
     queryKey: ['liveQuizSession', sessionId],
     queryFn: async () => {
@@ -55,6 +40,21 @@ export default function StudentLiveQuizPlay() {
     if (sessionRaw) lastSessionRef.current = sessionRaw;
     return sessionRaw || lastSessionRef.current;
   }, [sessionRaw]);
+
+  // Track total quiz time — must come AFTER session is defined
+  useEffect(() => {
+    if (session?.status === 'live' && session?.started_at && !quizStartTime) {
+      setQuizStartTime(new Date(session.started_at).getTime());
+    }
+  }, [session?.status, session?.started_at, quizStartTime]);
+
+  useEffect(() => {
+    if (!quizStartTime) return;
+    const interval = setInterval(() => {
+      setTotalQuizTime(Math.floor((Date.now() - quizStartTime) / 1000));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [quizStartTime]);
 
   const { data: player } = useQuery({
     queryKey: ['myLiveQuizPlayer', sessionId, user?.email],
