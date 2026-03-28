@@ -297,21 +297,62 @@ export default function AdminSeedQuestions() {
                   <Button
                     size="sm"
                     onClick={async () => {
-                      setImporting(true);
-                      setResult(null);
+                      setImporting(true); setResult(null);
                       try {
-                        const response = await base44.functions.invoke('seedAlgebraQuestions', {});
-                        setResult({ success: true, message: `✅ Algebra seed: ${response.data.created} created, ${response.data.skipped} skipped (${response.data.total_attempted} total)` });
-                      } catch (error) {
-                        setResult({ success: false, message: `Algebra seed failed: ${error.message}` });
-                      } finally {
-                        setImporting(false);
-                      }
+                        const r = await base44.functions.invoke('seedAlgebraQuestions', {});
+                        setResult({ success: true, message: `✅ Algebra: ${r.data.created} created, ${r.data.skipped} skipped` });
+                      } catch (e) { setResult({ success: false, message: `Algebra failed: ${e.message}` }); }
+                      finally { setImporting(false); }
                     }}
                     disabled={importing}
                     className="bg-gradient-to-r from-blue-500 to-purple-500"
                   >
-                    {importing ? 'Seeding...' : '📐 Seed Algebra (Y7-11, 100+ Qs)'}
+                    📐 Algebra (100+)
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={async () => {
+                      setImporting(true); setResult(null);
+                      try {
+                        const r = await base44.functions.invoke('seedNumberQuestions', {});
+                        setResult({ success: true, message: `✅ Number: ${r.data.created} created, ${r.data.skipped} skipped` });
+                      } catch (e) { setResult({ success: false, message: `Number failed: ${e.message}` }); }
+                      finally { setImporting(false); }
+                    }}
+                    disabled={importing}
+                    className="bg-gradient-to-r from-emerald-500 to-teal-500"
+                  >
+                    🔢 Number (80+)
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={async () => {
+                      setImporting(true); setResult(null);
+                      try {
+                        const r = await base44.functions.invoke('seedGeometryQuestions', {});
+                        setResult({ success: true, message: `✅ Geometry: ${r.data.created} created, ${r.data.skipped} skipped` });
+                      } catch (e) { setResult({ success: false, message: `Geometry failed: ${e.message}` }); }
+                      finally { setImporting(false); }
+                    }}
+                    disabled={importing}
+                    className="bg-gradient-to-r from-orange-500 to-amber-500"
+                  >
+                    📐 Geometry (80+)
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={async () => {
+                      setImporting(true); setResult(null);
+                      try {
+                        const r = await base44.functions.invoke('seedStatisticsQuestions', {});
+                        setResult({ success: true, message: `✅ Statistics: ${r.data.created} created, ${r.data.skipped} skipped` });
+                      } catch (e) { setResult({ success: false, message: `Statistics failed: ${e.message}` }); }
+                      finally { setImporting(false); }
+                    }}
+                    disabled={importing}
+                    className="bg-gradient-to-r from-pink-500 to-rose-500"
+                  >
+                    📊 Statistics (80+)
                   </Button>
                   <Button
                     size="sm"
