@@ -6,7 +6,7 @@ import { useNavigate } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import { Button } from '@/components/ui/button';
 import GlassCard from '@/components/ui/GlassCard';
-import { Trophy, Home, Loader2, Medal } from 'lucide-react';
+import { Trophy, Home, Loader2, Medal, BarChart2 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
 export default function TeacherLiveQuizResults() {
@@ -174,13 +174,21 @@ export default function TeacherLiveQuizResults() {
             </div>
           </GlassCard>
 
-          <div className="text-center">
+          <div className="flex items-center justify-center gap-3">
             <Button
-              onClick={() => navigate(createPageUrl('TeacherDashboard'))}
+              onClick={() => navigate(createPageUrl(`TeacherResults?sessionId=${sessionId}`))}
               className="bg-gradient-to-r from-purple-500 to-blue-500"
             >
+              <BarChart2 className="w-5 h-5 mr-2" />
+              Detailed Analytics
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => navigate(createPageUrl('TeacherDashboard'))}
+              className="border-white/20 text-slate-300 hover:text-white"
+            >
               <Home className="w-5 h-5 mr-2" />
-              Back to Dashboard
+              Dashboard
             </Button>
           </div>
         </motion.div>

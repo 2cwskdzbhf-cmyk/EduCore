@@ -14,6 +14,7 @@ import { AuthProvider, useAuth } from "@/lib/AuthContext";
 import UserNotRegisteredError from "@/components/UserNotRegisteredError";
 
 import mathsContent from "@/components/data/mathsContent";
+import TeacherResults from "./pages/TeacherResults";
 
 const { Pages, Layout, mainPage } = pagesConfig;
 
@@ -73,6 +74,7 @@ const AuthenticatedApp = () => {
           }
         />
       ))}
+      <Route path="/TeacherResults" element={<LayoutWrapper currentPageName="TeacherResults"><TeacherResults /></LayoutWrapper>} />
       <Route path="*" element={<PageNotFound />} />
     </Routes>
   );
