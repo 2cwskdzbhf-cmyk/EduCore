@@ -95,23 +95,34 @@ export default function GlobalQuestionBankDialog({ open, onClose, onAddQuestions
     if (!selected.length) { toast.error('Select at least one question'); return; }
 
     const mapped = selected.map(q => {
-      // Support both old GlobalQuestion schema (choices) and new seeds (options)
+      // Normalize question type from various possible formats
+      const origType = q.question_type || 'mcq';
+      const normalizedType = origType === 'multiple_choice' ? 'mcq' : origType === 'numeric' ? 'short_answer' : origType;
+      
+      // Get choices/options array
       const rawChoices = Array.isArray(q.choices) && q.choices.length > 0 ? q.choices
         : Array.isArray(q.options) && q.options.length > 0 ? q.options : [];
-      const isMCQ = (q.question_type === 'mcq' || q.question_type === 'multiple_choice') && rawChoices.length > 0;
+      
+      // Determine if this is truly an MCQ: must be type 'mcq'/'multiple_choice' AND have 2+ choices
+      const isMCQ = (origType === 'mcq' || origType === 'multiple_choice') && rawChoices.length >= 2;
 
       if (isMCQ) {
+        // MCQ: use up to 4 options with correct_index
         const opts = rawChoices.length >= 4 ? rawChoices.slice(0, 4) : [...rawChoices, ...Array(4 - rawChoices.length).fill('—')];
-        let correctIndex = typeof q.correct_index === 'number' ? q.correct_index : -1;
+        let correctIndex = typeof q.correct_index === 'number' && q.correct_index >= 0 ? q.correct_index : -1;
+        
+        // If no correct_index, find by matching correct_answer text
         if (correctIndex < 0 && q.correct_answer) {
           correctIndex = opts.findIndex(c => String(c).toLowerCase().trim() === String(q.correct_answer).toLowerCase().trim());
         }
+        correctIndex = Math.max(0, correctIndex);
+        
         return {
           prompt: q.question_text || '',
           question_type: 'multiple_choice',
           options: opts,
-          correct_index: Math.max(0, correctIndex),
-          correct_answer: opts[Math.max(0, correctIndex)] || q.correct_answer || '',
+          correct_index: correctIndex,
+          correct_answer: opts[correctIndex] || q.correct_answer || '',
           difficulty: q.difficulty || 'medium',
           explanation: q.explanation || '',
           tags: [],
@@ -120,7 +131,24 @@ export default function GlobalQuestionBankDialog({ open, onClose, onAddQuestions
           source_global_id: q.id,
           _isDraft: false
         };
+      } else if (origType === 'true_false' || origType === 'tf') {
+        // True/False: binary options
+        return {
+          prompt: q.question_text || '',
+          question_type: 'true_false',
+          options: ['True', 'False'],
+          correct_index: String(q.correct_answer).toLowerCase() === 'true' ? 0 : 1,
+          correct_answer: q.correct_answer || 'True',
+          difficulty: q.difficulty || 'medium',
+          explanation: q.explanation || '',
+          tags: [],
+          image_url: '',
+          option_images: ['', ''],
+          source_global_id: q.id,
+          _isDraft: false
+        };
       } else {
+        // Short answer, numeric, written answer - preserve as short_answer
         return {
           prompt: q.question_text || '',
           question_type: 'short_answer',
