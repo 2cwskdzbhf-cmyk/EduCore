@@ -64,10 +64,10 @@ export default function PersonalizedLearningPath({ studentEmail, classId }) {
   if (!learningPath) {
     return (
       <Card className="bg-white/5 border-white/10">
-        <CardContent className="p-8 text-center">
-          <AlertCircle className="w-12 h-12 text-slate-400 mx-auto mb-4" />
-          <p className="text-slate-400">Complete some quizzes to get personalized recommendations!</p>
-        </CardContent>
+        
+
+
+        
       </Card>);
 
   }
