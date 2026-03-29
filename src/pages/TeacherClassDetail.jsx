@@ -395,37 +395,45 @@ export default function TeacherClassDetail() {
               <span>{subject?.name}</span>
             </div>
             
-            <GlassCard className="p-4 inline-block">
-              <div className="flex items-center gap-3">
-                <div>
-                  <p className="text-xs text-slate-500 mb-1">Class Join Code</p>
-                  <p className="text-2xl font-bold text-white font-mono tracking-wider">{classData.join_code}</p>
-                </div>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => copyJoinCode(classData.join_code)}
-                  className="border-white/20 text-white hover:bg-white/10"
-                >
-                  {copiedCode ? (
-                    <>
-                      <CheckCircle2 className="w-4 h-4 mr-1" />
-                      Copied!
-                    </>
-                  ) : (
-                    'Copy Code'
-                  )}
-                </Button>
+            <div className="inline-flex items-center gap-4 bg-white/5 border border-white/10 rounded-2xl px-5 py-4 backdrop-blur-sm">
+              <div>
+                <p className="text-xs text-slate-500 mb-1 uppercase tracking-widest">Class Join Code</p>
+                <p className="text-3xl font-bold text-white font-mono tracking-[0.2em]">{classData.join_code}</p>
               </div>
-            </GlassCard>
+              <Button
+                size="sm"
+                onClick={() => copyJoinCode(classData.join_code)}
+                className={`transition-all duration-300 ${copiedCode
+                  ? 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-lg shadow-emerald-500/30'
+                  : 'bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 text-white shadow-lg shadow-purple-500/30'
+                }`}
+              >
+                {copiedCode ? (
+                  <>
+                    <CheckCircle2 className="w-4 h-4 mr-1.5" />
+                    Copied!
+                  </>
+                ) : (
+                  'Copy Code'
+                )}
+              </Button>
+            </div>
           </div>
 
           <Tabs defaultValue="setAssignments" className="space-y-6">
-            <TabsList className="bg-white/5 border border-white/10">
-              <TabsTrigger value="setAssignments">Set Assignments</TabsTrigger>
-              <TabsTrigger value="practice">Create</TabsTrigger>
-              <TabsTrigger value="live">Live Quizzes</TabsTrigger>
-              <TabsTrigger value="analytics">Analytics</TabsTrigger>
+            <TabsList className="bg-white/5 border border-white/10 h-auto p-1 flex flex-wrap gap-1">
+              <TabsTrigger value="setAssignments" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-500 data-[state=active]:to-blue-500 data-[state=active]:text-white">
+                📋 Active Assignments
+              </TabsTrigger>
+              <TabsTrigger value="practice" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-500 data-[state=active]:to-blue-500 data-[state=active]:text-white">
+                ✏️ Create Assignment
+              </TabsTrigger>
+              <TabsTrigger value="live" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-500 data-[state=active]:to-blue-500 data-[state=active]:text-white">
+                ⚡ Live Quizzes
+              </TabsTrigger>
+              <TabsTrigger value="analytics" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-500 data-[state=active]:to-blue-500 data-[state=active]:text-white">
+                📊 Analytics
+              </TabsTrigger>
             </TabsList>
 
             {/* Create Tab */}
@@ -1036,101 +1044,12 @@ export default function TeacherClassDetail() {
 
             {/* Analytics Tab */}
             <TabsContent value="analytics" className="space-y-6">
-              <GlassCard className="p-6">
-                <h3 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
-                  <Trophy className="w-6 h-6 text-amber-400" />
-                  Class Leaderboard
-                </h3>
-
-                {classData?.student_emails && classData.student_emails.length > 0 ? (
-                  classStudents.length > 0 ? (
-                  <div className="space-y-2">
-                    {classStudents
-                      .map(student => {
-                        const studentSubmissions = submissions.filter(s => s.student_email === student.email);
-                        const totalQuestions = studentSubmissions.reduce((sum, s) => sum + (s.questions_answered || 0), 0);
-                        const totalCorrect = studentSubmissions.reduce((sum, s) => sum + (s.correct_answers || 0), 0);
-                        const totalTimeSeconds = studentSubmissions.reduce((sum, s) => sum + (s.time_spent_seconds || 0), 0);
-                        const accuracy = totalQuestions > 0 ? (totalCorrect / totalQuestions) * 100 : 0;
-                        const completedCount = studentSubmissions.filter(s => s.status === 'submitted' || s.status === 'graded').length;
-
-                        return {
-                          ...student,
-                          accuracy,
-                          totalQuestions,
-                          totalCorrect,
-                          totalTimeSeconds,
-                          completedCount
-                        };
-                      })
-                      .sort((a, b) => {
-                        // Sort by accuracy descending, but put students with no activity at the bottom
-                        if (a.totalQuestions === 0 && b.totalQuestions > 0) return 1;
-                        if (a.totalQuestions > 0 && b.totalQuestions === 0) return -1;
-                        return b.accuracy - a.accuracy;
-                      })
-                      .map((student, index) => (
-                        <div
-                          key={student.id}
-                          className="bg-white/5 hover:bg-white/10 rounded-xl p-4 border border-white/10 cursor-pointer transition-all"
-                          onClick={() => setSelectedStudent(student)}
-                        >
-                          <div className="flex items-center gap-4">
-                            <div className="flex items-center justify-center w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 text-white font-bold flex-shrink-0">
-                              {index + 1}
-                            </div>
-
-                            <div className="flex-1 min-w-0">
-                              <p className="text-white font-medium truncate">{student.full_name}</p>
-                              <p className="text-xs text-slate-400 truncate">{student.email}</p>
-                            </div>
-
-                            <div className="grid grid-cols-5 gap-6 text-center">
-                              <div>
-                                <p className="text-xs text-slate-500 mb-1">Accuracy</p>
-                                <p className="text-lg font-bold text-white">
-                                  {student.totalQuestions > 0 ? `${student.accuracy.toFixed(1)}%` : '—'}
-                                </p>
-                              </div>
-                              <div>
-                                <p className="text-xs text-slate-500 mb-1">Questions</p>
-                                <p className="text-lg font-bold text-white">{student.totalQuestions}</p>
-                              </div>
-                              <div>
-                                <p className="text-xs text-slate-500 mb-1">Completed</p>
-                                <p className="text-lg font-bold text-white">{student.completedCount}</p>
-                              </div>
-                              <div>
-                                <p className="text-xs text-slate-500 mb-1">Time</p>
-                                <p className="text-lg font-bold text-white">
-                                  {Math.floor(student.totalTimeSeconds / 60)}m
-                                </p>
-                              </div>
-                              <div>
-                                <p className="text-xs text-slate-500 mb-1">Avg/Q</p>
-                                <p className="text-lg font-bold text-white">
-                                  {student.totalQuestions > 0 ? formatTime(Math.floor(student.totalTimeSeconds / student.totalQuestions)) : '—'}
-                                </p>
-                              </div>
-                            </div>
-
-                            <Eye className="w-5 h-5 text-slate-400 flex-shrink-0" />
-                          </div>
-                        </div>
-                      ))}
-                  </div>
-                  ) : (
-                    <div className="text-center py-8">
-                      <p className="text-slate-400 mb-2">Loading student data...</p>
-                      <p className="text-xs text-slate-500">
-                        {classData.student_emails.length} student(s) enrolled
-                      </p>
-                    </div>
-                  )
-                ) : (
-                  <p className="text-slate-400 text-center py-8">No students in this class yet</p>
-                )}
-              </GlassCard>
+              <ClassLeaderboard
+                classData={classData}
+                submissions={submissions}
+                assignments={assignments}
+                onSelectStudent={setSelectedStudent}
+              />
             </TabsContent>
           </Tabs>
         </motion.div>
@@ -1231,6 +1150,166 @@ export default function TeacherClassDetail() {
   );
 }
 
+function formatTime(seconds) {
+  if (!seconds || seconds === 0) return '0s';
+  const mins = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  if (mins === 0) return `${secs}s`;
+  return secs > 0 ? `${mins}m ${secs}s` : `${mins}m`;
+}
+
+function ClassLeaderboard({ classData, submissions, assignments, onSelectStudent }) {
+  const studentEmails = classData?.student_emails || [];
+
+  const { data: progressList = [], isLoading } = useQuery({
+    queryKey: ['classStudentProgress', classData?.id],
+    queryFn: async () => {
+      if (studentEmails.length === 0) return [];
+      const all = await base44.entities.StudentProgress.list();
+      return all.filter(p => studentEmails.includes(p.student_email));
+    },
+    enabled: studentEmails.length > 0,
+  });
+
+  if (studentEmails.length === 0) {
+    return (
+      <GlassCard className="p-12 text-center">
+        <Users className="w-12 h-12 text-slate-600 mx-auto mb-4" />
+        <p className="text-slate-400">No students in this class yet</p>
+      </GlassCard>
+    );
+  }
+
+  // Build leaderboard from submissions (works immediately, no User entity needed)
+  const leaderboard = studentEmails.map(email => {
+    const studentSubs = submissions.filter(s => s.student_email === email);
+    const progress = progressList.find(p => p.student_email === email);
+    const totalQ = studentSubs.reduce((s, sub) => s + (sub.questions_answered || 0), 0);
+    const totalCorrect = studentSubs.reduce((s, sub) => s + (sub.correct_answers || 0), 0);
+    const completed = studentSubs.filter(s => s.status === 'submitted' || s.status === 'graded').length;
+    const accuracy = totalQ > 0 ? (totalCorrect / totalQ) * 100 : 0;
+    const streak = progress?.current_streak || 0;
+    const displayName = progress?.student_email?.split('@')[0] || email.split('@')[0];
+
+    return { email, displayName, accuracy, totalQ, totalCorrect, completed, streak, progress };
+  }).sort((a, b) => {
+    if (a.totalQ === 0 && b.totalQ > 0) return 1;
+    if (a.totalQ > 0 && b.totalQ === 0) return -1;
+    return b.accuracy - a.accuracy;
+  });
+
+  const medalColors = ['from-amber-400 to-yellow-500', 'from-slate-300 to-slate-400', 'from-amber-600 to-orange-700'];
+  const medalEmojis = ['🥇', '🥈', '🥉'];
+
+  return (
+    <GlassCard className="p-6">
+      <div className="flex items-center justify-between mb-6">
+        <h3 className="text-2xl font-bold text-white flex items-center gap-2">
+          <Trophy className="w-6 h-6 text-amber-400" />
+          Class Leaderboard
+        </h3>
+        <span className="text-sm text-slate-400">{studentEmails.length} students enrolled</span>
+      </div>
+
+      {/* Top 3 podium */}
+      {leaderboard.filter(s => s.totalQ > 0).length >= 3 && (
+        <div className="grid grid-cols-3 gap-3 mb-6">
+          {[leaderboard[1], leaderboard[0], leaderboard[2]].map((s, podiumIdx) => {
+            if (!s) return null;
+            const rank = podiumIdx === 1 ? 0 : podiumIdx === 0 ? 1 : 2;
+            const heights = ['h-20', 'h-28', 'h-16'];
+            const actualRank = leaderboard.indexOf(s);
+            return (
+              <div key={s.email} className={`flex flex-col items-center justify-end ${heights[podiumIdx]}`}>
+                <div className="text-2xl mb-1">{medalEmojis[actualRank]}</div>
+                <div className={`w-full rounded-t-xl bg-gradient-to-b ${medalColors[actualRank]} flex flex-col items-center justify-center py-3 px-2`}>
+                  <p className="text-white font-bold text-sm truncate max-w-full px-1">{s.displayName}</p>
+                  <p className="text-white/80 text-xs">{s.accuracy.toFixed(0)}%</p>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      <div className="space-y-2">
+        {leaderboard.map((student, index) => {
+          const hasActivity = student.totalQ > 0;
+          return (
+            <motion.div
+              key={student.email}
+              initial={{ opacity: 0, x: -10 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: index * 0.03 }}
+              className="flex items-center gap-4 p-4 rounded-xl border border-white/10 bg-white/[0.03] hover:bg-white/[0.08] transition-all cursor-pointer group"
+              onClick={() => onSelectStudent({ email: student.email, full_name: student.displayName, ...student.progress })}
+            >
+              {/* Rank */}
+              <div className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm flex-shrink-0 ${
+                index === 0 ? 'bg-gradient-to-br from-amber-400 to-yellow-500 text-white shadow-lg shadow-amber-500/30' :
+                index === 1 ? 'bg-gradient-to-br from-slate-300 to-slate-400 text-slate-800' :
+                index === 2 ? 'bg-gradient-to-br from-amber-600 to-orange-700 text-white' :
+                'bg-white/10 text-slate-400'
+              }`}>
+                {index < 3 ? ['🥇','🥈','🥉'][index] : index + 1}
+              </div>
+
+              {/* Name */}
+              <div className="flex-1 min-w-0">
+                <p className="text-white font-medium truncate">{student.displayName}</p>
+                <p className="text-xs text-slate-500 truncate">{student.email}</p>
+              </div>
+
+              {/* Stats */}
+              {hasActivity ? (
+                <div className="flex items-center gap-6 text-center">
+                  <div>
+                    <p className="text-xs text-slate-500 mb-0.5">Accuracy</p>
+                    <p className={`text-base font-bold ${student.accuracy >= 80 ? 'text-emerald-400' : student.accuracy >= 60 ? 'text-amber-400' : 'text-red-400'}`}>
+                      {student.accuracy.toFixed(1)}%
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-500 mb-0.5">Questions</p>
+                    <p className="text-base font-bold text-white">{student.totalQ}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-500 mb-0.5">Completed</p>
+                    <p className="text-base font-bold text-white">{student.completed}</p>
+                  </div>
+                  {student.streak > 0 && (
+                    <div>
+                      <p className="text-xs text-slate-500 mb-0.5">Streak</p>
+                      <p className="text-base font-bold text-orange-400">🔥{student.streak}</p>
+                    </div>
+                  )}
+                  {/* Accuracy bar */}
+                  <div className="w-24 hidden md:block">
+                    <div className="h-2 bg-white/10 rounded-full overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all ${student.accuracy >= 80 ? 'bg-emerald-400' : student.accuracy >= 60 ? 'bg-amber-400' : 'bg-red-400'}`}
+                        style={{ width: `${Math.min(100, student.accuracy)}%` }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-xs text-slate-600 italic">No activity yet</p>
+              )}
+
+              <Eye className="w-4 h-4 text-slate-600 group-hover:text-slate-400 flex-shrink-0 transition-colors" />
+            </motion.div>
+          );
+        })}
+      </div>
+
+      {isLoading && (
+        <div className="text-center py-4 text-slate-500 text-sm">Loading progress data…</div>
+      )}
+    </GlassCard>
+  );
+}
+
 function AssignmentProgressModal({ assignment, classStudents, submissions, topics, onClose, onViewStudent }) {
   const topicName = assignment.custom_topic_name || 
     (assignment.topic_id ? topics.find(t => t.id === assignment.topic_id)?.name : 'No topic');
@@ -1270,14 +1349,6 @@ function AssignmentProgressModal({ assignment, classStudents, submissions, topic
       lastActivity: submission.updated_date
     };
   });
-
-  const formatTime = (seconds) => {
-    if (seconds === 0) return '0s';
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    if (mins === 0) return `${secs}s`;
-    return secs > 0 ? `${mins}m ${secs}s` : `${mins}m`;
-  };
 
   return (
     <motion.div
