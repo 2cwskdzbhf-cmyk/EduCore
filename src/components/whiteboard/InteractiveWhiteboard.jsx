@@ -60,6 +60,8 @@ export default function InteractiveWhiteboard({
   const [isMultiSelect, setIsMultiSelect] = useState(false);
   const [dragSelectStart, setDragSelectStart] = useState(null);
   const [activeGuides, setActiveGuides] = useState({ vertical: null, horizontal: null });
+  const [lastClickTime, setLastClickTime] = useState(null);
+  const [lastClickIdx, setLastClickIdx] = useState(null);
 
   const saveWhiteboardMutation = useMutation({
     mutationFn: async () => {
@@ -221,6 +223,24 @@ export default function InteractiveWhiteboard({
       }
 
       if (clickedIdx >= 0) {
+        // Check for double-click to edit text
+        if (strokes[clickedIdx].type === 'text' && Date.now() - (lastClickTime || 0) < 300 && lastClickIdx === clickedIdx) {
+          setEditingTextIdx(clickedIdx);
+          setInlineTextValue(strokes[clickedIdx].content);
+          const rect = canvasRef.current.getBoundingClientRect();
+          setInputPosition({ 
+            x: strokes[clickedIdx].x, 
+            y: strokes[clickedIdx].y, 
+            canvasX: rect.left, 
+            canvasY: rect.top, 
+            idx: clickedIdx 
+          });
+          setTimeout(() => inlineInputRef.current?.focus(), 0);
+          setLastClickTime(Date.now());
+          setLastClickIdx(clickedIdx);
+          return;
+        }
+        
         if (isShiftClick) {
           // Toggle selection with shift
           if (selectedIndices.includes(clickedIdx)) {
@@ -235,10 +255,13 @@ export default function InteractiveWhiteboard({
         // Start dragging selected objects
         setIsDragging(true);
         setDragStart({ x: offsetX, y: offsetY });
+        setLastClickTime(Date.now());
+        setLastClickIdx(clickedIdx);
       } else {
         // Click on empty space - start drag selection
         if (!isShiftClick) setSelectedIndices([]);
         setDragSelectStart({ x: offsetX, y: offsetY });
+        setLastClickIdx(null);
       }
       return;
     }
@@ -255,6 +278,7 @@ export default function InteractiveWhiteboard({
         color: textColor,
         size: textFontSize,
         font: textFont,
+        rotation: 0,
         timestamp: new Date().toISOString(),
         drawn_by: 'user'
       };
@@ -263,8 +287,15 @@ export default function InteractiveWhiteboard({
       setStrokes(newStrokes);
       setEditingTextIdx(newIdx);
       setInlineTextValue('');
-      setInputPosition({ x: offsetX, y: offsetY, canvasX: 0, canvasY: 0, idx: newIdx });
-      // Priority focus with multiple attempts to ensure capture
+      const rect = canvasRef.current?.getBoundingClientRect();
+      setInputPosition({ 
+        x: offsetX, 
+        y: offsetY, 
+        canvasX: rect?.left || 0, 
+        canvasY: rect?.top || 0, 
+        idx: newIdx 
+      });
+      // Ensure focus with proper timing
       setTimeout(() => {
         if (inlineInputRef.current) {
           inlineInputRef.current.focus();
@@ -766,12 +797,14 @@ export default function InteractiveWhiteboard({
             pointerEvents: 'auto'
           }}
           onMouseDown={(e) => e.stopPropagation()}
+          onContextMenu={(e) => e.stopPropagation()}
         >
-          <div className="bg-slate-950 border border-white/20 rounded p-2 shadow-lg w-56 space-y-2">
+          <div className="bg-slate-950 border-2 border-purple-500/50 rounded p-2 shadow-xl shadow-purple-500/20 space-y-2">
             <input
               ref={inlineInputRef}
               autoFocus
               autoComplete="off"
+              spellCheck="false"
               type="text"
               value={textInput}
               onChange={(e) => {
@@ -793,7 +826,6 @@ export default function InteractiveWhiteboard({
                 }
                 setInputPosition(null);
                 setEditingTextIdx(null);
-                setTextMode(false);
               }}
               onKeyDown={(e) => {
                 e.stopPropagation();
@@ -805,16 +837,14 @@ export default function InteractiveWhiteboard({
                   }
                   setInputPosition(null);
                   setEditingTextIdx(null);
-                  setTextMode(false);
                 }
                 if (e.key === 'Escape') {
                   setInputPosition(null);
                   setEditingTextIdx(null);
-                  setTextMode(false);
                 }
               }}
               placeholder="Type text..."
-              className="w-full bg-white/5 border border-white/10 text-white rounded px-2 py-1 text-sm outline-none focus:border-white/30 focus:ring-1 focus:ring-white/50"
+              className="w-full bg-white/5 border border-white/10 text-white rounded px-2 py-1 text-sm outline-none focus:border-purple-400/50 focus:ring-1 focus:ring-purple-400/30"
               style={{ fontSize: textFontSize + 'px', fontFamily: textFont, color: textColor, width: Math.max(150, textInput.length * (textFontSize * 0.6)) + 'px' }}
             />
 
