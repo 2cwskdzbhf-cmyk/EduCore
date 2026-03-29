@@ -45,6 +45,7 @@ export default function AssignmentBuilder() {
   const [selectedTopic, setSelectedTopic] = useState('');
   const [customTopicName, setCustomTopicName] = useState('');
   const [dueDate, setDueDate] = useState('');
+  const [showLeaderboard, setShowLeaderboard] = useState(true);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [questions, setQuestions] = useState([
     {
@@ -121,6 +122,7 @@ export default function AssignmentBuilder() {
       }
 
       setOriginalQuizId(existingAssignment.quiz_id);
+      setShowLeaderboard(existingAssignment.show_leaderboard !== false);
 
       const loadedQuestions = existingQuestions.map((q, idx) => ({
         id: idx + 1,
@@ -283,7 +285,8 @@ export default function AssignmentBuilder() {
         const assignmentData = {
           title: assignmentTitle,
           status: 'published',
-          max_points: questionsToSave.length * 10
+          max_points: questionsToSave.length * 10,
+          show_leaderboard: showLeaderboard
         };
         if (selectedTopic === 'custom' && customTopicName.trim()) {
           assignmentData.custom_topic_name = customTopicName.trim();
@@ -314,7 +317,8 @@ export default function AssignmentBuilder() {
           quiz_id: quizSet.id,
           assignment_type: 'quiz',
           status: 'published',
-          max_points: questionsToSave.length * 10
+          max_points: questionsToSave.length * 10,
+          show_leaderboard: showLeaderboard
         };
         if (selectedTopic === 'custom' && customTopicName.trim()) {
           assignmentData.custom_topic_name = customTopicName.trim();
@@ -618,15 +622,30 @@ export default function AssignmentBuilder() {
           )}
 
           {!isLiveMode && (
-            <div className="mt-4">
-              <Label className="text-white mb-2">Due Date (Optional)</Label>
-              <Input
-                type="datetime-local"
-                value={dueDate}
-                onChange={(e) => setDueDate(e.target.value)}
-                className="bg-white/5 border-white/10 text-white"
-              />
-            </div>
+            <>
+              <div className="mt-4">
+                <Label className="text-white mb-2">Due Date (Optional)</Label>
+                <Input
+                  type="datetime-local"
+                  value={dueDate}
+                  onChange={(e) => setDueDate(e.target.value)}
+                  className="bg-white/5 border-white/10 text-white"
+                />
+              </div>
+
+              <div className="mt-4 p-4 bg-white/5 rounded-xl border border-white/10">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label className="text-white">Show Class Leaderboard</Label>
+                    <p className="text-xs text-slate-400 mt-1">Students will see how they rank compared to classmates</p>
+                  </div>
+                  <Switch
+                    checked={showLeaderboard}
+                    onCheckedChange={setShowLeaderboard}
+                  />
+                </div>
+              </div>
+            </>
           )}
         </GlassCard>
 

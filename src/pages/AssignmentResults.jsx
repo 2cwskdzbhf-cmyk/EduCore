@@ -173,6 +173,7 @@ export default function AssignmentResults() {
         </div>
 
         {/* Leaderboard */}
+        {assignment?.show_leaderboard !== false && (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -238,6 +239,7 @@ export default function AssignmentResults() {
             </div>
           </GlassCard>
         </motion.div>
+        )}
 
         {/* Action Buttons */}
         <div className="flex gap-3 justify-center mt-8">

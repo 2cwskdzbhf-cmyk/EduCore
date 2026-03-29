@@ -1,0 +1,158 @@
+{
+  "name": "Assignment",
+  "type": "object",
+  "properties": {
+    "title": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string"
+    },
+    "instructions": {
+      "type": "string",
+      "description": "Detailed instructions in markdown"
+    },
+    "class_id": {
+      "type": "string"
+    },
+    "teacher_email": {
+      "type": "string"
+    },
+    "subject_id": {
+      "type": "string"
+    },
+    "topic_id": {
+      "type": "string"
+    },
+    "custom_topic_name": {
+      "type": "string",
+      "description": "Custom topic name that only applies to this assignment"
+    },
+    "assignment_type": {
+      "type": "string",
+      "enum": [
+        "quiz",
+        "written",
+        "project",
+        "worksheet",
+        "homework",
+        "classwork"
+      ],
+      "description": "Type of assignment"
+    },
+    "quiz_id": {
+      "type": "string",
+      "description": "Linked quiz for quiz-type assignments"
+    },
+    "resources": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "slide",
+              "pdf",
+              "video",
+              "link",
+              "document",
+              "image"
+            ]
+          },
+          "title": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          }
+        }
+      },
+      "description": "Attached resources (slides, PDFs, links)"
+    },
+    "due_date": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "available_from": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "available_until": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "max_points": {
+      "type": "number"
+    },
+    "difficulty": {
+      "type": "string",
+      "enum": [
+        "foundation",
+        "intermediate",
+        "higher",
+        "mixed"
+      ]
+    },
+    "estimated_minutes": {
+      "type": "number"
+    },
+    "ai_help_enabled": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether AI assistance is allowed"
+    },
+    "allow_late_submission": {
+      "type": "boolean",
+      "default": false
+    },
+    "late_penalty_percent": {
+      "type": "number",
+      "description": "Percentage deducted for late work"
+    },
+    "rubric": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "criteria": {
+            "type": "string"
+          },
+          "max_points": {
+            "type": "number"
+          },
+          "description": {
+            "type": "string"
+          }
+        }
+      },
+      "description": "Grading rubric for written assignments"
+    },
+    "show_leaderboard": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether to show class leaderboard to students after completion"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "draft",
+        "published",
+        "closed",
+        "archived"
+      ],
+      "default": "draft"
+    }
+  },
+  "required": [
+    "title",
+    "class_id",
+    "teacher_email"
+  ]
+}
