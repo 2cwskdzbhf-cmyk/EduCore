@@ -1,0 +1,74 @@
+{
+  "name": "User",
+  "type": "object",
+  "properties": {
+    "user_type": {
+      "type": "string",
+      "enum": [
+        "student",
+        "teacher",
+        "admin"
+      ],
+      "description": "User role in the system"
+    },
+    "year_group": {
+      "type": "number",
+      "description": "For students: year group (7-11)"
+    },
+    "subjects": {
+      "type": "array",
+      "description": "Subject IDs the user is enrolled in or teaches",
+      "items": {
+        "type": "string"
+      }
+    },
+    "avatar_url": {
+      "type": "string"
+    },
+    "date_of_birth": {
+      "type": "string",
+      "format": "date",
+      "description": "User's date of birth"
+    },
+    "bio": {
+      "type": "string",
+      "description": "Bio or description about the user"
+    },
+    "interests": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "User's interests and hobbies"
+    },
+    "career_goal": {
+      "type": "string",
+      "description": "Desired job/career for the future"
+    },
+    "theme": {
+      "type": "string",
+      "enum": [
+        "dark",
+        "light"
+      ],
+      "default": "dark",
+      "description": "UI theme preference"
+    },
+    "notifications_enabled": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether notifications are enabled"
+    },
+    "email_notifications": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether email notifications are enabled"
+    }
+  },
+  "required": [
+    "user_type",
+    "year_group",
+    "subjects",
+    "avatar_url"
+  ]
+}

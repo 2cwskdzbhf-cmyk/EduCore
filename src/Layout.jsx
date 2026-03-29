@@ -14,10 +14,12 @@ import {
   Users,
   ClipboardList,
   Shield,
-  BarChart3
+  BarChart3,
+  User as UserIcon
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import ProfileModal from '@/components/profile/ProfileModal';
 
 export default function Layout({ children, currentPageName }) {
   const navigate = useNavigate();
@@ -25,6 +27,7 @@ export default function Layout({ children, currentPageName }) {
   const [loading, setLoading] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [sidebarExpanded, setSidebarExpanded] = useState(false);
+  const [profileModalOpen, setProfileModalOpen] = useState(false);
 
   const publicPages = ['Landing'];
   const authOnlyPages = ['Onboarding'];
@@ -214,12 +217,19 @@ export default function Layout({ children, currentPageName }) {
           "border-t border-white/10",
           sidebarExpanded ? "p-4" : "py-4 flex flex-col items-center"
         )}>
-            <div className={cn(
-              "flex items-center",
-              sidebarExpanded ? "gap-3 overflow-hidden mb-3" : "justify-center mb-3"
-            )}>
-              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center text-white font-bold flex-shrink-0 shadow-lg shadow-purple-500/50">
-                {user.full_name?.charAt(0) || user.email?.charAt(0) || '?'}
+            <button
+              onClick={() => setProfileModalOpen(true)}
+              className={cn(
+                "w-full rounded-xl transition-all duration-300 mb-3 hover:bg-white/10 flex items-center",
+                sidebarExpanded ? "gap-3 overflow-hidden p-2" : "justify-center p-2"
+              )}
+            >
+              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center text-white font-bold flex-shrink-0 shadow-lg shadow-purple-500/50 overflow-hidden">
+                {user.avatar_url ? (
+                  <img src={user.avatar_url} alt="Avatar" className="w-full h-full object-cover" />
+                ) : (
+                  user.full_name?.charAt(0) || user.email?.charAt(0) || '?'
+                )}
               </div>
               <motion.div 
                 className="flex-1 min-w-0"
@@ -230,10 +240,10 @@ export default function Layout({ children, currentPageName }) {
                 }}
                 transition={{ duration: 0.3 }}
               >
-                <p className="font-medium text-white truncate text-sm">{user.full_name || 'User'}</p>
-                <p className="text-xs text-slate-400 truncate capitalize">{user.user_type || user.role || 'User'}</p>
+                <p className="font-medium text-white truncate text-sm text-left">{user.full_name || 'User'}</p>
+                <p className="text-xs text-slate-400 truncate capitalize text-left">{user.user_type || user.role || 'User'}</p>
               </motion.div>
-            </div>
+            </button>
           <Button 
             variant="ghost" 
             className={cn(
@@ -256,12 +266,20 @@ export default function Layout({ children, currentPageName }) {
             </div>
             <span className="text-lg font-bold bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">EduCore</span>
           </Link>
-          <button
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="p-2 rounded-lg hover:bg-white/10 text-white"
-          >
-            {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setProfileModalOpen(true)}
+              className="p-2 rounded-lg hover:bg-white/10 text-slate-400 hover:text-white transition-colors"
+            >
+              <UserIcon className="w-5 h-5" />
+            </button>
+            <button
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="p-2 rounded-lg hover:bg-white/10 text-white"
+            >
+              {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+            </button>
+          </div>
         </div>
       </header>
 
@@ -333,6 +351,19 @@ export default function Layout({ children, currentPageName }) {
       )}>
         {children}
       </main>
+
+      <ProfileModal
+        open={profileModalOpen}
+        onClose={() => setProfileModalOpen(false)}
+        user={user}
+        onUpdateUser={() => {
+          const refreshUser = async () => {
+            const userData = await base44.auth.me();
+            setUser(userData);
+          };
+          refreshUser();
+        }}
+      />
     </div>
   );
 }
