@@ -23,7 +23,8 @@ import {
   X,
   Loader2,
   Zap,
-  Brain } from
+  Brain,
+  ExternalLink } from
 'lucide-react';
 
 export default function StudentDashboard() {
@@ -178,6 +179,58 @@ export default function StudentDashboard() {
     enabled: !!user?.email
   });
 
+  const { data: timetableLessons = [] } = useQuery({
+    queryKey: ['timetableLessons', user?.email],
+    queryFn: async () => {
+      if (!user?.email) return [];
+      return base44.entities.TimetableLesson.filter({ student_email: user.email }, '-created_date');
+    },
+    enabled: !!user?.email
+  });
+
+  const [timeUntilNext, setTimeUntilNext] = useState('');
+
+  useEffect(() => {
+    const updateCountdown = () => {
+      const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+      const todayDay = days[new Date().getDay()];
+      
+      const todayLessons = timetableLessons.filter(l => l.day_of_week === todayDay);
+      if (todayLessons.length === 0) {
+        setTimeUntilNext('');
+        return;
+      }
+
+      const now = new Date();
+      const currentTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+      
+      const nextLesson = todayLessons
+        .filter(l => l.start_time && l.start_time > currentTime)
+        .sort((a, b) => a.start_time.localeCompare(b.start_time))[0];
+
+      if (nextLesson && nextLesson.start_time) {
+        const [hours, mins] = nextLesson.start_time.split(':').map(Number);
+        const lessonTime = new Date();
+        lessonTime.setHours(hours, mins, 0);
+        const diff = lessonTime - now;
+        
+        if (diff > 0) {
+          const minsUntil = Math.floor(diff / 60000);
+          if (minsUntil < 60) {
+            setTimeUntilNext(`${minsUntil} min${minsUntil !== 1 ? 's' : ''}`);
+          } else {
+            const hoursUntil = Math.floor(minsUntil / 60);
+            setTimeUntilNext(`${hoursUntil}h ${minsUntil % 60}m`);
+          }
+        }
+      }
+    };
+
+    updateCountdown();
+    const timer = setInterval(updateCountdown, 60000);
+    return () => clearInterval(timer);
+  }, [timetableLessons]);
+
   const avgResponseTime =
   recentAttempts.length > 0 ?
   Math.round(recentAttempts.reduce((sum, a) => sum + (a.time_taken_seconds || 0), 0) / recentAttempts.length) :
@@ -242,6 +295,23 @@ export default function StudentDashboard() {
 
   const trend = getAccuracyTrend();
   const dueAssignments = getDueAssignments();
+
+  const getNextLesson = () => {
+    const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const todayDay = days[new Date().getDay()];
+    const todayLessons = timetableLessons.filter(l => l.day_of_week === todayDay);
+    
+    if (todayLessons.length === 0) return null;
+
+    const now = new Date();
+    const currentTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+    
+    return todayLessons
+      .filter(l => l.start_time && l.start_time > currentTime)
+      .sort((a, b) => a.start_time.localeCompare(b.start_time))[0] || null;
+  };
+
+  const nextLesson = getNextLesson();
 
   const handleJoinClass = async () => {
     if (!classJoinCode || !user?.email) return;
@@ -476,7 +546,7 @@ export default function StudentDashboard() {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4 }}
+          transition={{ delay: nextLesson ? 0.5 : 0.4 }}
           className="mb-8">
           
           <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2 drop-shadow-lg">
@@ -543,7 +613,7 @@ export default function StudentDashboard() {
           className="grid md:grid-cols-1 gap-4 mb-8"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.5 }}>
+          transition={{ delay: nextLesson ? 0.6 : 0.5 }}>
           
           <GlassCard
             className="p-6 cursor-pointer hover:scale-[1.02] bg-slate-950/50 backdrop-blur-xl"

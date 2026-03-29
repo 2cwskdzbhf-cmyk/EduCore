@@ -69,8 +69,8 @@ export default function MyTimetable() {
     duration_minutes: 60,
     link: '',
     notes: '',
+    linked_class_id: '',
   });
-  const [linkedClasses, setLinkedClasses] = useState([]);
   const queryClient = useQueryClient();
 
   useEffect(() => {
@@ -154,6 +154,7 @@ export default function MyTimetable() {
       duration_minutes: 60,
       link: '',
       notes: '',
+      linked_class_id: '',
     });
     setEditingId(null);
   };
@@ -181,19 +182,13 @@ export default function MyTimetable() {
       duration_minutes: lesson.duration_minutes,
       link: lesson.link || '',
       notes: lesson.notes || '',
+      linked_class_id: lesson.linked_class_id || '',
     });
     setEditingId(lesson.id);
     setShowForm(true);
   };
 
-  const handleLinkClass = (classData) => {
-    setFormData((prev) => ({
-      ...prev,
-      subject: classData.subject_id ? 'Other' : 'Other',
-      lesson_name: classData.name,
-      linked_class_id: classData.id,
-    }));
-  };
+
 
   const handleDragEnd = (result) => {
     const { source, destination, draggableId } = result;
@@ -305,72 +300,16 @@ export default function MyTimetable() {
         </div>
 
         {/* Add Lesson Button */}
-        <div className="flex gap-3 mb-6">
-          <Button
-            onClick={() => {
-              resetForm();
-              setShowForm(true);
-            }}
-            className="bg-gradient-to-r from-purple-500 to-blue-500"
-          >
-            <Plus className="w-5 h-5 mr-2" />
-            Add Lesson
-          </Button>
-
-          <Button
-            onClick={() => setLinkedClasses(joinedClasses)}
-            variant="outline"
-            className="border-white/20 text-white hover:bg-white/10"
-          >
-            <LinkIcon className="w-5 h-5 mr-2" />
-            Link Classes
-          </Button>
-        </div>
-
-        {/* Link Classes Modal */}
-        <AnimatePresence>
-          {linkedClasses.length > 0 && (
-            <motion.div
-              className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-6"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setLinkedClasses([])}
-            >
-              <motion.div
-                className="bg-slate-950 border border-white/10 rounded-2xl max-w-md w-full p-6"
-                initial={{ scale: 0.9 }}
-                animate={{ scale: 1 }}
-                exit={{ scale: 0.9 }}
-                onClick={(e) => e.stopPropagation()}
-              >
-                <h3 className="text-xl font-bold text-white mb-4">Link Existing Classes</h3>
-                <div className="space-y-2 max-h-96 overflow-y-auto">
-                  {linkedClasses.map((cls) => (
-                    <button
-                      key={cls.id}
-                      onClick={() => {
-                        handleLinkClass(cls);
-                        setLinkedClasses([]);
-                        setShowForm(true);
-                      }}
-                      className="w-full p-3 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-left transition-all"
-                    >
-                      <p className="font-semibold text-white">{cls.name}</p>
-                      <p className="text-xs text-slate-400">{cls.year_group && `Year ${cls.year_group}`}</p>
-                    </button>
-                  ))}
-                </div>
-                <Button
-                  onClick={() => setLinkedClasses([])}
-                  className="w-full mt-4 bg-white/10 hover:bg-white/20 text-white"
-                >
-                  Close
-                </Button>
-              </motion.div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+        <Button
+          onClick={() => {
+            resetForm();
+            setShowForm(true);
+          }}
+          className="bg-gradient-to-r from-purple-500 to-blue-500 mb-6"
+        >
+          <Plus className="w-5 h-5 mr-2" />
+          Add Lesson
+        </Button>
 
         {/* Add/Edit Lesson Form */}
         <AnimatePresence>
@@ -493,6 +432,28 @@ export default function MyTimetable() {
                         }
                         className="bg-white/5 border-white/10 text-white"
                       />
+                    </div>
+
+                    <div className="md:col-span-2">
+                      <Label className="text-white mb-2 block">Link Class (Optional)</Label>
+                      <Select
+                        value={formData.linked_class_id || ''}
+                        onValueChange={(value) =>
+                          setFormData({ ...formData, linked_class_id: value || '' })
+                        }
+                      >
+                        <SelectTrigger className="bg-white/5 border-white/10 text-white">
+                          <SelectValue placeholder="Select a class to link" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value={null}>None</SelectItem>
+                          {joinedClasses.map((cls) => (
+                            <SelectItem key={cls.id} value={cls.id}>
+                              {cls.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
 
                     <div className="md:col-span-2">
