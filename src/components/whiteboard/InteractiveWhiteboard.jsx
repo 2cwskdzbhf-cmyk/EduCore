@@ -264,10 +264,13 @@ export default function InteractiveWhiteboard({
       setEditingTextIdx(newIdx);
       setInlineTextValue('');
       setInputPosition({ x: offsetX, y: offsetY, canvasX: 0, canvasY: 0, idx: newIdx });
-      // Focus immediately without delay to capture keyboard input
-      requestAnimationFrame(() => {
-        inlineInputRef.current?.focus();
-      });
+      // Priority focus with multiple attempts to ensure capture
+      setTimeout(() => {
+        if (inlineInputRef.current) {
+          inlineInputRef.current.focus();
+          inlineInputRef.current.select();
+        }
+      }, 0);
       return;
     }
 
@@ -328,7 +331,7 @@ export default function InteractiveWhiteboard({
     };
   };
 
-  const checkSnapping = (movedStrokes, snapThreshold = 10) => {
+  const checkSnapping = (movedStrokes, snapThreshold = 8) => {
     const guides = { vertical: null, horizontal: null };
     const movedIndices = new Set(selectedIndices);
     
@@ -338,41 +341,54 @@ export default function InteractiveWhiteboard({
     selectedIndices.forEach(idx => {
       const stroke = movedStrokes[idx];
       const moved = getSnapPoints(stroke);
+      let snappedVertically = false;
+      let snappedHorizontally = false;
       
-      // Check against canvas center
-      if (Math.abs(moved.centerX - canvasCenter) < snapThreshold) {
+      // Check against canvas center (lower priority)
+      if (!snappedVertically && Math.abs(moved.centerX - canvasCenter) < snapThreshold) {
         guides.vertical = canvasCenter;
         stroke.x = canvasCenter - stroke.width / 2;
+        snappedVertically = true;
       }
       
-      // Check against other objects
+      // Check against other objects (higher priority)
       strokes.forEach((otherStroke, oIdx) => {
         if (movedIndices.has(oIdx)) return;
         
         const other = getSnapPoints(otherStroke);
         
-        // Vertical alignment
-        if (Math.abs(moved.left - other.left) < snapThreshold) {
-          guides.vertical = other.left;
-          stroke.x = other.left;
-        } else if (Math.abs(moved.right - other.right) < snapThreshold) {
-          guides.vertical = other.right;
-          stroke.x = other.right - stroke.width;
-        } else if (Math.abs(moved.centerX - other.centerX) < snapThreshold) {
-          guides.vertical = other.centerX;
-          stroke.x = other.centerX - stroke.width / 2;
+        // Vertical alignment - prioritize left edge snap
+        if (!snappedVertically) {
+          if (Math.abs(moved.left - other.left) < snapThreshold) {
+            guides.vertical = other.left;
+            stroke.x = other.left;
+            snappedVertically = true;
+          } else if (Math.abs(moved.right - other.right) < snapThreshold) {
+            guides.vertical = other.right;
+            stroke.x = other.right - stroke.width;
+            snappedVertically = true;
+          } else if (Math.abs(moved.centerX - other.centerX) < snapThreshold) {
+            guides.vertical = other.centerX;
+            stroke.x = other.centerX - stroke.width / 2;
+            snappedVertically = true;
+          }
         }
         
         // Horizontal alignment
-        if (Math.abs(moved.top - other.top) < snapThreshold) {
-          guides.horizontal = other.top;
-          stroke.y = other.top + (stroke.type === 'text' ? stroke.size : 0);
-        } else if (Math.abs(moved.bottom - other.bottom) < snapThreshold) {
-          guides.horizontal = other.bottom;
-          stroke.y = other.bottom - (stroke.type === 'text' ? 0 : stroke.height);
-        } else if (Math.abs(moved.centerY - other.centerY) < snapThreshold) {
-          guides.horizontal = other.centerY;
-          stroke.y = other.centerY + (stroke.type === 'text' ? stroke.size / 2 : stroke.height / 2);
+        if (!snappedHorizontally) {
+          if (Math.abs(moved.top - other.top) < snapThreshold) {
+            guides.horizontal = other.top;
+            stroke.y = other.top + (stroke.type === 'text' ? stroke.size : 0);
+            snappedHorizontally = true;
+          } else if (Math.abs(moved.bottom - other.bottom) < snapThreshold) {
+            guides.horizontal = other.bottom;
+            stroke.y = other.bottom - (stroke.type === 'text' ? 0 : stroke.height);
+            snappedHorizontally = true;
+          } else if (Math.abs(moved.centerY - other.centerY) < snapThreshold) {
+            guides.horizontal = other.centerY;
+            stroke.y = other.centerY + (stroke.type === 'text' ? stroke.size / 2 : stroke.height / 2);
+            snappedHorizontally = true;
+          }
         }
       });
     });
@@ -743,11 +759,13 @@ export default function InteractiveWhiteboard({
       {/* Inline Text Input on Canvas */}
       {inputPosition !== null && (
         <div
-          className="fixed z-40"
+          className="fixed z-50"
           style={{
             left: (inputPosition.canvasX + inputPosition.x) + 'px',
-            top: (inputPosition.canvasY + inputPosition.y) + 'px'
+            top: (inputPosition.canvasY + inputPosition.y) + 'px',
+            pointerEvents: 'auto'
           }}
+          onMouseDown={(e) => e.stopPropagation()}
         >
           <div className="bg-slate-950 border border-white/20 rounded p-2 shadow-lg w-56 space-y-2">
             <input
@@ -778,6 +796,7 @@ export default function InteractiveWhiteboard({
                 setTextMode(false);
               }}
               onKeyDown={(e) => {
+                e.stopPropagation();
                 if (e.key === 'Enter') {
                   if (inputPosition?.idx !== undefined) {
                     const newStrokes = [...strokes];
@@ -795,7 +814,7 @@ export default function InteractiveWhiteboard({
                 }
               }}
               placeholder="Type text..."
-              className="w-full bg-white/5 border border-white/10 text-white rounded px-2 py-1 text-sm outline-none focus:border-white/30"
+              className="w-full bg-white/5 border border-white/10 text-white rounded px-2 py-1 text-sm outline-none focus:border-white/30 focus:ring-1 focus:ring-white/50"
               style={{ fontSize: textFontSize + 'px', fontFamily: textFont, color: textColor, width: Math.max(150, textInput.length * (textFontSize * 0.6)) + 'px' }}
             />
 
