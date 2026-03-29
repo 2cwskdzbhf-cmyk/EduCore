@@ -119,24 +119,95 @@ export default function GlobalQuestionBankDialog({ open, onClose, onAddQuestions
   );
   const isSelected = (q) => !!selected.find(x => x.id === q.id);
 
+  // Generate answer keyword variations (lowercase, uppercase, no spaces, trimmed)
+  const generateAnswerVariations = (answer) => {
+    if (!answer) return [''];
+    const base = String(answer).trim();
+    const variations = new Set();
+    variations.add(base);
+    variations.add(base.toLowerCase());
+    variations.add(base.toUpperCase());
+    // No spaces variant
+    variations.add(base.replace(/\s+/g, ''));
+    variations.add(base.toLowerCase().replace(/\s+/g, ''));
+    // Normalize spaces (single space)
+    variations.add(base.replace(/\s+/g, ' ').trim());
+    return [...variations].filter(Boolean);
+  };
+
   const handleApply = () => {
     if (!selected.length) { toast.error('Select at least one question'); return; }
     const mapped = selected.map(q => {
       const origType = q.question_type || 'mcq';
       const rawChoices = Array.isArray(q.choices) && q.choices.length > 0 ? q.choices
         : Array.isArray(q.options) && q.options.length > 0 ? q.options : [];
-      const isMCQ = (origType === 'mcq' || origType === 'multiple_choice') && rawChoices.length >= 2;
-      if (isMCQ) {
-        const opts = rawChoices.length >= 4 ? rawChoices.slice(0, 4) : [...rawChoices, ...Array(4 - rawChoices.length).fill('—')];
-        let correctIndex = typeof q.correct_index === 'number' && q.correct_index >= 0 ? q.correct_index : -1;
-        if (correctIndex < 0 && q.correct_answer) correctIndex = opts.findIndex(c => String(c).toLowerCase().trim() === String(q.correct_answer).toLowerCase().trim());
-        correctIndex = Math.max(0, correctIndex);
-        return { prompt: q.question_text || '', question_type: 'multiple_choice', options: opts, correct_index: correctIndex, correct_answer: opts[correctIndex] || q.correct_answer || '', difficulty: q.difficulty || 'medium', explanation: q.explanation || '', tags: [], image_url: '', option_images: ['', '', '', ''], source_global_id: q.id, _isDraft: false };
-      } else if (origType === 'true_false' || origType === 'tf') {
+      const isMCQ = (origType === 'mcq' || origType === 'multiple_choice');
+      const isTF = origType === 'true_false' || origType === 'tf';
+
+      if (isTF) {
         return { prompt: q.question_text || '', question_type: 'true_false', options: ['True', 'False'], correct_index: String(q.correct_answer).toLowerCase() === 'true' ? 0 : 1, correct_answer: q.correct_answer || 'True', difficulty: q.difficulty || 'medium', explanation: q.explanation || '', tags: [], image_url: '', option_images: ['', ''], source_global_id: q.id, _isDraft: false };
-      } else {
-        return { prompt: q.question_text || '', question_type: 'short_answer', options: [q.correct_answer || '', '', '', ''], correct_index: 0, correct_answer: q.correct_answer || '', difficulty: q.difficulty || 'medium', explanation: q.explanation || '', tags: [], image_url: '', option_images: ['', '', '', ''], source_global_id: q.id, _isDraft: false };
       }
+
+      if (isMCQ) {
+        // Build a clean list of real choices (no placeholders)
+        const realChoices = rawChoices.filter(c => c && String(c).trim() && String(c).trim() !== '—');
+
+        // Identify correct answer
+        const correctAnswer = String(q.correct_answer || '').trim();
+
+        // Separate correct from wrong answers
+        const wrongChoices = realChoices.filter(c =>
+          String(c).toLowerCase().trim() !== correctAnswer.toLowerCase()
+        );
+
+        // Shuffle wrong answers and pick up to 3
+        const shuffledWrong = [...wrongChoices].sort(() => Math.random() - 0.5).slice(0, 3);
+
+        // Build final 4 options: correct + 3 wrong, then shuffle positions
+        const finalOptions = [correctAnswer, ...shuffledWrong].sort(() => Math.random() - 0.5);
+
+        // Pad to 4 if somehow we have fewer
+        while (finalOptions.length < 4) finalOptions.push('');
+
+        const correctIndex = finalOptions.findIndex(
+          c => String(c).toLowerCase().trim() === correctAnswer.toLowerCase()
+        );
+
+        return {
+          prompt: q.question_text || '',
+          question_type: 'multiple_choice',
+          options: finalOptions.slice(0, 4),
+          correct_index: Math.max(0, correctIndex),
+          correct_answer: correctAnswer,
+          difficulty: q.difficulty || 'medium',
+          explanation: q.explanation || '',
+          tags: [],
+          image_url: '',
+          option_images: ['', '', '', ''],
+          source_global_id: q.id,
+          _isDraft: false
+        };
+      }
+
+      // Written / short answer — generate keyword variations
+      const correctAnswer = String(q.correct_answer || '').trim();
+      const answerKeywords = generateAnswerVariations(correctAnswer);
+
+      return {
+        prompt: q.question_text || '',
+        question_type: 'short_answer',
+        correct_answer: correctAnswer,
+        answer_keywords: answerKeywords,
+        options: [],
+        correct_index: 0,
+        difficulty: q.difficulty || 'medium',
+        explanation: q.explanation || '',
+        tags: [],
+        image_url: '',
+        option_images: [],
+        source_global_id: q.id,
+        _isDraft: false
+      };
     });
     onAddQuestions?.(mapped);
     toast.success(`Added ${mapped.length} question${mapped.length !== 1 ? 's' : ''}`);

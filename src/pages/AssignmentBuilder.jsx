@@ -451,17 +451,25 @@ export default function AssignmentBuilder() {
   const handleGlobalBankAdd = (mappedQuestions) => {
     if (!Array.isArray(mappedQuestions) || mappedQuestions.length === 0) return;
     const startIdx = questions.length;
-    const converted = mappedQuestions.map((q, i) => ({
-      id: startIdx + i + 1,
-      type: q.question_type === 'short_answer' ? 'written' : (q.question_type || 'multiple_choice'),
-      prompt: q.prompt || '',
-      options: Array.isArray(q.options) ? q.options : ['', '', '', ''],
-      correctIndex: typeof q.correct_index === 'number' ? q.correct_index : 0,
-      explanation: q.explanation || '',
-      answerKeywords: q.answer_keywords?.length > 0 ? q.answer_keywords : [q.correct_answer || ''],
-      requireWorking: false,
-      workingKeywords: ['']
-    }));
+    const converted = mappedQuestions.map((q, i) => {
+      const isWritten = q.question_type === 'short_answer' || q.question_type === 'written';
+      return {
+        id: startIdx + i + 1,
+        type: isWritten ? 'written' : (q.question_type || 'multiple_choice'),
+        prompt: q.prompt || '',
+        options: isWritten ? ['', '', '', ''] : (Array.isArray(q.options) ? q.options : ['', '', '', '']),
+        correctIndex: isWritten ? null : (typeof q.correct_index === 'number' ? q.correct_index : 0),
+        explanation: q.explanation || '',
+        // For written: use the pre-generated keyword variations from the bank dialog
+        answerKeywords: isWritten
+          ? (Array.isArray(q.answer_keywords) && q.answer_keywords.length > 0
+              ? q.answer_keywords
+              : [q.correct_answer || ''])
+          : [''],
+        requireWorking: false,
+        workingKeywords: ['']
+      };
+    });
     setQuestions(prev => [...prev, ...converted]);
     setCurrentQuestionIndex(startIdx);
   };
