@@ -42,7 +42,7 @@ export default function InteractiveWhiteboard({
   const [eraserSize, setEraserSize] = useState(15);
   const [strokes, setStrokes] = useState(whiteboard?.strokes || []);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [textMode, setTextMode] = useState(false);
+  const [textMode, setTextMode] = useState(true);
   const [textInput, setTextInput] = useState('');
   const [textPosition, setTextPosition] = useState(null);
   const [selectedStroke, setSelectedStroke] = useState(null);
@@ -317,10 +317,12 @@ export default function InteractiveWhiteboard({
       return;
     }
 
-    const { offsetX: ox, offsetY: oy } = event.nativeEvent;
-    contextRef.current.beginPath();
-    contextRef.current.moveTo(ox, oy);
-    setIsDrawing(true);
+    if (tool === 'pen' || tool === 'eraser') {
+      const { offsetX: ox, offsetY: oy } = event.nativeEvent;
+      contextRef.current.beginPath();
+      contextRef.current.moveTo(ox, oy);
+      setIsDrawing(true);
+    }
   };
 
   const finishDrawing = () => {
@@ -487,7 +489,7 @@ export default function InteractiveWhiteboard({
       return;
     }
 
-    if (!isDrawing) return;
+    if (!isDrawing || !tool || textMode) return;
 
     const context = contextRef.current;
 
@@ -630,36 +632,36 @@ export default function InteractiveWhiteboard({
               <div className="flex gap-2">
                 <Button
                   size="sm"
-                  onClick={() => { setTool('pen'); setTextMode(false); }}
-                  className={tool === 'pen' ? 'bg-purple-500' : 'bg-white/10 hover:bg-white/20'}
+                  onClick={() => { setTool('pen'); }}
+                  className={tool === 'pen' && !textMode ? 'bg-purple-500' : 'bg-white/10 hover:bg-white/20'}
                   title="Draw"
-                >
+                  >
                   <Pen className="w-4 h-4" />
-                </Button>
-                <Button
+                  </Button>
+                  <Button
                   size="sm"
-                  onClick={() => { setTool('eraser'); setTextMode(false); }}
-                  className={tool === 'eraser' ? 'bg-red-500' : 'bg-white/10 hover:bg-white/20'}
+                  onClick={() => { setTool('eraser'); }}
+                  className={tool === 'eraser' && !textMode ? 'bg-red-500' : 'bg-white/10 hover:bg-white/20'}
                   title="Erase"
-                >
+                  >
                   <Eraser className="w-4 h-4" />
-                </Button>
-                <Button
+                  </Button>
+                  <Button
                   size="sm"
-                  onClick={() => { setTool('select'); setTextMode(false); }}
-                  className={tool === 'select' ? 'bg-green-500' : 'bg-white/10 hover:bg-white/20'}
+                  onClick={() => { setTool('select'); }}
+                  className={tool === 'select' && !textMode ? 'bg-green-500' : 'bg-white/10 hover:bg-white/20'}
                   title="Select & move"
-                >
+                  >
                   ➢
-                </Button>
-                <Button
+                  </Button>
+                  <Button
                   size="sm"
-                  onClick={() => { setTextMode(!textMode); setTool(null); }}
+                  onClick={() => { setTextMode(!textMode); }}
                   className={textMode ? 'bg-blue-500' : 'bg-white/10 hover:bg-white/20'}
-                  title="Add text"
-                >
+                  title="Add text (always on)"
+                  >
                   <Type className="w-4 h-4" />
-                </Button>
+                  </Button>
                 <Button
                   size="sm"
                   onClick={() => imageInputRef.current?.click()}
@@ -832,10 +834,11 @@ export default function InteractiveWhiteboard({
                 }
               }}
               onBlur={() => {
-                if (inputPosition?.idx !== undefined) {
+                if (inputPosition?.idx !== undefined && strokes[inputPosition.idx]) {
                   const newStrokes = [...strokes];
                   newStrokes[inputPosition.idx].content = textInput;
                   setStrokes(newStrokes);
+                  redrawCanvas();
                 }
                 setInputPosition(null);
                 setEditingTextIdx(null);
@@ -843,10 +846,11 @@ export default function InteractiveWhiteboard({
               onKeyDown={(e) => {
                 e.stopPropagation();
                 if (e.key === 'Escape') {
-                  if (inputPosition?.idx !== undefined) {
+                  if (inputPosition?.idx !== undefined && strokes[inputPosition.idx]) {
                     const newStrokes = [...strokes];
                     newStrokes[inputPosition.idx].content = textInput;
                     setStrokes(newStrokes);
+                    redrawCanvas();
                   }
                   setInputPosition(null);
                   setEditingTextIdx(null);
