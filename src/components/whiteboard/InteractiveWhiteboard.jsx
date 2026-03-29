@@ -56,6 +56,9 @@ export default function InteractiveWhiteboard({
   const [inlineTextValue, setInlineTextValue] = useState('');
   const inlineInputRef = useRef(null);
   const [inputPosition, setInputPosition] = useState(null);
+  const [selectedIndices, setSelectedIndices] = useState([]);
+  const [isMultiSelect, setIsMultiSelect] = useState(false);
+  const [dragSelectStart, setDragSelectStart] = useState(null);
 
   const saveWhiteboardMutation = useMutation({
     mutationFn: async () => {
@@ -117,30 +120,34 @@ export default function InteractiveWhiteboard({
         context.font = `${stroke.size || 16}px ${stroke.font || 'Arial'}`;
         context.fillText(stroke.content, stroke.x, stroke.y);
         
-        if (selectedStroke === idx) {
+        if (selectedIndices.includes(idx)) {
           context.strokeStyle = '#fbbf24';
           context.lineWidth = 2;
           context.strokeRect(stroke.x - 5, stroke.y - stroke.size - 5, stroke.width, stroke.height + 5);
           
-          // Draw resize handle
-          const handleX = stroke.x + stroke.width - 5;
-          const handleY = stroke.y + stroke.height;
-          context.fillStyle = '#fbbf24';
-          context.fillRect(handleX, handleY, 10, 10);
+          // Draw resize handle only if single selection
+          if (selectedIndices.length === 1) {
+            const handleX = stroke.x + stroke.width - 5;
+            const handleY = stroke.y + stroke.height;
+            context.fillStyle = '#fbbf24';
+            context.fillRect(handleX, handleY, 10, 10);
+          }
         }
       } else if (stroke.type === 'image' && stroke.src) {
         const img = new Image();
         img.src = stroke.src;
         img.onload = () => {
           context.drawImage(img, stroke.x, stroke.y, stroke.width, stroke.height);
-          if (selectedStroke === idx) {
+          if (selectedIndices.includes(idx)) {
             context.strokeStyle = '#fbbf24';
             context.lineWidth = 2;
             context.strokeRect(stroke.x, stroke.y, stroke.width, stroke.height);
             
-            // Draw resize handle
-            context.fillStyle = '#fbbf24';
-            context.fillRect(stroke.x + stroke.width - 5, stroke.y + stroke.height - 5, 10, 10);
+            // Draw resize handle only if single selection
+            if (selectedIndices.length === 1) {
+              context.fillStyle = '#fbbf24';
+              context.fillRect(stroke.x + stroke.width - 5, stroke.y + stroke.height - 5, 10, 10);
+            }
           }
         };
       }
@@ -150,66 +157,158 @@ export default function InteractiveWhiteboard({
   const startDrawing = (event) => {
     if (!canEdit) return;
 
-    if (tool === 'select' && selectedStroke !== null) {
-      const { offsetX, offsetY } = event.nativeEvent;
-      const stroke = strokes[selectedStroke];
-      
-      // Check if clicking on resize handle
-      if (stroke.type === 'image' || stroke.type === 'text') {
-        const handleX = stroke.x + stroke.width;
-        const handleY = stroke.y + stroke.height;
-        if (Math.abs(offsetX - handleX) < 10 && Math.abs(offsetY - handleY) < 10) {
-          setResizeHandle('br');
-          setIsDragging(true);
-          setDragStart({ x: offsetX, y: offsetY });
-          return;
-        }
-      }
-      
-      setIsDragging(true);
-      setDragStart({ x: offsetX, y: offsetY });
-      return;
-    }
+    const { offsetX, offsetY } = event.nativeEvent;
+    const isShiftClick = event.shiftKey;
 
     if (tool === 'select') {
-      handleCanvasClick(event);
+      // Check if clicking on a resize handle
+      if (selectedIndices.length > 0) {
+        const firstSelected = strokes[selectedIndices[0]];
+        if (selectedIndices.length === 1 && (firstSelected.type === 'image' || firstSelected.type === 'text')) {
+          const handleX = firstSelected.x + firstSelected.width;
+          const handleY = firstSelected.y + firstSelected.height;
+          if (Math.abs(offsetX - handleX) < 10 && Math.abs(offsetY - handleY) < 10) {
+            setResizeHandle('br');
+            setIsDragging(true);
+            setDragStart({ x: offsetX, y: offsetY });
+            return;
+          }
+        }
+      }
+
+      // Check if clicking on an object
+      let clickedIdx = -1;
+      for (let i = strokes.length - 1; i >= 0; i--) {
+        const stroke = strokes[i];
+        const padding = 8;
+        if (stroke.type === 'text') {
+          if (offsetX >= stroke.x - padding && offsetX <= stroke.x + stroke.width + padding && 
+              offsetY >= stroke.y - stroke.size - padding && offsetY <= stroke.y + padding) {
+            clickedIdx = i;
+            break;
+          }
+        } else if (stroke.type === 'image') {
+          if (offsetX >= stroke.x - padding && offsetX <= stroke.x + stroke.width + padding && 
+              offsetY >= stroke.y - padding && offsetY <= stroke.y + stroke.height + padding) {
+            clickedIdx = i;
+            break;
+          }
+        }
+      }
+
+      if (clickedIdx >= 0) {
+        if (isShiftClick) {
+          // Toggle selection with shift
+          if (selectedIndices.includes(clickedIdx)) {
+            setSelectedIndices(selectedIndices.filter(i => i !== clickedIdx));
+          } else {
+            setSelectedIndices([...selectedIndices, clickedIdx]);
+          }
+        } else if (!selectedIndices.includes(clickedIdx)) {
+          setSelectedIndices([clickedIdx]);
+        }
+        
+        // Start dragging selected objects
+        setIsDragging(true);
+        setDragStart({ x: offsetX, y: offsetY });
+      } else {
+        // Click on empty space - start drag selection
+        if (!isShiftClick) setSelectedIndices([]);
+        setDragSelectStart({ x: offsetX, y: offsetY });
+      }
       return;
     }
 
-    const { offsetX, offsetY } = event.nativeEvent;
+    // Text tool - create new textbox at click position
+    if (textMode) {
+      const newStroke = {
+        type: 'text',
+        content: '',
+        x: offsetX,
+        y: offsetY,
+        width: 50,
+        height: textFontSize,
+        color: textColor,
+        size: textFontSize,
+        font: textFont,
+        timestamp: new Date().toISOString(),
+        drawn_by: 'user'
+      };
+      const newIdx = strokes.length;
+      setStrokes([...strokes, newStroke]);
+      setEditingTextIdx(newIdx);
+      setInlineTextValue('');
+      setInputPosition({ x: offsetX, y: offsetY, canvasX: 0, canvasY: 0, idx: newIdx });
+      setTimeout(() => inlineInputRef.current?.focus(), 0);
+      return;
+    }
+
+    const { offsetX: ox, offsetY: oy } = event.nativeEvent;
     contextRef.current.beginPath();
-    contextRef.current.moveTo(offsetX, offsetY);
+    contextRef.current.moveTo(ox, oy);
     setIsDrawing(true);
   };
 
   const finishDrawing = () => {
-    contextRef.current.closePath();
+    if (isDrawing) contextRef.current.closePath();
     setIsDrawing(false);
     setIsDragging(false);
     setDragStart(null);
     setResizeHandle(null);
+    
+    // Finish drag selection
+    if (dragSelectStart) {
+      const rect = canvasRef.current.getBoundingClientRect();
+      const endX = event?.nativeEvent?.offsetX;
+      const endY = event?.nativeEvent?.offsetY;
+      
+      if (endX && endY) {
+        const minX = Math.min(dragSelectStart.x, endX);
+        const maxX = Math.max(dragSelectStart.x, endX);
+        const minY = Math.min(dragSelectStart.y, endY);
+        const maxY = Math.max(dragSelectStart.y, endY);
+        
+        const newly = [];
+        strokes.forEach((stroke, i) => {
+          if (stroke.type === 'text') {
+            if (stroke.x >= minX && stroke.x + stroke.width <= maxX && 
+                stroke.y >= minY && stroke.y - stroke.size <= maxY) {
+              newly.push(i);
+            }
+          } else if (stroke.type === 'image') {
+            if (stroke.x >= minX && stroke.x + stroke.width <= maxX && 
+                stroke.y >= minY && stroke.y + stroke.height <= maxY) {
+              newly.push(i);
+            }
+          }
+        });
+        setSelectedIndices(newly);
+      }
+      setDragSelectStart(null);
+    }
   };
 
   const handleDragMove = (event) => {
-    if (!isDragging || selectedStroke === null || !dragStart) return;
+    if (!isDragging || !dragStart) return;
 
     const { offsetX, offsetY } = event.nativeEvent;
     const dx = offsetX - dragStart.x;
     const dy = offsetY - dragStart.y;
 
     const newStrokes = [...strokes];
-    const stroke = newStrokes[selectedStroke];
 
-    if (resizeHandle) {
-      // Resize operation
+    if (resizeHandle && selectedIndices.length === 1) {
+      const stroke = newStrokes[selectedIndices[0]];
       if (resizeHandle === 'br' && (stroke.type === 'image' || stroke.type === 'text')) {
         stroke.width = Math.max(30, stroke.width + dx);
         stroke.height = Math.max(20, stroke.height + dy);
       }
     } else {
-      // Move operation
-      stroke.x += dx;
-      stroke.y += dy;
+      // Move all selected objects
+      selectedIndices.forEach(idx => {
+        newStrokes[idx].x += dx;
+        newStrokes[idx].y += dy;
+      });
     }
 
     setStrokes(newStrokes);
@@ -219,15 +318,22 @@ export default function InteractiveWhiteboard({
   const draw = (event) => {
     if (!canEdit) return;
 
+    const { offsetX, offsetY } = event.nativeEvent;
+
     if (isDragging) {
       handleDragMove(event);
       redrawCanvas();
       return;
     }
 
+    if (dragSelectStart) {
+      // Drag selection box
+      redrawCanvas();
+      return;
+    }
+
     if (!isDrawing) return;
 
-    const { offsetX, offsetY } = event.nativeEvent;
     const context = contextRef.current;
 
     if (tool === 'pen') {
@@ -553,26 +659,45 @@ export default function InteractiveWhiteboard({
               autoFocus
               type="text"
               value={textInput}
-              onChange={(e) => setTextInput(e.target.value)}
+              onChange={(e) => {
+                setTextInput(e.target.value);
+                // Update stroke width dynamically
+                if (inputPosition?.idx !== null && inputPosition?.idx !== undefined) {
+                  const newStrokes = [...strokes];
+                  newStrokes[inputPosition.idx].width = Math.max(50, e.target.value.length * (textFontSize * 0.6));
+                  setStrokes(newStrokes);
+                }
+              }}
               onBlur={() => {
-                if (textInput.trim()) handleTextAdd(inputPosition.x, inputPosition.y);
+                if (textInput.trim() && inputPosition?.idx !== undefined) {
+                  const newStrokes = [...strokes];
+                  newStrokes[inputPosition.idx].content = textInput;
+                  setStrokes(newStrokes);
+                }
                 setInputPosition(null);
+                setEditingTextIdx(null);
                 setTextMode(false);
               }}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
-                  if (textInput.trim()) handleTextAdd(inputPosition.x, inputPosition.y);
+                  if (textInput.trim() && inputPosition?.idx !== undefined) {
+                    const newStrokes = [...strokes];
+                    newStrokes[inputPosition.idx].content = textInput;
+                    setStrokes(newStrokes);
+                  }
                   setInputPosition(null);
+                  setEditingTextIdx(null);
                   setTextMode(false);
                 }
                 if (e.key === 'Escape') {
                   setInputPosition(null);
+                  setEditingTextIdx(null);
                   setTextMode(false);
                 }
               }}
               placeholder="Type text..."
-              className="w-full bg-white/5 border border-white/10 text-white rounded px-2 py-1 text-sm"
-              style={{ fontSize: textFontSize + 'px', fontFamily: textFont, color: textColor }}
+              className="w-full bg-white/5 border border-white/10 text-white rounded px-2 py-1 text-sm outline-none"
+              style={{ fontSize: textFontSize + 'px', fontFamily: textFont, color: textColor, width: Math.max(150, textInput.length * (textFontSize * 0.6)) + 'px' }}
             />
 
             {/* Font Size */}
