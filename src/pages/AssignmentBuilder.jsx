@@ -272,17 +272,18 @@ export default function AssignmentBuilder() {
   const publishMutation = useMutation({
     mutationFn: async () => {
       if (!user?.email || !classId) throw new Error('Missing user or class information');
+      const questionsToSave = questions.filter(isQuestionStarted);
       
       if (isEditMode && originalQuizId) {
         const oldQuestions = await base44.entities.QuizQuestion.filter({ quiz_set_id: originalQuizId });
         for (const oldQ of oldQuestions) await base44.entities.QuizQuestion.delete(oldQ.id);
-        for (let i = 0; i < questions.length; i++) {
-          await base44.entities.QuizQuestion.create(buildQuestionData(questions[i], originalQuizId, i));
+        for (let i = 0; i < questionsToSave.length; i++) {
+          await base44.entities.QuizQuestion.create(buildQuestionData(questionsToSave[i], originalQuizId, i));
         }
         const assignmentData = {
           title: assignmentTitle,
           status: 'published',
-          max_points: questions.length * 10
+          max_points: questionsToSave.length * 10
         };
         if (selectedTopic === 'custom' && customTopicName.trim()) {
           assignmentData.custom_topic_name = customTopicName.trim();
@@ -301,10 +302,10 @@ export default function AssignmentBuilder() {
           title: assignmentTitle,
           topic_id: selectedTopic !== 'custom' ? (selectedTopic || null) : null,
           status: 'published',
-          question_count: questions.length
+          question_count: questionsToSave.length
         });
-        for (let i = 0; i < questions.length; i++) {
-          await base44.entities.QuizQuestion.create(buildQuestionData(questions[i], quizSet.id, i));
+        for (let i = 0; i < questionsToSave.length; i++) {
+          await base44.entities.QuizQuestion.create(buildQuestionData(questionsToSave[i], quizSet.id, i));
         }
         const assignmentData = {
           title: assignmentTitle,
@@ -313,7 +314,7 @@ export default function AssignmentBuilder() {
           quiz_id: quizSet.id,
           assignment_type: 'quiz',
           status: 'published',
-          max_points: questions.length * 10
+          max_points: questionsToSave.length * 10
         };
         if (selectedTopic === 'custom' && customTopicName.trim()) {
           assignmentData.custom_topic_name = customTopicName.trim();
@@ -474,10 +475,23 @@ export default function AssignmentBuilder() {
     setCurrentQuestionIndex(startIdx);
   };
 
+  // A question is "started" if it has any prompt text
+  const isQuestionStarted = (q) => q.prompt && q.prompt.trim() !== '';
+  
+  // Only validate questions that have been started (have a prompt)
+  const startedQuestions = questions.filter(isQuestionStarted);
+  
   const canSubmit = assignmentTitle.trim() !== '' && 
-                    questions.length > 0 &&
-                    questions.every(isQuestionValid) &&
+                    startedQuestions.length > 0 &&
+                    startedQuestions.every(isQuestionValid) &&
                     (selectedTopic !== 'custom' || customTopicName.trim() !== '');
+
+  // Tell the teacher what's missing
+  const submitBlockReason = !assignmentTitle.trim() ? 'Add a title first'
+    : startedQuestions.length === 0 ? 'Add at least one question'
+    : !startedQuestions.every(isQuestionValid) ? 'Complete all questions (select correct answer & fill options)'
+    : selectedTopic === 'custom' && !customTopicName.trim() ? 'Enter a custom topic name'
+    : null;
 
   const pageTitle = isLiveMode ? 'Create Live Quiz' : (isEditMode ? 'Edit Assignment' : 'Create Assignment');
   const backUrl = createPageUrl(`TeacherClassDetail?id=${classId}`);
@@ -513,41 +527,35 @@ export default function AssignmentBuilder() {
             )}
 
             {isLiveMode ? (
-              <Button
-                onClick={() => startLiveMutation.mutate()}
-                disabled={!canSubmit || startLiveMutation.isPending}
-                className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 shadow-lg shadow-amber-500/30"
-              >
-                {startLiveMutation.isPending ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />
-                    Starting...
-                  </>
-                ) : (
-                  <>
-                    <Zap className="w-4 h-4 mr-2" />
-                    Start Live Quiz
-                  </>
-                )}
-              </Button>
+              <div className="flex flex-col items-end gap-1">
+                <Button
+                  onClick={() => startLiveMutation.mutate()}
+                  disabled={!canSubmit || startLiveMutation.isPending}
+                  className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 shadow-lg shadow-amber-500/30"
+                >
+                  {startLiveMutation.isPending ? (
+                    <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />Starting...</>
+                  ) : (
+                    <><Zap className="w-4 h-4 mr-2" />Start Live Quiz</>
+                  )}
+                </Button>
+                {submitBlockReason && <p className="text-xs text-amber-400">{submitBlockReason}</p>}
+              </div>
             ) : (
-              <Button
-                onClick={() => publishMutation.mutate()}
-                disabled={!canSubmit || publishMutation.isPending}
-                className="bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 shadow-lg shadow-emerald-500/30"
-              >
-                {publishMutation.isPending ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />
-                    Publishing...
-                  </>
-                ) : (
-                  <>
-                    <CheckCircle2 className="w-4 h-4 mr-2" />
-                    {isEditMode ? 'Update Assignment' : 'Publish Assignment'}
-                  </>
-                )}
-              </Button>
+              <div className="flex flex-col items-end gap-1">
+                <Button
+                  onClick={() => publishMutation.mutate()}
+                  disabled={!canSubmit || publishMutation.isPending}
+                  className="bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 shadow-lg shadow-emerald-500/30"
+                >
+                  {publishMutation.isPending ? (
+                    <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />Publishing...</>
+                  ) : (
+                    <><CheckCircle2 className="w-4 h-4 mr-2" />{isEditMode ? 'Update Assignment' : 'Publish Assignment'}</>
+                  )}
+                </Button>
+                {submitBlockReason && <p className="text-xs text-amber-400">{submitBlockReason}</p>}
+              </div>
             )}
           </div>
         </div>
