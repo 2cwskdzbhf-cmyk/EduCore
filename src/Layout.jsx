@@ -17,7 +17,8 @@ import {
   BarChart3,
   User as UserIcon,
   TrendingUp,
-  Brain
+  Brain,
+  Calendar
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -115,6 +116,7 @@ export default function Layout({ children, currentPageName }) {
 
   const studentNav = [
     { name: 'Dashboard', icon: LayoutDashboard, page: 'StudentDashboard' },
+    { name: 'Timetable', icon: Calendar, page: 'MyTimetable' },
     { name: 'Portfolio', icon: Users, page: 'StudentPortfolio' },
     { name: 'Test Scores', icon: TrendingUp, page: 'TestScores' },
     { name: 'Exam Forecast', icon: Brain, page: 'ExamForecast' },

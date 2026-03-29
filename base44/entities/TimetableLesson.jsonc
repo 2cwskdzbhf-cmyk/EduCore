@@ -1,0 +1,83 @@
+{
+  "name": "TimetableLesson",
+  "type": "object",
+  "properties": {
+    "student_email": {
+      "type": "string",
+      "description": "Email of the student"
+    },
+    "subject": {
+      "type": "string",
+      "enum": [
+        "Maths",
+        "English",
+        "Science",
+        "History",
+        "Geography",
+        "Spanish",
+        "Computer Science",
+        "Other"
+      ],
+      "description": "Subject name"
+    },
+    "lesson_name": {
+      "type": "string",
+      "description": "Name or topic of the lesson"
+    },
+    "teacher_name": {
+      "type": "string",
+      "description": "Teacher name (optional)"
+    },
+    "day_of_week": {
+      "type": "string",
+      "enum": [
+        "Monday",
+        "Tuesday",
+        "Wednesday",
+        "Thursday",
+        "Friday"
+      ],
+      "description": "Day of the week"
+    },
+    "week_number": {
+      "type": "number",
+      "enum": [
+        1,
+        2
+      ],
+      "description": "Week 1 or Week 2 (for 2-week timetables)"
+    },
+    "start_time": {
+      "type": "string",
+      "description": "Start time in HH:MM format (e.g., 09:00)"
+    },
+    "duration_minutes": {
+      "type": "number",
+      "description": "Duration of lesson in minutes"
+    },
+    "link": {
+      "type": "string",
+      "description": "Optional link to online class or Google Drive folder"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Optional notes about the lesson"
+    },
+    "linked_class_id": {
+      "type": "string",
+      "description": "Reference to linked Class entity (optional)"
+    },
+    "order_index": {
+      "type": "number",
+      "description": "Order of lesson in the day (for sorting)"
+    }
+  },
+  "required": [
+    "student_email",
+    "subject",
+    "lesson_name",
+    "day_of_week",
+    "week_number",
+    "duration_minutes"
+  ]
+}
