@@ -244,24 +244,28 @@ export default function TakeAssignment() {
             {/* Multiple Choice */}
             {questionType === 'multiple_choice' && (
               <div className="space-y-3">
-                {currentQuestion.options?.map((option, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => setAnswer(idx)}
-                    className={`
-                      w-full p-4 rounded-xl text-left transition-all
-                      ${answers[currentQuestionIndex] === idx
-                        ? 'bg-purple-500 text-white border border-purple-400 shadow-lg shadow-purple-500/30'
-                        : 'bg-white/5 text-white border border-white/10 hover:bg-white/10'
-                      }
-                    `}
-                  >
-                    <div className="flex items-center gap-3">
-                      <span className="font-bold">{String.fromCharCode(65 + idx)}</span>
-                      <span>{option}</span>
-                    </div>
-                  </button>
-                ))}
+                {currentQuestion.options?.map((option, idx) => {
+                  const isSelected = answers[currentQuestionIndex] === idx;
+                  return (
+                    <motion.button
+                      key={idx}
+                      onClick={() => setAnswer(idx)}
+                      animate={isSelected ? { scale: 1.02 } : {}}
+                      className={`
+                        w-full p-4 rounded-xl text-left transition-all
+                        ${isSelected
+                          ? 'bg-purple-500 text-white border border-purple-400 shadow-lg shadow-purple-500/30'
+                          : 'bg-white/5 text-white border border-white/10 hover:bg-white/10'
+                        }
+                      `}
+                    >
+                      <div className="flex items-center gap-3">
+                        <span className="font-bold">{String.fromCharCode(65 + idx)}</span>
+                        <span>{option}</span>
+                      </div>
+                    </motion.button>
+                  );
+                })}
               </div>
             )}
 

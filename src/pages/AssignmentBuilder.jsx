@@ -905,6 +905,7 @@ export default function AssignmentBuilder() {
           onClose={() => setShowGlobalBank(false)}
           onAddQuestions={handleGlobalBankAdd}
           classSubjectId={classData?.subject_id}
+          classYearGroup={classData?.year_group}
         />
       </div>
     </div>

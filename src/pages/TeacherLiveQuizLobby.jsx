@@ -301,8 +301,8 @@ export default function TeacherLiveQuizLobby() {
 
           <Button
             onClick={() => startMutation.mutate()}
-            disabled={startMutation.isPending}
-            className="bg-gradient-to-r from-emerald-500 to-teal-500 px-10"
+            disabled={startMutation.isPending || questions.length === 0}
+            className="bg-gradient-to-r from-emerald-500 to-teal-500 px-10 disabled:opacity-50"
           >
             {startMutation.isPending ? (
               <Loader2 className="w-4 h-4 mr-2 animate-spin" />

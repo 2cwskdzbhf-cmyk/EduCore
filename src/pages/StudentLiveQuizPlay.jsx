@@ -21,8 +21,33 @@ export default function StudentLiveQuizPlay() {
   const [showScoreboard, setShowScoreboard] = useState(false);
   const [quizStartTime, setQuizStartTime] = useState(null);
   const [totalQuizTime, setTotalQuizTime] = useState(0);
+  const [showFeedback, setShowFeedback] = useState(false);
 
   const lastSessionRef = useRef(null);
+
+  // Play sound effect
+  const playSound = (correct) => {
+    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+    
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+    
+    if (correct) {
+      oscillator.frequency.value = 800;
+      gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.2);
+      oscillator.start(audioContext.currentTime);
+      oscillator.stop(audioContext.currentTime + 0.2);
+    } else {
+      oscillator.frequency.value = 300;
+      gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+      oscillator.start(audioContext.currentTime);
+      oscillator.stop(audioContext.currentTime + 0.3);
+    }
+  };
 
   useEffect(() => {
     base44.auth.me().then(setUser);
@@ -214,6 +239,8 @@ export default function StudentLiveQuizPlay() {
     onSuccess: (result) => {
       if (result?.alreadyAnswered) return;
       setAnswerResult(result);
+      setShowFeedback(true);
+      playSound(result.isCorrect);
       queryClient.invalidateQueries(['myLiveQuizPlayer']);
       setTimeout(() => setShowScoreboard(true), 1500);
     }
@@ -445,35 +472,40 @@ export default function StudentLiveQuizPlay() {
               )}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {options.map((opt, i) => {
-                  const isSelected = selected === i;
-                  const isCorrect = answerResult?.correctIndex === i;
-                  const showCorrect = answerResult && isCorrect;
-                  const showIncorrect = answerResult && isSelected && !isCorrect;
+                   const isSelected = selected === i;
+                   const isCorrect = answerResult?.correctIndex === i;
+                   const showCorrect = showFeedback && answerResult && isCorrect;
+                   const showIncorrect = showFeedback && answerResult && isSelected && !isCorrect;
 
-                  return (
-                    <motion.div
-                      key={i}
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: i * 0.1 }}
-                    >
-                      <Button
-                       onClick={() => { setSelected(i); submitAnswer.mutate(i); }}
-                       disabled={selected !== null}
-                       className={`h-20 text-lg w-full transition-all relative ${
-                         showCorrect ? 'bg-emerald-500 hover:bg-emerald-600 border-2 border-emerald-400 animate-pulse' :
-                         showIncorrect ? 'bg-red-500 hover:bg-red-600 border-2 border-red-400 animate-shake' :
-                         isSelected ? 'bg-purple-500 hover:bg-purple-600 opacity-70' : ''
-                       }`}
-                       variant={isSelected || showCorrect || showIncorrect ? 'default' : 'outline'}
-                      >
-                       {opt}
-                       {showCorrect && <CheckCircle2 className="absolute right-3 top-1/2 -translate-y-1/2 w-6 h-6" />}
-                       {showIncorrect && <XCircle className="absolute right-3 top-1/2 -translate-y-1/2 w-6 h-6" />}
-                      </Button>
-                    </motion.div>
-                  );
-                })}
+                   return (
+                     <motion.div
+                       key={i}
+                       initial={{ opacity: 0, y: 20 }}
+                       animate={{ opacity: 1, y: 0 }}
+                       transition={{ delay: i * 0.1 }}
+                     >
+                       <motion.div
+                         animate={showCorrect ? { scale: [1, 1.05, 1] } : showIncorrect ? { x: [-5, 5, -5, 0] } : {}}
+                         transition={{ duration: 0.5 }}
+                       >
+                         <Button
+                          onClick={() => { setSelected(i); submitAnswer.mutate(i); }}
+                          disabled={selected !== null}
+                          className={`h-20 text-lg w-full transition-all relative ${
+                            showCorrect ? 'bg-emerald-500 hover:bg-emerald-600 border-2 border-emerald-400 text-white font-bold' :
+                            showIncorrect ? 'bg-red-500 hover:bg-red-600 border-2 border-red-400 text-white font-bold' :
+                            isSelected ? 'bg-purple-500 hover:bg-purple-600 opacity-70' : ''
+                          }`}
+                          variant={isSelected || showCorrect || showIncorrect ? 'default' : 'outline'}
+                         >
+                          {opt}
+                          {showCorrect && <CheckCircle2 className="absolute right-3 top-1/2 -translate-y-1/2 w-6 h-6" />}
+                          {showIncorrect && <XCircle className="absolute right-3 top-1/2 -translate-y-1/2 w-6 h-6" />}
+                         </Button>
+                       </motion.div>
+                     </motion.div>
+                   );
+                 })}
               </div>
             </>
           ) : (

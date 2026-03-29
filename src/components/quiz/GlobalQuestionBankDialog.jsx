@@ -30,12 +30,12 @@ function matchesType(q, typeValue) {
   return false;
 }
 
-export default function GlobalQuestionBankDialog({ open, onClose, onAddQuestions, classSubjectId }) {
+export default function GlobalQuestionBankDialog({ open, onClose, onAddQuestions, classSubjectId, classYearGroup }) {
   const [screen, setScreen] = useState('subjects');
   const [subject, setSubject] = useState(null);
   const [topic, setTopic] = useState(null);
   const [subtopic, setSubtopic] = useState(null);
-  // Multi-select arrays
+  // Multi-select arrays — yearGroups auto-set from class
   const [yearGroups, setYearGroups] = useState([]);
   const [difficulties, setDifficulties] = useState([]);
   const [questionTypes, setQuestionTypes] = useState([]);
@@ -47,16 +47,22 @@ export default function GlobalQuestionBankDialog({ open, onClose, onAddQuestions
       if (classSubjectId) {
         // Auto-navigate to topics if class has a subject
         setSubject({ id: classSubjectId });
-        setScreen('topics');
+        // Auto-set year groups from class
+        if (classYearGroup) {
+          setYearGroups([String(classYearGroup)]);
+          setScreen('difficulty');
+        } else {
+          setScreen('topics');
+        }
       } else {
         setScreen('subjects');
         setSubject(null);
       }
       setTopic(null); setSubtopic(null);
-      setYearGroups([]); setDifficulties([]); setQuestionTypes([]);
+      setDifficulties([]); setQuestionTypes([]);
       setSelected([]); setSearch('');
     }
-  }, [open, classSubjectId]);
+  }, [open, classSubjectId, classYearGroup]);
 
   const toggleItem = (setter, value) => setter(prev =>
     prev.includes(value) ? prev.filter(v => v !== value) : [...prev, value]
@@ -227,8 +233,7 @@ export default function GlobalQuestionBankDialog({ open, onClose, onAddQuestions
   const goBack = () => {
     if (screen === 'questions') { setScreen('questiontype'); setSelected([]); }
     else if (screen === 'questiontype') { setScreen('difficulty'); }
-    else if (screen === 'difficulty') { setScreen('yeargroup'); }
-    else if (screen === 'yeargroup') { setScreen(subtopics.length > 0 ? 'subtopics' : 'topics'); }
+    else if (screen === 'difficulty') { setScreen(subtopics.length > 0 ? 'subtopics' : 'topics'); }
     else if (screen === 'subtopics') { setScreen('topics'); setSubtopic(null); }
     else if (screen === 'topics') { 
       if (classSubjectId) {
@@ -327,40 +332,7 @@ export default function GlobalQuestionBankDialog({ open, onClose, onAddQuestions
             </div>
           )}
 
-          {/* YEAR GROUP — multi-select */}
-          {screen === 'yeargroup' && (
-            <div>
-              <StepLabel step={4} label="Choose year group(s)" hint="Select one or more" />
-              <div className="grid grid-cols-3 gap-3 mt-4">
-                {YEAR_GROUPS.map(y => {
-                  const val = String(y);
-                  const active = yearGroups.includes(val);
-                  return (
-                    <button
-                      key={y}
-                      onClick={() => toggleItem(setYearGroups, val)}
-                      className={cn(
-                        "flex flex-col items-center justify-center p-5 rounded-xl border transition-all group relative",
-                        active ? "bg-blue-500/20 border-blue-500/60 ring-2 ring-blue-500/40" : "bg-white/[0.03] border-white/10 hover:bg-blue-500/10 hover:border-blue-500/30"
-                      )}
-                    >
-                      {active && <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center"><Check className="w-3 h-3 text-white" /></div>}
-                      <Calendar className={cn("w-7 h-7 mb-2 transition-transform", active ? "text-blue-300" : "text-blue-400 group-hover:scale-110")} />
-                      <span className="text-xl font-bold text-white">Year {y}</span>
-                      <span className="text-xs text-slate-500 mt-0.5">Age {y + 4}–{y + 5}</span>
-                    </button>
-                  );
-                })}
-              </div>
-              <MultiSelectFooter
-                count={yearGroups.length}
-                label="year group"
-                onNext={() => setScreen('difficulty')}
-                onSelectAll={() => setYearGroups(YEAR_GROUPS.map(String))}
-                onClear={() => setYearGroups([])}
-              />
-            </div>
-          )}
+
 
           {/* DIFFICULTY — multi-select */}
           {screen === 'difficulty' && (
