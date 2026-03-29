@@ -800,12 +800,11 @@ export default function InteractiveWhiteboard({
           onContextMenu={(e) => e.stopPropagation()}
         >
           <div className="bg-slate-950 border-2 border-purple-500/50 rounded p-2 shadow-xl shadow-purple-500/20 space-y-2">
-            <input
+            <textarea
               ref={inlineInputRef}
               autoFocus
               autoComplete="off"
               spellCheck="false"
-              type="text"
               value={textInput}
               onChange={(e) => {
                 const newText = e.target.value;
@@ -814,7 +813,7 @@ export default function InteractiveWhiteboard({
                 if (inputPosition?.idx !== undefined) {
                   const newStrokes = [...strokes];
                   newStrokes[inputPosition.idx].content = newText;
-                  newStrokes[inputPosition.idx].width = Math.max(150, newText.length * (textFontSize * 0.6));
+                  newStrokes[inputPosition.idx].width = Math.max(150, newText.split('\n')[0].length * (textFontSize * 0.6));
                   setStrokes(newStrokes);
                 }
               }}
@@ -829,23 +828,14 @@ export default function InteractiveWhiteboard({
               }}
               onKeyDown={(e) => {
                 e.stopPropagation();
-                if (e.key === 'Enter') {
-                  if (inputPosition?.idx !== undefined) {
-                    const newStrokes = [...strokes];
-                    newStrokes[inputPosition.idx].content = textInput;
-                    setStrokes(newStrokes);
-                  }
-                  setInputPosition(null);
-                  setEditingTextIdx(null);
-                }
                 if (e.key === 'Escape') {
                   setInputPosition(null);
                   setEditingTextIdx(null);
                 }
               }}
-              placeholder="Type text..."
-              className="w-full bg-white/5 border border-white/10 text-white rounded px-2 py-1 text-sm outline-none focus:border-purple-400/50 focus:ring-1 focus:ring-purple-400/30"
-              style={{ fontSize: textFontSize + 'px', fontFamily: textFont, color: textColor, width: Math.max(150, textInput.length * (textFontSize * 0.6)) + 'px' }}
+              placeholder="Type text... (Press Escape to finish)"
+              className="w-full bg-white/5 border border-white/10 text-white rounded px-2 py-1 text-sm outline-none focus:border-purple-400/50 focus:ring-1 focus:ring-purple-400/30 resize-none"
+              style={{ fontSize: textFontSize + 'px', fontFamily: textFont, color: textColor, width: Math.max(150, textInput.length * (textFontSize * 0.6)) + 'px', minHeight: textFontSize * 3 + 'px' }}
             />
 
             {/* Font Size */}
