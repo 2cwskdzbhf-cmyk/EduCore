@@ -387,7 +387,7 @@ export default function TeacherClassDetail() {
 
           <div className="mb-8">
             <h1 className="text-3xl font-bold text-white mb-2">{classData.name}</h1>
-            <div className="flex flex-wrap items-center gap-4 text-sm text-slate-400 mb-3">
+            <div className="flex flex-wrap items-center gap-4 text-sm text-slate-300 mb-3">
               <span className="flex items-center gap-1">
                 <Users className="w-4 h-4" />
                 {classData.student_emails?.length || 0} students
@@ -421,17 +421,17 @@ export default function TeacherClassDetail() {
           </div>
 
           <Tabs defaultValue="setAssignments" className="space-y-6">
-            <TabsList className="bg-white/5 border border-white/10 h-auto p-1 flex flex-wrap gap-1">
-              <TabsTrigger value="setAssignments" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-500 data-[state=active]:to-blue-500 data-[state=active]:text-white">
+            <TabsList className="bg-white/5 border border-white/10 h-auto p-1 flex flex-wrap gap-1 justify-start w-full">
+              <TabsTrigger value="setAssignments" className="text-slate-200 data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-500 data-[state=active]:to-blue-500 data-[state=active]:text-white">
                 📋 Active Assignments
               </TabsTrigger>
-              <TabsTrigger value="practice" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-500 data-[state=active]:to-blue-500 data-[state=active]:text-white">
+              <TabsTrigger value="practice" className="text-slate-200 data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-500 data-[state=active]:to-blue-500 data-[state=active]:text-white">
                 ✏️ Create Assignment
               </TabsTrigger>
-              <TabsTrigger value="live" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-500 data-[state=active]:to-blue-500 data-[state=active]:text-white">
+              <TabsTrigger value="live" className="text-slate-200 data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-500 data-[state=active]:to-blue-500 data-[state=active]:text-white">
                 ⚡ Live Quizzes
               </TabsTrigger>
-              <TabsTrigger value="analytics" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-500 data-[state=active]:to-blue-500 data-[state=active]:text-white">
+              <TabsTrigger value="analytics" className="text-slate-200 data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-500 data-[state=active]:to-blue-500 data-[state=active]:text-white">
                 📊 Analytics
               </TabsTrigger>
             </TabsList>
@@ -929,7 +929,7 @@ export default function TeacherClassDetail() {
                         <div className="flex items-center justify-between">
                           <div>
                             <p className="text-white font-medium">{set.title}</p>
-                            <p className="text-slate-400 text-sm">{set.question_count} questions • {set.difficulty}</p>
+                            <p className="text-slate-200 text-sm">{set.question_count} questions • {set.difficulty}</p>
                           </div>
                           <Button size="sm" className="bg-amber-500" onClick={() => navigate(createPageUrl(`StartLiveQuiz?setId=${set.id}&classId=${classId}`))}>
                             Start Session
@@ -980,7 +980,7 @@ export default function TeacherClassDetail() {
                               </span>
                             </div>
                             
-                            <div className="flex flex-wrap items-center gap-4 text-sm text-slate-400">
+                            <div className="flex flex-wrap items-center gap-4 text-sm text-slate-200">
                               {topicName && (
                                 <span className="flex items-center gap-1">
                                   <ClipboardList className="w-4 h-4" />
@@ -994,10 +994,10 @@ export default function TeacherClassDetail() {
                                 </span>
                               )}
                               {!assignment.due_date && (
-                                <span className="text-slate-500">No due date</span>
+                               <span className="text-slate-300">No due date</span>
                               )}
-                              <span className="text-slate-500">
-                                Created {new Date(assignment.created_date).toLocaleDateString()}
+                              <span className="text-slate-300">
+                               Created {new Date(assignment.created_date).toLocaleDateString()}
                               </span>
                             </div>
                           </div>
@@ -1014,19 +1014,19 @@ export default function TeacherClassDetail() {
 
                         <div className="grid grid-cols-3 gap-4 pt-4 border-t border-white/10" onClick={() => setSelectedAssignment(assignment)}>
                           <div>
-                            <p className="text-xs text-slate-500 mb-1">Started</p>
+                            <p className="text-xs text-slate-300 mb-1">Started</p>
                             <p className="text-2xl font-bold text-white">{started}</p>
-                            <p className="text-xs text-slate-400">of {classData.student_emails?.length || 0} students</p>
-                          </div>
-                          <div>
-                            <p className="text-xs text-slate-500 mb-1">Completed</p>
+                            <p className="text-xs text-slate-300">of {classData.student_emails?.length || 0} students</p>
+                            </div>
+                            <div>
+                            <p className="text-xs text-slate-300 mb-1">Completed</p>
                             <p className="text-2xl font-bold text-white">{completed}</p>
-                            <p className="text-xs text-slate-400">submissions</p>
-                          </div>
-                          <div>
-                            <p className="text-xs text-slate-500 mb-1">Avg Accuracy</p>
+                            <p className="text-xs text-slate-300">submissions</p>
+                            </div>
+                            <div>
+                            <p className="text-xs text-slate-300 mb-1">Avg Accuracy</p>
                             <p className="text-2xl font-bold text-white">{avgAccuracy}%</p>
-                            <p className="text-xs text-slate-400">{totalQuestions} questions</p>
+                            <p className="text-xs text-slate-300">{totalQuestions} questions</p>
                           </div>
                         </div>
                       </GlassCard>
@@ -1208,7 +1208,7 @@ function ClassLeaderboard({ classData, submissions, assignments, onSelectStudent
           <Trophy className="w-6 h-6 text-amber-400" />
           Class Leaderboard
         </h3>
-        <span className="text-sm text-slate-400">{studentEmails.length} students enrolled</span>
+        <span className="text-sm text-slate-300">{studentEmails.length} students enrolled</span>
       </div>
 
       {/* Top 3 podium */}
@@ -1257,29 +1257,29 @@ function ClassLeaderboard({ classData, submissions, assignments, onSelectStudent
               {/* Name */}
               <div className="flex-1 min-w-0">
                 <p className="text-white font-medium truncate">{student.displayName}</p>
-                <p className="text-xs text-slate-500 truncate">{student.email}</p>
+                <p className="text-xs text-slate-300 truncate">{student.email}</p>
               </div>
 
               {/* Stats */}
               {hasActivity ? (
                 <div className="flex items-center gap-6 text-center">
                   <div>
-                    <p className="text-xs text-slate-500 mb-0.5">Accuracy</p>
+                    <p className="text-xs text-slate-300 mb-0.5">Accuracy</p>
                     <p className={`text-base font-bold ${student.accuracy >= 80 ? 'text-emerald-400' : student.accuracy >= 60 ? 'text-amber-400' : 'text-red-400'}`}>
                       {student.accuracy.toFixed(1)}%
                     </p>
                   </div>
                   <div>
-                    <p className="text-xs text-slate-500 mb-0.5">Questions</p>
+                    <p className="text-xs text-slate-300 mb-0.5">Questions</p>
                     <p className="text-base font-bold text-white">{student.totalQ}</p>
                   </div>
                   <div>
-                    <p className="text-xs text-slate-500 mb-0.5">Completed</p>
+                    <p className="text-xs text-slate-300 mb-0.5">Completed</p>
                     <p className="text-base font-bold text-white">{student.completed}</p>
                   </div>
                   {student.streak > 0 && (
                     <div>
-                      <p className="text-xs text-slate-500 mb-0.5">Streak</p>
+                      <p className="text-xs text-slate-300 mb-0.5">Streak</p>
                       <p className="text-base font-bold text-orange-400">🔥{student.streak}</p>
                     </div>
                   )}
@@ -1294,7 +1294,7 @@ function ClassLeaderboard({ classData, submissions, assignments, onSelectStudent
                   </div>
                 </div>
               ) : (
-                <p className="text-xs text-slate-600 italic">No activity yet</p>
+                <p className="text-xs text-slate-400 italic">No activity yet</p>
               )}
 
               <Eye className="w-4 h-4 text-slate-600 group-hover:text-slate-400 flex-shrink-0 transition-colors" />
@@ -1369,11 +1369,11 @@ function AssignmentProgressModal({ assignment, classStudents, submissions, topic
           <div className="flex items-start justify-between mb-6">
             <div>
               <h2 className="text-2xl font-bold text-white mb-2">{assignment.title}</h2>
-              <div className="flex items-center gap-4 text-sm text-slate-400">
-                <span className="flex items-center gap-1">
-                  <ClipboardList className="w-4 h-4" />
-                  {topicName}
-                </span>
+              <div className="flex items-center gap-4 text-sm text-slate-200">
+              <span className="flex items-center gap-1">
+              <ClipboardList className="w-4 h-4" />
+              {topicName}
+              </span>
                 {assignment.due_date && (
                   <span className="flex items-center gap-1">
                     <Calendar className="w-4 h-4" />
@@ -1427,25 +1427,25 @@ function AssignmentProgressModal({ assignment, classStudents, submissions, topic
 
                     <div className="grid grid-cols-5 gap-6 text-center">
                       <div>
-                        <p className="text-xs text-slate-500 mb-1">Questions</p>
+                        <p className="text-xs text-slate-300 mb-1">Questions</p>
                         <p className="text-lg font-bold text-white">{student.questionsAnswered}</p>
                       </div>
                       <div>
-                        <p className="text-xs text-slate-500 mb-1">Correct</p>
+                        <p className="text-xs text-slate-300 mb-1">Correct</p>
                         <p className="text-lg font-bold text-white">{student.correctAnswers}</p>
                       </div>
                       <div>
-                        <p className="text-xs text-slate-500 mb-1">Accuracy</p>
+                        <p className="text-xs text-slate-300 mb-1">Accuracy</p>
                         <p className="text-lg font-bold text-white">
                           {student.accuracy !== null ? `${student.accuracy}%` : '—'}
                         </p>
                       </div>
                       <div>
-                        <p className="text-xs text-slate-500 mb-1">Time</p>
+                        <p className="text-xs text-slate-300 mb-1">Time</p>
                         <p className="text-lg font-bold text-white">{formatTime(student.timeSpent)}</p>
                       </div>
                       <div>
-                        <p className="text-xs text-slate-500 mb-1">Avg/Q</p>
+                        <p className="text-xs text-slate-300 mb-1">Avg/Q</p>
                         <p className="text-lg font-bold text-white">
                           {student.questionsAnswered > 0 ? formatTime(Math.floor(student.timeSpent / student.questionsAnswered)) : '—'}
                         </p>
