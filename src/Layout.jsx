@@ -15,7 +15,8 @@ import {
   ClipboardList,
   Shield,
   BarChart3,
-  User as UserIcon
+  User as UserIcon,
+  TrendingUp
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -114,6 +115,7 @@ export default function Layout({ children, currentPageName }) {
   const studentNav = [
     { name: 'Dashboard', icon: LayoutDashboard, page: 'StudentDashboard' },
     { name: 'Portfolio', icon: Users, page: 'StudentPortfolio' },
+    { name: 'Test Scores', icon: TrendingUp, page: 'TestScores' },
     { name: 'AI Tutor', icon: MessageSquare, page: 'AITutor' },
   ];
 

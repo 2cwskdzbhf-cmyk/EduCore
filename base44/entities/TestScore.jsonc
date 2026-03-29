@@ -1,0 +1,66 @@
+{
+  "name": "TestScore",
+  "type": "object",
+  "properties": {
+    "student_email": {
+      "type": "string",
+      "description": "Email of the student who took the test"
+    },
+    "subject": {
+      "type": "string",
+      "enum": [
+        "Maths",
+        "English",
+        "Science",
+        "Geography",
+        "History",
+        "Spanish",
+        "Computer Science",
+        "Other"
+      ],
+      "description": "Subject of the test"
+    },
+    "test_name": {
+      "type": "string",
+      "description": "Name of the test (e.g., Algebra test, End of topic test)"
+    },
+    "score": {
+      "type": "number",
+      "description": "Score the student got"
+    },
+    "total_marks": {
+      "type": "number",
+      "description": "Total marks for the test"
+    },
+    "percentage": {
+      "type": "number",
+      "description": "Calculated percentage (score / total_marks * 100)"
+    },
+    "grade": {
+      "type": "string",
+      "description": "Grade achieved (optional)"
+    },
+    "date": {
+      "type": "string",
+      "format": "date",
+      "description": "Date the test was taken"
+    },
+    "topic": {
+      "type": "string",
+      "description": "Topic covered in the test (e.g., Fractions, Rivers, Energy)"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Optional notes about the test"
+    }
+  },
+  "required": [
+    "student_email",
+    "subject",
+    "test_name",
+    "score",
+    "total_marks",
+    "date",
+    "topic"
+  ]
+}
