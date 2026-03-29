@@ -39,11 +39,14 @@ export default function InteractiveWhiteboard({
   const [tool, setTool] = useState('pen');
   const [color, setColor] = useState('#ffffff');
   const [brushSize, setBrushSize] = useState(3);
+  const [eraserSize, setEraserSize] = useState(15);
   const [strokes, setStrokes] = useState(whiteboard?.strokes || []);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [textMode, setTextMode] = useState(false);
   const [textInput, setTextInput] = useState('');
   const [textPosition, setTextPosition] = useState(null);
+  const [selectedStroke, setSelectedStroke] = useState(null);
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
 
   const saveWhiteboardMutation = useMutation({
     mutationFn: async () => {
@@ -109,6 +112,11 @@ export default function InteractiveWhiteboard({
   const startDrawing = (event) => {
     if (!canEdit) return;
 
+    if (tool === 'select') {
+      handleCanvasClick(event);
+      return;
+    }
+
     const { offsetX, offsetY } = event.nativeEvent;
     contextRef.current.beginPath();
     contextRef.current.moveTo(offsetX, offsetY);
@@ -132,7 +140,7 @@ export default function InteractiveWhiteboard({
       context.lineTo(offsetX, offsetY);
       context.stroke();
     } else if (tool === 'eraser') {
-      context.clearRect(offsetX - brushSize / 2, offsetY - brushSize / 2, brushSize, brushSize);
+      context.clearRect(offsetX - eraserSize / 2, offsetY - eraserSize / 2, eraserSize, eraserSize);
     }
   };
 
@@ -145,20 +153,22 @@ export default function InteractiveWhiteboard({
     onClear?.();
   };
 
-  const handleTextAdd = (text, x, y) => {
-    if (!canEdit || !text.trim()) return;
+  const handleTextAdd = (x, y) => {
     const context = contextRef.current;
+    const fontSize = 16;
     context.fillStyle = color;
-    context.font = `${brushSize * 5}px Arial`;
-    context.fillText(text, x, y);
+    context.font = `${fontSize}px Arial`;
+    context.fillText(textInput, x, y);
     
     const newStroke = {
       type: 'text',
-      content: text,
+      content: textInput,
       x,
       y,
+      width: textInput.length * 8,
+      height: fontSize,
       color,
-      size: brushSize * 5,
+      size: fontSize,
       timestamp: new Date().toISOString(),
       drawn_by: 'user'
     };
@@ -201,12 +211,24 @@ export default function InteractiveWhiteboard({
   };
 
   const handleCanvasClick = (e) => {
-    if (textMode && canEdit) {
-      const rect = canvasRef.current.getBoundingClientRect();
-      setTextPosition({
-        x: e.clientX - rect.left,
-        y: e.clientY - rect.top
+    if (!canEdit) return;
+    
+    const rect = canvasRef.current.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    if (textMode) {
+      setTextPosition({ x, y });
+      setTimeout(() => textInputRef.current?.focus(), 0);
+    } else if (tool === 'select') {
+      // Check if clicking on a stroke
+      const clicked = strokes.findIndex(stroke => {
+        if (stroke.type === 'text' && stroke.x && stroke.y) {
+          return x >= stroke.x && x <= stroke.x + stroke.width && y >= stroke.y - stroke.size && y <= stroke.y;
+        }
+        return false;
       });
+      setSelectedStroke(clicked >= 0 ? clicked : null);
     }
   };
 
@@ -243,6 +265,14 @@ export default function InteractiveWhiteboard({
                   title="Erase"
                 >
                   <Eraser className="w-4 h-4" />
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={() => { setTool('select'); setTextMode(false); }}
+                  className={tool === 'select' ? 'bg-green-500' : 'bg-white/10 hover:bg-white/20'}
+                  title="Select & move"
+                >
+                  ➢
                 </Button>
                 <Button
                   size="sm"
@@ -301,6 +331,21 @@ export default function InteractiveWhiteboard({
                 </div>
               )}
 
+              {/* Eraser Size */}
+              {tool === 'eraser' && (
+                <div className="flex items-center gap-2">
+                  <input
+                    type="range"
+                    min="5"
+                    max="50"
+                    value={eraserSize}
+                    onChange={(e) => setEraserSize(parseInt(e.target.value))}
+                    className="w-24"
+                  />
+                  <span className="text-xs text-slate-400">{eraserSize}px</span>
+                </div>
+              )}
+
               {/* Spacer */}
               <div className="flex-1" />
 
@@ -320,7 +365,7 @@ export default function InteractiveWhiteboard({
                 size="sm"
                 onClick={() => setIsFullscreen(!isFullscreen)}
                 variant="outline"
-                className="border-white/30 text-white hover:bg-white/10"
+                className="border-white/30 text-slate-300 hover:text-white hover:bg-white/10"
                 title={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
               >
                 {isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
@@ -400,7 +445,7 @@ export default function InteractiveWhiteboard({
                 onChange={(e) => setTextInput(e.target.value)}
                 onKeyPress={(e) => {
                   if (e.key === 'Enter') {
-                    handleTextAdd(textInput, textPosition.x, textPosition.y);
+                    handleTextAdd(textPosition.x, textPosition.y);
                   }
                 }}
                 placeholder="Type text..."
@@ -409,7 +454,7 @@ export default function InteractiveWhiteboard({
               <div className="flex gap-2">
                 <Button
                   size="sm"
-                  onClick={() => handleTextAdd(textInput, textPosition.x, textPosition.y)}
+                  onClick={() => handleTextAdd(textPosition.x, textPosition.y)}
                   className="flex-1 bg-purple-500"
                 >
                   Add
