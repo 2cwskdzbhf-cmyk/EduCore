@@ -439,83 +439,114 @@ export default function TeacherClassDetail() {
             {/* Create Tab */}
             <TabsContent value="practice" className="space-y-6">
               {!createMode && (
-                <GlassCard className="p-8">
-                  <h3 className="text-xl font-bold text-white mb-6 text-center">Choose Creation Method</h3>
-                  <div className="grid md:grid-cols-2 gap-6">
+                <div className="space-y-4">
+                  <div className="flex items-center gap-3 mb-2">
+                    <ClipboardList className="w-5 h-5 text-blue-400" />
+                    <h3 className="text-lg font-semibold text-white">Create Assignment</h3>
+                  </div>
+                  <div className="grid md:grid-cols-2 gap-4">
+                    {/* Manual - clean blue card */}
                     <motion.div
                       whileHover={{ scale: 1.02 }}
                       className="cursor-pointer"
                       onClick={() => setCreateMode('manual')}
                     >
-                      <GlassCard className="p-8 text-center hover:bg-white/10 border-2 border-white/10 hover:border-purple-500/50">
-                        <div className="w-16 h-16 mx-auto mb-4 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center">
-                          <Edit2 className="w-8 h-8 text-white" />
+                      <div className="relative overflow-hidden rounded-2xl border-2 border-blue-500/40 bg-gradient-to-br from-blue-900/40 to-cyan-900/30 p-7 hover:border-blue-400/70 hover:from-blue-900/60 transition-all duration-200 group">
+                        <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 rounded-full -translate-y-1/2 translate-x-1/2" />
+                        <div className="w-14 h-14 mb-5 rounded-2xl bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center shadow-lg shadow-blue-500/40">
+                          <Edit2 className="w-7 h-7 text-white" />
                         </div>
-                        <h4 className="text-xl font-bold text-white mb-2">Manual Create</h4>
-                        <p className="text-sm text-slate-400">Build assignments manually or add questions from the library</p>
-                      </GlassCard>
+                        <h4 className="text-xl font-bold text-white mb-1">Manual Create</h4>
+                        <p className="text-sm text-blue-200/70 mb-5 leading-relaxed">Build an assignment from scratch or pull from your question library.</p>
+                        <div className="flex flex-col gap-2 text-xs text-blue-200/60">
+                          <span className="flex items-center gap-2"><CheckCircle2 className="w-3.5 h-3.5 text-blue-400" /> Full control over every question</span>
+                          <span className="flex items-center gap-2"><CheckCircle2 className="w-3.5 h-3.5 text-blue-400" /> Pick from your question library</span>
+                          <span className="flex items-center gap-2"><CheckCircle2 className="w-3.5 h-3.5 text-blue-400" /> Add resources, rubrics & instructions</span>
+                        </div>
+                        <div className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-blue-300 group-hover:text-blue-200 transition-colors">
+                          Get started <ChevronLeft className="w-4 h-4 rotate-180" />
+                        </div>
+                      </div>
                     </motion.div>
 
+                    {/* AI Generate - purple glowing card */}
                     <motion.div
                       whileHover={{ scale: 1.02 }}
                       className="cursor-pointer"
                       onClick={() => setCreateMode('ai')}
                     >
-                      <GlassCard className="p-8 text-center hover:bg-white/10 border-2 border-white/10 hover:border-purple-500/50">
-                        <div className="w-16 h-16 mx-auto mb-4 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
-                          <Sparkles className="w-8 h-8 text-white" />
+                      <div className="relative overflow-hidden rounded-2xl border-2 border-purple-500/50 bg-gradient-to-br from-purple-900/50 to-pink-900/30 p-7 hover:border-purple-400/80 hover:from-purple-900/70 transition-all duration-200 group">
+                        <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/10 rounded-full -translate-y-1/2 translate-x-1/2" />
+                        <div className="absolute bottom-2 right-2 text-5xl opacity-10 select-none">✨</div>
+                        <div className="w-14 h-14 mb-5 rounded-2xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center shadow-lg shadow-purple-500/50">
+                          <Sparkles className="w-7 h-7 text-white" />
                         </div>
-                        <h4 className="text-xl font-bold text-white mb-2">AI Generate</h4>
-                        <p className="text-sm text-slate-400">Let AI create practice questions for your students</p>
-                      </GlassCard>
+                        <div className="flex items-center gap-2 mb-1">
+                          <h4 className="text-xl font-bold text-white">AI Generate</h4>
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-purple-500/30 text-purple-200 border border-purple-400/30 font-medium">Recommended</span>
+                        </div>
+                        <p className="text-sm text-purple-200/70 mb-5 leading-relaxed">Let AI create tailored practice questions in seconds based on topic & difficulty.</p>
+                        <div className="flex flex-col gap-2 text-xs text-purple-200/60">
+                          <span className="flex items-center gap-2"><Sparkles className="w-3.5 h-3.5 text-purple-400" /> Instant question generation</span>
+                          <span className="flex items-center gap-2"><Sparkles className="w-3.5 h-3.5 text-purple-400" /> Tuned to topic & difficulty level</span>
+                          <span className="flex items-center gap-2"><Sparkles className="w-3.5 h-3.5 text-purple-400" /> Edit, delete or regenerate questions</span>
+                        </div>
+                        <div className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-purple-300 group-hover:text-purple-200 transition-colors">
+                          Generate now <ChevronLeft className="w-4 h-4 rotate-180" />
+                        </div>
+                      </div>
                     </motion.div>
                   </div>
-                </GlassCard>
+                </div>
               )}
 
               {createMode === 'manual' && (
-                <GlassCard className="p-6">
-                  <div className="flex items-center justify-between mb-6">
-                    <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                <div className="space-y-4">
+                  <div className="flex items-center gap-3">
+                    <button onClick={() => setCreateMode('')} className="text-slate-400 hover:text-white transition-colors">
+                      <ChevronLeft className="w-5 h-5" />
+                    </button>
+                    <h3 className="text-lg font-semibold text-white flex items-center gap-2">
                       <Edit2 className="w-5 h-5 text-blue-400" />
-                      Manual Create
+                      Manual Assignment Creator
                     </h3>
-                    <Button variant="ghost" onClick={() => setCreateMode('')} className="text-slate-400">
-                      <X className="w-5 h-5" />
-                    </Button>
                   </div>
-                  
-                  <div className="space-y-4">
-                    <Button
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div
                       onClick={() => navigate(createPageUrl(`AssignmentBuilder?classId=${classId}`))}
-                      className="w-full bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 shadow-lg shadow-emerald-500/30 text-white"
+                      className="cursor-pointer rounded-2xl border border-emerald-500/30 bg-emerald-900/20 hover:bg-emerald-900/40 hover:border-emerald-400/50 p-6 transition-all group"
                     >
-                      <Plus className="w-5 h-5 mr-2" />
-                      Create Assignment from Scratch
-                    </Button>
-
-                    <Button
+                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-500 flex items-center justify-center mb-4">
+                        <Plus className="w-5 h-5 text-white" />
+                      </div>
+                      <h4 className="text-white font-semibold mb-1">Create from Scratch</h4>
+                      <p className="text-sm text-emerald-200/60">Write your own questions, add a rubric, attach resources and set a due date.</p>
+                    </div>
+                    <div
                       onClick={() => navigate(createPageUrl('TeacherAssignmentLibrary'))}
-                      className="w-full bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 shadow-lg shadow-blue-500/30 text-white"
+                      className="cursor-pointer rounded-2xl border border-blue-500/30 bg-blue-900/20 hover:bg-blue-900/40 hover:border-blue-400/50 p-6 transition-all group"
                     >
-                      <BookOpen className="w-5 h-5 mr-2" />
-                      Add Questions from Library
-                    </Button>
+                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center mb-4">
+                        <BookOpen className="w-5 h-5 text-white" />
+                      </div>
+                      <h4 className="text-white font-semibold mb-1">From Question Library</h4>
+                      <p className="text-sm text-blue-200/60">Browse your saved question library and select questions to build an assignment.</p>
+                    </div>
                   </div>
-                </GlassCard>
+                </div>
               )}
 
               {createMode === 'ai' && (
                 <>
                   <GlassCard className="p-6">
-                    <div className="flex items-center justify-between mb-6">
-                      <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                    <div className="flex items-center gap-3 mb-6">
+                      <button onClick={() => setCreateMode('')} className="text-slate-400 hover:text-white transition-colors">
+                        <ChevronLeft className="w-5 h-5" />
+                      </button>
+                      <h3 className="text-lg font-semibold text-white flex items-center gap-2">
                         <Sparkles className="w-5 h-5 text-purple-400" />
                         AI Generate Assignment Questions
                       </h3>
-                      <Button variant="ghost" onClick={() => setCreateMode('')} className="text-slate-400">
-                        <X className="w-5 h-5" />
-                      </Button>
                     </div>
 
                 <div className="space-y-4">
@@ -689,83 +720,114 @@ export default function TeacherClassDetail() {
             {/* Live Quizzes Tab */}
             <TabsContent value="live" className="space-y-6">
               {!createMode && (
-                <GlassCard className="p-8">
-                  <h3 className="text-xl font-bold text-white mb-6 text-center">Choose Creation Method</h3>
-                  <div className="grid md:grid-cols-2 gap-6">
+                <div className="space-y-4">
+                  <div className="flex items-center gap-3 mb-2">
+                    <Zap className="w-5 h-5 text-amber-400" />
+                    <h3 className="text-lg font-semibold text-white">Launch a Live Quiz</h3>
+                  </div>
+                  <div className="grid md:grid-cols-2 gap-4">
+                    {/* Manual Live Quiz */}
                     <motion.div
                       whileHover={{ scale: 1.02 }}
                       className="cursor-pointer"
                       onClick={() => setCreateMode('manual')}
                     >
-                      <GlassCard className="p-8 text-center hover:bg-white/10 border-2 border-white/10 hover:border-purple-500/50">
-                        <div className="w-16 h-16 mx-auto mb-4 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center">
-                          <Edit2 className="w-8 h-8 text-white" />
+                      <div className="relative overflow-hidden rounded-2xl border-2 border-teal-500/40 bg-gradient-to-br from-teal-900/40 to-emerald-900/30 p-7 hover:border-teal-400/70 hover:from-teal-900/60 transition-all duration-200 group">
+                        <div className="absolute top-0 right-0 w-32 h-32 bg-teal-500/10 rounded-full -translate-y-1/2 translate-x-1/2" />
+                        <div className="w-14 h-14 mb-5 rounded-2xl bg-gradient-to-br from-teal-500 to-emerald-500 flex items-center justify-center shadow-lg shadow-teal-500/40">
+                          <Edit2 className="w-7 h-7 text-white" />
                         </div>
-                        <h4 className="text-xl font-bold text-white mb-2">Manual Create</h4>
-                        <p className="text-sm text-slate-400">Build quizzes manually or add questions from the library</p>
-                      </GlassCard>
+                        <h4 className="text-xl font-bold text-white mb-1">Manual Quiz</h4>
+                        <p className="text-sm text-teal-200/70 mb-5 leading-relaxed">Design a live quiz from scratch or launch a saved quiz set from your library.</p>
+                        <div className="flex flex-col gap-2 text-xs text-teal-200/60">
+                          <span className="flex items-center gap-2"><CheckCircle2 className="w-3.5 h-3.5 text-teal-400" /> Write custom questions</span>
+                          <span className="flex items-center gap-2"><CheckCircle2 className="w-3.5 h-3.5 text-teal-400" /> Launch from saved quiz library</span>
+                          <span className="flex items-center gap-2"><CheckCircle2 className="w-3.5 h-3.5 text-teal-400" /> Full control over pacing</span>
+                        </div>
+                        <div className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-teal-300 group-hover:text-teal-200 transition-colors">
+                          Get started <ChevronLeft className="w-4 h-4 rotate-180" />
+                        </div>
+                      </div>
                     </motion.div>
 
+                    {/* AI Live Quiz - amber/orange for energy */}
                     <motion.div
                       whileHover={{ scale: 1.02 }}
                       className="cursor-pointer"
                       onClick={() => setCreateMode('ai')}
                     >
-                      <GlassCard className="p-8 text-center hover:bg-white/10 border-2 border-white/10 hover:border-purple-500/50">
-                        <div className="w-16 h-16 mx-auto mb-4 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
-                          <Sparkles className="w-8 h-8 text-white" />
+                      <div className="relative overflow-hidden rounded-2xl border-2 border-amber-500/50 bg-gradient-to-br from-amber-900/40 to-orange-900/30 p-7 hover:border-amber-400/80 hover:from-amber-900/60 transition-all duration-200 group">
+                        <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/10 rounded-full -translate-y-1/2 translate-x-1/2" />
+                        <div className="absolute bottom-2 right-2 text-5xl opacity-10 select-none">⚡</div>
+                        <div className="w-14 h-14 mb-5 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center shadow-lg shadow-amber-500/50">
+                          <Sparkles className="w-7 h-7 text-white" />
                         </div>
-                        <h4 className="text-xl font-bold text-white mb-2">AI Generate</h4>
-                        <p className="text-sm text-slate-400">Let AI create quiz questions for your students</p>
-                      </GlassCard>
+                        <div className="flex items-center gap-2 mb-1">
+                          <h4 className="text-xl font-bold text-white">AI Live Quiz</h4>
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-amber-500/30 text-amber-200 border border-amber-400/30 font-medium">Fastest</span>
+                        </div>
+                        <p className="text-sm text-amber-200/70 mb-5 leading-relaxed">AI generates a ready-to-launch live quiz in seconds. Preview, tweak, then go!</p>
+                        <div className="flex flex-col gap-2 text-xs text-amber-200/60">
+                          <span className="flex items-center gap-2"><Zap className="w-3.5 h-3.5 text-amber-400" /> Quiz ready in under 30 seconds</span>
+                          <span className="flex items-center gap-2"><Zap className="w-3.5 h-3.5 text-amber-400" /> Matched to topic & difficulty</span>
+                          <span className="flex items-center gap-2"><Zap className="w-3.5 h-3.5 text-amber-400" /> Start live session immediately</span>
+                        </div>
+                        <div className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-amber-300 group-hover:text-amber-200 transition-colors">
+                          Generate & launch <ChevronLeft className="w-4 h-4 rotate-180" />
+                        </div>
+                      </div>
                     </motion.div>
                   </div>
-                </GlassCard>
+                </div>
               )}
 
               {createMode === 'manual' && (
-                <GlassCard className="p-6">
-                  <div className="flex items-center justify-between mb-6">
-                    <h3 className="text-xl font-bold text-white flex items-center gap-2">
-                      <Edit2 className="w-5 h-5 text-blue-400" />
-                      Manual Create Quiz
+                <div className="space-y-4">
+                  <div className="flex items-center gap-3">
+                    <button onClick={() => setCreateMode('')} className="text-slate-400 hover:text-white transition-colors">
+                      <ChevronLeft className="w-5 h-5" />
+                    </button>
+                    <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                      <Edit2 className="w-5 h-5 text-teal-400" />
+                      Manual Live Quiz
                     </h3>
-                    <Button variant="ghost" onClick={() => setCreateMode('')} className="text-slate-400">
-                      <X className="w-5 h-5" />
-                    </Button>
                   </div>
-                  
-                  <div className="space-y-4">
-                    <Button
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div
                       onClick={() => navigate(createPageUrl(`CreateQuiz?classId=${classId}`))}
-                      className="w-full bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 shadow-lg shadow-emerald-500/30 text-white"
+                      className="cursor-pointer rounded-2xl border border-teal-500/30 bg-teal-900/20 hover:bg-teal-900/40 hover:border-teal-400/50 p-6 transition-all"
                     >
-                      <Plus className="w-5 h-5 mr-2" />
-                      Create Quiz from Scratch
-                    </Button>
-
-                    <Button
+                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-teal-500 to-emerald-500 flex items-center justify-center mb-4">
+                        <Plus className="w-5 h-5 text-white" />
+                      </div>
+                      <h4 className="text-white font-semibold mb-1">Create Quiz from Scratch</h4>
+                      <p className="text-sm text-teal-200/60">Open the quiz builder and write your own questions for a live session.</p>
+                    </div>
+                    <div
                       onClick={() => navigate(createPageUrl('QuizLibrary'))}
-                      className="w-full bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 shadow-lg shadow-blue-500/30 text-white"
+                      className="cursor-pointer rounded-2xl border border-emerald-500/30 bg-emerald-900/20 hover:bg-emerald-900/40 hover:border-emerald-400/50 p-6 transition-all"
                     >
-                      <BookOpen className="w-5 h-5 mr-2" />
-                      Add Questions from Library
-                    </Button>
+                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-400 flex items-center justify-center mb-4">
+                        <BookOpen className="w-5 h-5 text-white" />
+                      </div>
+                      <h4 className="text-white font-semibold mb-1">From Quiz Library</h4>
+                      <p className="text-sm text-emerald-200/60">Browse your saved quizzes and launch an existing set as a live session.</p>
+                    </div>
                   </div>
-                </GlassCard>
+                </div>
               )}
 
               {createMode === 'ai' && (
                 <>
                   <GlassCard className="p-6">
-                    <div className="flex items-center justify-between mb-6">
-                      <h3 className="text-xl font-bold text-white flex items-center gap-2">
-                        <Sparkles className="w-5 h-5 text-purple-400" />
-                        AI Generate Quiz Questions
+                    <div className="flex items-center gap-3 mb-6">
+                      <button onClick={() => setCreateMode('')} className="text-slate-400 hover:text-white transition-colors">
+                        <ChevronLeft className="w-5 h-5" />
+                      </button>
+                      <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                        <Zap className="w-5 h-5 text-amber-400" />
+                        AI Generate Live Quiz
                       </h3>
-                      <Button variant="ghost" onClick={() => setCreateMode('')} className="text-slate-400">
-                        <X className="w-5 h-5" />
-                      </Button>
                     </div>
 
                     <div className="space-y-4">
