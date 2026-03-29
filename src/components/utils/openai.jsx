@@ -28,6 +28,8 @@ export async function callOpenAI({ prompt, response_json_schema, file_urls }) {
     return response.data.response;
   } catch (error) {
     console.error('OpenAI call failed:', error);
-    throw new Error(`AI call failed: ${error.message}`);
+    // Surface the actual error message from the backend response if available
+    const serverMessage = error?.response?.data?.error;
+    throw new Error(serverMessage || error.message || 'AI call failed');
   }
 }

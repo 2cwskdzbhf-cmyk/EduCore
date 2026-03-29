@@ -87,8 +87,12 @@ Deno.serve(async (req) => {
 
   } catch (error) {
     console.error('OpenAI error:', error);
-    return Response.json({ 
-      error: error.message || 'Failed to call OpenAI' 
-    }, { status: 500 });
+    const isQuota = error?.status === 429 || error?.code === 'insufficient_quota';
+    return Response.json({
+      error: isQuota
+        ? 'OpenAI quota exceeded. Please check your API key billing at platform.openai.com.'
+        : (error.message || 'Failed to call OpenAI'),
+      code: error?.code || null,
+    }, { status: isQuota ? 429 : 500 });
   }
 });
