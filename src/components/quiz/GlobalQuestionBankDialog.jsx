@@ -77,7 +77,12 @@ export default function GlobalQuestionBankDialog({ open, onClose, onAddQuestions
     queryKey: ['globalTopicsTop', subject?.id || classSubjectId],
     queryFn: async () => {
       const subId = subject?.id || classSubjectId;
-      const all = await base44.entities.GlobalTopic.filter({ subject_id: subId });
+      // Try GlobalTopic first
+      let all = await base44.entities.GlobalTopic.filter({ subject_id: subId });
+      // Fallback to Topic if GlobalTopic is empty
+      if (all.length === 0) {
+        all = await base44.entities.Topic.filter({ subject_id: subId });
+      }
       return all.filter(t => !t.parent_topic_id).sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0));
     },
     enabled: open && (!!subject?.id || !!classSubjectId),
