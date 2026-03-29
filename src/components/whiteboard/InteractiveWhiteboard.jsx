@@ -46,7 +46,11 @@ export default function InteractiveWhiteboard({
   const [textInput, setTextInput] = useState('');
   const [textPosition, setTextPosition] = useState(null);
   const [selectedStroke, setSelectedStroke] = useState(null);
-  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStart, setDragStart] = useState(null);
+  const [textFontSize, setTextFontSize] = useState(16);
+  const [textColor, setTextColor] = useState('#ffffff');
+  const [textFont, setTextFont] = useState('Arial');
 
   const saveWhiteboardMutation = useMutation({
     mutationFn: async () => {
@@ -93,24 +97,51 @@ export default function InteractiveWhiteboard({
     context.fillStyle = '#0f172a';
     context.fillRect(0, 0, context.canvas.width, context.canvas.height);
 
-    strokes.forEach((stroke) => {
+    strokes.forEach((stroke, idx) => {
       if (stroke.type === 'line') {
         context.strokeStyle = stroke.color;
         context.lineWidth = stroke.width;
         context.beginPath();
-        stroke.points.forEach((point, idx) => {
-          if (idx === 0) context.moveTo(point.x, point.y);
+        stroke.points.forEach((point, i) => {
+          if (i === 0) context.moveTo(point.x, point.y);
           else context.lineTo(point.x, point.y);
         });
         context.stroke();
-      } else if (stroke.type === 'erase') {
-        context.clearRect(stroke.x - stroke.width / 2, stroke.y - stroke.width / 2, stroke.width, stroke.width);
+      } else if (stroke.type === 'text') {
+        context.fillStyle = stroke.color || '#ffffff';
+        context.font = `${stroke.size || 16}px ${stroke.font || 'Arial'}`;
+        context.fillText(stroke.content, stroke.x, stroke.y);
+        
+        if (selectedStroke === idx) {
+          const metrics = context.measureText(stroke.content);
+          context.strokeStyle = '#fbbf24';
+          context.lineWidth = 2;
+          context.strokeRect(stroke.x - 5, stroke.y - stroke.size - 5, metrics.width + 10, stroke.size + 10);
+        }
+      } else if (stroke.type === 'image' && stroke.src) {
+        const img = new Image();
+        img.src = stroke.src;
+        img.onload = () => {
+          context.drawImage(img, stroke.x, stroke.y, stroke.width, stroke.height);
+          if (selectedStroke === idx) {
+            context.strokeStyle = '#fbbf24';
+            context.lineWidth = 2;
+            context.strokeRect(stroke.x, stroke.y, stroke.width, stroke.height);
+          }
+        };
       }
     });
   };
 
   const startDrawing = (event) => {
     if (!canEdit) return;
+
+    if (tool === 'select' && selectedStroke !== null) {
+      const { offsetX, offsetY } = event.nativeEvent;
+      setIsDragging(true);
+      setDragStart({ x: offsetX, y: offsetY });
+      return;
+    }
 
     if (tool === 'select') {
       handleCanvasClick(event);
@@ -126,10 +157,37 @@ export default function InteractiveWhiteboard({
   const finishDrawing = () => {
     contextRef.current.closePath();
     setIsDrawing(false);
+    setIsDragging(false);
+    setDragStart(null);
+  };
+
+  const handleDragMove = (event) => {
+    if (!isDragging || selectedStroke === null || !dragStart) return;
+
+    const { offsetX, offsetY } = event.nativeEvent;
+    const dx = offsetX - dragStart.x;
+    const dy = offsetY - dragStart.y;
+
+    const newStrokes = [...strokes];
+    newStrokes[selectedStroke] = {
+      ...newStrokes[selectedStroke],
+      x: newStrokes[selectedStroke].x + dx,
+      y: newStrokes[selectedStroke].y + dy
+    };
+    setStrokes(newStrokes);
+    setDragStart({ x: offsetX, y: offsetY });
   };
 
   const draw = (event) => {
-    if (!isDrawing || !canEdit) return;
+    if (!canEdit) return;
+
+    if (isDragging) {
+      handleDragMove(event);
+      redrawCanvas();
+      return;
+    }
+
+    if (!isDrawing) return;
 
     const { offsetX, offsetY } = event.nativeEvent;
     const context = contextRef.current;
@@ -155,9 +213,8 @@ export default function InteractiveWhiteboard({
 
   const handleTextAdd = (x, y) => {
     const context = contextRef.current;
-    const fontSize = 16;
-    context.fillStyle = color;
-    context.font = `${fontSize}px Arial`;
+    context.fillStyle = textColor;
+    context.font = `${textFontSize}px ${textFont}`;
     context.fillText(textInput, x, y);
     
     const newStroke = {
@@ -165,10 +222,11 @@ export default function InteractiveWhiteboard({
       content: textInput,
       x,
       y,
-      width: textInput.length * 8,
-      height: fontSize,
-      color,
-      size: fontSize,
+      width: textInput.length * (textFontSize * 0.6),
+      height: textFontSize,
+      color: textColor,
+      size: textFontSize,
+      font: textFont,
       timestamp: new Date().toISOString(),
       drawn_by: 'user'
     };
@@ -410,7 +468,7 @@ export default function InteractiveWhiteboard({
           onClick={handleCanvasClick}
           className={cn(
             'flex-1 bg-slate-900 rounded-lg border border-white/10 min-h-[400px]',
-            canEdit && textMode ? 'cursor-text' : canEdit ? 'cursor-crosshair' : 'cursor-default opacity-80'
+            canEdit && textMode ? 'cursor-text' : canEdit && tool === 'select' ? 'cursor-move' : canEdit ? 'cursor-crosshair' : 'cursor-default opacity-80'
           )}
         />
 
@@ -425,14 +483,14 @@ export default function InteractiveWhiteboard({
       <AnimatePresence>
         {textMode && textPosition && (
           <motion.div
-            className="fixed inset-0 flex items-center justify-center z-40"
+            className="fixed inset-0 flex items-center justify-center z-40 bg-black/50"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={() => setTextMode(false)}
           >
             <motion.div
-              className="bg-slate-950 border border-white/20 rounded-lg p-4 shadow-lg"
+              className="bg-slate-950 border border-white/20 rounded-lg p-6 shadow-lg max-w-sm w-full mx-4"
               initial={{ scale: 0.9 }}
               animate={{ scale: 1 }}
               exit={{ scale: 0.9 }}
@@ -449,8 +507,58 @@ export default function InteractiveWhiteboard({
                   }
                 }}
                 placeholder="Type text..."
-                className="bg-white/5 border-white/10 text-white mb-3"
+                className="bg-white/5 border-white/10 text-white mb-4"
               />
+
+              <div className="space-y-3 mb-4">
+                {/* Font Size */}
+                <div>
+                  <label className="text-xs text-slate-400 mb-2 block">Size: {textFontSize}px</label>
+                  <input
+                    type="range"
+                    min="8"
+                    max="48"
+                    value={textFontSize}
+                    onChange={(e) => setTextFontSize(parseInt(e.target.value))}
+                    className="w-full"
+                  />
+                </div>
+
+                {/* Font */}
+                <div>
+                  <label className="text-xs text-slate-400 mb-2 block">Font</label>
+                  <select
+                    value={textFont}
+                    onChange={(e) => setTextFont(e.target.value)}
+                    className="w-full bg-white/5 border border-white/10 text-white rounded px-3 py-2 text-sm"
+                  >
+                    <option value="Arial">Arial</option>
+                    <option value="Georgia">Georgia</option>
+                    <option value="Times New Roman">Times New Roman</option>
+                    <option value="Courier New">Courier New</option>
+                    <option value="Verdana">Verdana</option>
+                  </select>
+                </div>
+
+                {/* Color */}
+                <div>
+                  <label className="text-xs text-slate-400 mb-2 block">Color</label>
+                  <div className="flex gap-2">
+                    {['#ffffff', '#ff6b6b', '#4ecdc4', '#45b7d1', '#96ceb4', '#ffeaa7', '#000000'].map((c) => (
+                      <button
+                        key={c}
+                        onClick={() => setTextColor(c)}
+                        className={cn(
+                          'w-8 h-8 rounded-full border-2 transition-all',
+                          textColor === c ? 'border-white scale-110' : 'border-white/30 hover:border-white'
+                        )}
+                        style={{ backgroundColor: c }}
+                      />
+                    ))}
+                  </div>
+                </div>
+              </div>
+
               <div className="flex gap-2">
                 <Button
                   size="sm"
