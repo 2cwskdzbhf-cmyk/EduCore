@@ -55,6 +55,7 @@ export default function InteractiveWhiteboard({
   const [editingTextIdx, setEditingTextIdx] = useState(null);
   const [inlineTextValue, setInlineTextValue] = useState('');
   const inlineInputRef = useRef(null);
+  const [inputPosition, setInputPosition] = useState(null);
 
   const saveWhiteboardMutation = useMutation({
     mutationFn: async () => {
@@ -313,26 +314,30 @@ export default function InteractiveWhiteboard({
     const y = e.clientY - rect.top;
 
     if (textMode) {
-      // Start inline text editing
-      setTextPosition({ x, y });
+      // Start inline text editing directly on canvas
+      setTextPosition(null);
+      setInputPosition({ x, y, canvasX: rect.left, canvasY: rect.top });
       setInlineTextValue('');
       setEditingTextIdx(null);
       setTimeout(() => inlineInputRef.current?.focus(), 0);
     } else if (tool === 'select') {
-      // Check if clicking on a text or image
+      // Check if clicking on a text or image with more forgiving hit area
       let found = false;
-      for (let i = 0; i < strokes.length; i++) {
+      for (let i = strokes.length - 1; i >= 0; i--) {
         const stroke = strokes[i];
         if (stroke.type === 'text') {
-          if (x >= stroke.x && x <= stroke.x + stroke.width && y >= stroke.y - stroke.size && y <= stroke.y) {
+          const padding = 8;
+          if (x >= stroke.x - padding && x <= stroke.x + stroke.width + padding && 
+              y >= stroke.y - stroke.size - padding && y <= stroke.y + padding) {
             setSelectedStroke(i);
-            setEditingTextIdx(i);
-            setInlineTextValue(stroke.content);
+            setEditingTextIdx(null);
             found = true;
             break;
           }
         } else if (stroke.type === 'image') {
-          if (x >= stroke.x && x <= stroke.x + stroke.width && y >= stroke.y && y <= stroke.y + stroke.height) {
+          const padding = 5;
+          if (x >= stroke.x - padding && x <= stroke.x + stroke.width + padding && 
+              y >= stroke.y - padding && y <= stroke.y + stroke.height + padding) {
             setSelectedStroke(i);
             setEditingTextIdx(null);
             found = true;
@@ -533,20 +538,16 @@ export default function InteractiveWhiteboard({
         )}
       </GlassCard>
 
-      {/* Inline Text Editing */}
-      {textMode && textPosition && (
-        <motion.div
-          className="fixed z-40 bg-slate-950 border border-white/20 rounded-lg p-4 shadow-lg"
+      {/* Inline Text Input on Canvas */}
+      {inputPosition && (
+        <div
+          className="fixed z-40"
           style={{
-            left: textPosition.x + 'px',
-            top: textPosition.y + 'px',
-            transform: 'translate(-50%, -50%)'
+            left: (inputPosition.canvasX + inputPosition.x) + 'px',
+            top: (inputPosition.canvasY + inputPosition.y) + 'px'
           }}
-          initial={{ scale: 0.8, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          exit={{ scale: 0.8, opacity: 0 }}
         >
-          <div className="w-48 space-y-2">
+          <div className="bg-slate-950 border border-white/20 rounded p-2 shadow-lg w-56 space-y-2">
             <input
               ref={inlineInputRef}
               autoFocus
@@ -554,18 +555,24 @@ export default function InteractiveWhiteboard({
               value={textInput}
               onChange={(e) => setTextInput(e.target.value)}
               onBlur={() => {
-                if (textInput.trim()) handleTextAdd(textPosition.x, textPosition.y);
-                else setTextMode(false);
+                if (textInput.trim()) handleTextAdd(inputPosition.x, inputPosition.y);
+                setInputPosition(null);
+                setTextMode(false);
               }}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
-                  if (textInput.trim()) handleTextAdd(textPosition.x, textPosition.y);
-                  else setTextMode(false);
+                  if (textInput.trim()) handleTextAdd(inputPosition.x, inputPosition.y);
+                  setInputPosition(null);
+                  setTextMode(false);
                 }
-                if (e.key === 'Escape') setTextMode(false);
+                if (e.key === 'Escape') {
+                  setInputPosition(null);
+                  setTextMode(false);
+                }
               }}
               placeholder="Type text..."
               className="w-full bg-white/5 border border-white/10 text-white rounded px-2 py-1 text-sm"
+              style={{ fontSize: textFontSize + 'px', fontFamily: textFont, color: textColor }}
             />
 
             {/* Font Size */}
@@ -588,7 +595,6 @@ export default function InteractiveWhiteboard({
                 value={textFont}
                 onChange={(e) => setTextFont(e.target.value)}
                 className="w-full bg-white/5 border border-white/10 text-white rounded px-2 py-1 text-xs"
-                style={{ color: textFont }}
               >
                 <option value="Arial" style={{ fontFamily: 'Arial' }}>Arial</option>
                 <option value="Georgia" style={{ fontFamily: 'Georgia' }}>Georgia</option>
@@ -601,13 +607,13 @@ export default function InteractiveWhiteboard({
             {/* Color */}
             <div className="text-xs">
               <label className="text-slate-400 block mb-1">Color</label>
-              <div className="flex gap-1">
+              <div className="flex gap-1 flex-wrap">
                 {['#ffffff', '#ff6b6b', '#4ecdc4', '#45b7d1', '#96ceb4', '#ffeaa7', '#000000'].map((c) => (
                   <button
                     key={c}
                     onClick={() => setTextColor(c)}
                     className={cn(
-                      'w-6 h-6 rounded-full border-2 transition-all',
+                      'w-5 h-5 rounded-full border-2 transition-all',
                       textColor === c ? 'border-white scale-110' : 'border-white/30'
                     )}
                     style={{ backgroundColor: c }}
@@ -616,7 +622,7 @@ export default function InteractiveWhiteboard({
               </div>
             </div>
           </div>
-        </motion.div>
+        </div>
       )}
 
       {/* Text Edit for Selected Text */}
