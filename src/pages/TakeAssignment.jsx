@@ -140,8 +140,16 @@ export default function TakeAssignment() {
 
       return { totalScore, maxScore: questions.length, percentage };
     },
-    onSuccess: () => {
-      navigate(createPageUrl(`StudentClassDetail?classId=${assignment.class_id}`));
+    onSuccess: (data, variables, context) => {
+      // Find the submission we just created to get its ID
+      setTimeout(async () => {
+        const submissions = await base44.entities.AssignmentSubmission.filter({ 
+          assignment_id: assignment.id,
+          student_email: user.email 
+        });
+        const latestSubmission = submissions[0];
+        navigate(createPageUrl(`AssignmentResults?assignmentId=${assignment.id}&classId=${assignment.class_id}`));
+      }, 100);
     }
   });
 

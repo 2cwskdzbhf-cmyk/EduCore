@@ -19,6 +19,7 @@ import LiveClassroomView from "./pages/LiveClassroomView";
 import QuizScheduler from "./pages/QuizScheduler";
 import KnowledgeGapReport from "./pages/KnowledgeGapReport";
 import ClassKnowledgeGaps from "./pages/ClassKnowledgeGaps";
+import AssignmentResults from "./pages/AssignmentResults";
 
 const { Pages, Layout, mainPage } = pagesConfig;
 
@@ -83,6 +84,7 @@ const AuthenticatedApp = () => {
       <Route path="/QuizScheduler" element={<LayoutWrapper currentPageName="QuizScheduler"><QuizScheduler /></LayoutWrapper>} />
       <Route path="/KnowledgeGapReport" element={<LayoutWrapper currentPageName="KnowledgeGapReport"><KnowledgeGapReport /></LayoutWrapper>} />
       <Route path="/ClassKnowledgeGaps" element={<LayoutWrapper currentPageName="ClassKnowledgeGaps"><ClassKnowledgeGaps /></LayoutWrapper>} />
+      <Route path="/AssignmentResults" element={<LayoutWrapper currentPageName="AssignmentResults"><AssignmentResults /></LayoutWrapper>} />
       <Route path="*" element={<PageNotFound />} />
     </Routes>
   );
