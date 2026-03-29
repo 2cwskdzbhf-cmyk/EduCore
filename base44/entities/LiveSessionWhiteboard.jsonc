@@ -1,0 +1,85 @@
+{
+  "name": "LiveSessionWhiteboard",
+  "type": "object",
+  "properties": {
+    "session_id": {
+      "type": "string",
+      "description": "Reference to LiveQuizSession"
+    },
+    "teacher_email": {
+      "type": "string",
+      "description": "Email of the teacher controlling the whiteboard"
+    },
+    "drawing_data": {
+      "type": "string",
+      "description": "Canvas drawing data as PNG or SVG"
+    },
+    "strokes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "line",
+              "circle",
+              "rectangle",
+              "text",
+              "erase"
+            ]
+          },
+          "points": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "x": {
+                  "type": "number"
+                },
+                "y": {
+                  "type": "number"
+                }
+              }
+            }
+          },
+          "color": {
+            "type": "string"
+          },
+          "width": {
+            "type": "number"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "drawn_by": {
+            "type": "string"
+          }
+        }
+      },
+      "description": "Array of drawing strokes"
+    },
+    "student_edit_permissions": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "boolean"
+      },
+      "description": "Map of student emails to edit permission boolean"
+    },
+    "allow_all_edits": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether all students can edit"
+    },
+    "is_enabled": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether whiteboard is visible"
+    }
+  },
+  "required": [
+    "session_id",
+    "teacher_email"
+  ]
+}
