@@ -100,7 +100,7 @@ export default function TeacherDashboard() {
 
   const createClassMutation = useMutation({
     mutationFn: async () => {
-      if (!user?.email) return;
+      if (!user?.email || !selectedSubject) throw new Error('Subject is required');
       
       let joinCode = generateUniqueJoinCode();
       let isUnique = false;
@@ -120,7 +120,7 @@ export default function TeacherDashboard() {
         name: newClassName,
         teacher_email: user.email,
         subject_id: selectedSubject,
-        year_group: parseInt(selectedYearGroup),
+        year_group: selectedYearGroup ? parseInt(selectedYearGroup) : null,
         join_code: joinCode,
         student_emails: [],
         is_active: true
@@ -132,6 +132,9 @@ export default function TeacherDashboard() {
       setNewClassName('');
       setSelectedSubject('');
       setSelectedYearGroup('');
+    },
+    onError: (error) => {
+      alert(error.message || 'Failed to create class');
     }
   });
 
@@ -231,11 +234,11 @@ export default function TeacherDashboard() {
                     </Select>
                   </div>
                   <Button
-                    className="w-full"
-                    onClick={() => createClassMutation.mutate()}
-                    disabled={!newClassName || !selectedSubject || !selectedYearGroup || createClassMutation.isPending}
+                   className="w-full"
+                   onClick={() => createClassMutation.mutate()}
+                   disabled={!newClassName || !selectedSubject || createClassMutation.isPending}
                   >
-                    {createClassMutation.isPending ? 'Creating...' : 'Create Class'}
+                   {createClassMutation.isPending ? 'Creating...' : 'Create Class'}
                   </Button>
                 </div>
               </DialogContent>

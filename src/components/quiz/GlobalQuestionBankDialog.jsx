@@ -30,7 +30,7 @@ function matchesType(q, typeValue) {
   return false;
 }
 
-export default function GlobalQuestionBankDialog({ open, onClose, onAddQuestions }) {
+export default function GlobalQuestionBankDialog({ open, onClose, onAddQuestions, classSubjectId }) {
   const [screen, setScreen] = useState('subjects');
   const [subject, setSubject] = useState(null);
   const [topic, setTopic] = useState(null);
@@ -44,12 +44,19 @@ export default function GlobalQuestionBankDialog({ open, onClose, onAddQuestions
 
   useEffect(() => {
     if (open) {
-      setScreen('subjects');
-      setSubject(null); setTopic(null); setSubtopic(null);
+      if (classSubjectId) {
+        // Auto-navigate to topics if class has a subject
+        setSubject({ id: classSubjectId });
+        setScreen('topics');
+      } else {
+        setScreen('subjects');
+        setSubject(null);
+      }
+      setTopic(null); setSubtopic(null);
       setYearGroups([]); setDifficulties([]); setQuestionTypes([]);
       setSelected([]); setSearch('');
     }
-  }, [open]);
+  }, [open, classSubjectId]);
 
   const toggleItem = (setter, value) => setter(prev =>
     prev.includes(value) ? prev.filter(v => v !== value) : [...prev, value]
@@ -58,16 +65,17 @@ export default function GlobalQuestionBankDialog({ open, onClose, onAddQuestions
   const { data: subjects = [], isLoading: loadingSubjects } = useQuery({
     queryKey: ['subjects'],
     queryFn: () => base44.entities.Subject.list(),
-    enabled: open,
+    enabled: open && !classSubjectId,
   });
 
   const { data: topics = [], isLoading: loadingTopics } = useQuery({
-    queryKey: ['globalTopicsTop', subject?.id],
+    queryKey: ['globalTopicsTop', subject?.id || classSubjectId],
     queryFn: async () => {
-      const all = await base44.entities.GlobalTopic.filter({ subject_id: subject.id });
+      const subId = subject?.id || classSubjectId;
+      const all = await base44.entities.GlobalTopic.filter({ subject_id: subId });
       return all.filter(t => !t.parent_topic_id).sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0));
     },
-    enabled: open && !!subject?.id,
+    enabled: open && (!!subject?.id || !!classSubjectId),
   });
 
   const { data: subtopics = [], isLoading: loadingSubtopics } = useQuery({
@@ -222,7 +230,14 @@ export default function GlobalQuestionBankDialog({ open, onClose, onAddQuestions
     else if (screen === 'difficulty') { setScreen('yeargroup'); }
     else if (screen === 'yeargroup') { setScreen(subtopics.length > 0 ? 'subtopics' : 'topics'); }
     else if (screen === 'subtopics') { setScreen('topics'); setSubtopic(null); }
-    else if (screen === 'topics') { setScreen('subjects'); setSubject(null); }
+    else if (screen === 'topics') { 
+      if (classSubjectId) {
+        onClose?.();
+      } else {
+        setScreen('subjects'); 
+        setSubject(null);
+      }
+    }
   };
 
   const breadcrumbParts = [
@@ -276,7 +291,7 @@ export default function GlobalQuestionBankDialog({ open, onClose, onAddQuestions
         <div className="flex-1 overflow-y-auto p-5">
 
           {/* SUBJECTS */}
-          {screen === 'subjects' && (
+          {screen === 'subjects' && !classSubjectId && (
             <div className="space-y-3">
               <StepLabel step={1} label="Choose a subject" hint="Single select" />
               {loadingSubjects ? <Spinner /> : subjects.map(s => (
