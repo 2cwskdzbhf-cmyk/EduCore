@@ -59,6 +59,7 @@ export default function InteractiveWhiteboard({
   const [selectedIndices, setSelectedIndices] = useState([]);
   const [isMultiSelect, setIsMultiSelect] = useState(false);
   const [dragSelectStart, setDragSelectStart] = useState(null);
+  const [activeGuides, setActiveGuides] = useState({ vertical: null, horizontal: null });
 
   const saveWhiteboardMutation = useMutation({
     mutationFn: async () => {
@@ -104,6 +105,29 @@ export default function InteractiveWhiteboard({
 
     context.fillStyle = '#0f172a';
     context.fillRect(0, 0, context.canvas.width, context.canvas.height);
+
+    // Draw alignment guides
+    if (activeGuides.vertical !== null) {
+      context.strokeStyle = 'rgba(251, 191, 36, 0.6)';
+      context.lineWidth = 2;
+      context.setLineDash([5, 5]);
+      context.beginPath();
+      context.moveTo(activeGuides.vertical, 0);
+      context.lineTo(activeGuides.vertical, context.canvas.height);
+      context.stroke();
+      context.setLineDash([]);
+    }
+    
+    if (activeGuides.horizontal !== null) {
+      context.strokeStyle = 'rgba(251, 191, 36, 0.6)';
+      context.lineWidth = 2;
+      context.setLineDash([5, 5]);
+      context.beginPath();
+      context.moveTo(0, activeGuides.horizontal);
+      context.lineTo(context.canvas.width, activeGuides.horizontal);
+      context.stroke();
+      context.setLineDash([]);
+    }
 
     strokes.forEach((stroke, idx) => {
       if (stroke.type === 'line') {
@@ -259,6 +283,7 @@ export default function InteractiveWhiteboard({
     setIsDragging(false);
     setDragStart(null);
     setResizeHandle(null);
+    setActiveGuides({ vertical: null, horizontal: null });
     
     // Finish drag selection
     if (dragSelectStart) {
@@ -292,6 +317,69 @@ export default function InteractiveWhiteboard({
     }
   };
 
+  const getSnapPoints = (stroke) => {
+    return {
+      left: stroke.x,
+      right: stroke.x + stroke.width,
+      centerX: stroke.x + stroke.width / 2,
+      top: stroke.y - (stroke.type === 'text' ? stroke.size : 0),
+      bottom: stroke.y + (stroke.type === 'text' ? 0 : stroke.height),
+      centerY: stroke.y + (stroke.type === 'text' ? -stroke.size / 2 : stroke.height / 2)
+    };
+  };
+
+  const checkSnapping = (movedStrokes, snapThreshold = 10) => {
+    const guides = { vertical: null, horizontal: null };
+    const movedIndices = new Set(selectedIndices);
+    
+    // Get canvas center
+    const canvasCenter = canvasRef.current?.width / 2 || 400;
+    
+    selectedIndices.forEach(idx => {
+      const stroke = movedStrokes[idx];
+      const moved = getSnapPoints(stroke);
+      
+      // Check against canvas center
+      if (Math.abs(moved.centerX - canvasCenter) < snapThreshold) {
+        guides.vertical = canvasCenter;
+        stroke.x = canvasCenter - stroke.width / 2;
+      }
+      
+      // Check against other objects
+      strokes.forEach((otherStroke, oIdx) => {
+        if (movedIndices.has(oIdx)) return;
+        
+        const other = getSnapPoints(otherStroke);
+        
+        // Vertical alignment
+        if (Math.abs(moved.left - other.left) < snapThreshold) {
+          guides.vertical = other.left;
+          stroke.x = other.left;
+        } else if (Math.abs(moved.right - other.right) < snapThreshold) {
+          guides.vertical = other.right;
+          stroke.x = other.right - stroke.width;
+        } else if (Math.abs(moved.centerX - other.centerX) < snapThreshold) {
+          guides.vertical = other.centerX;
+          stroke.x = other.centerX - stroke.width / 2;
+        }
+        
+        // Horizontal alignment
+        if (Math.abs(moved.top - other.top) < snapThreshold) {
+          guides.horizontal = other.top;
+          stroke.y = other.top + (stroke.type === 'text' ? stroke.size : 0);
+        } else if (Math.abs(moved.bottom - other.bottom) < snapThreshold) {
+          guides.horizontal = other.bottom;
+          stroke.y = other.bottom - (stroke.type === 'text' ? 0 : stroke.height);
+        } else if (Math.abs(moved.centerY - other.centerY) < snapThreshold) {
+          guides.horizontal = other.centerY;
+          stroke.y = other.centerY + (stroke.type === 'text' ? stroke.size / 2 : stroke.height / 2);
+        }
+      });
+    });
+    
+    return guides;
+  };
+
   const handleDragMove = (event) => {
     if (!isDragging || !dragStart) return;
 
@@ -313,6 +401,10 @@ export default function InteractiveWhiteboard({
         newStrokes[idx].x += dx;
         newStrokes[idx].y += dy;
       });
+      
+      // Check for snapping
+      const guides = checkSnapping(newStrokes);
+      setActiveGuides(guides);
     }
 
     setStrokes(newStrokes);
