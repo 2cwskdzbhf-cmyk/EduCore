@@ -226,7 +226,7 @@ export default function InteractiveWhiteboard({
         content: '',
         x: offsetX,
         y: offsetY,
-        width: 50,
+        width: 150,
         height: textFontSize,
         color: textColor,
         size: textFontSize,
@@ -235,11 +235,15 @@ export default function InteractiveWhiteboard({
         drawn_by: 'user'
       };
       const newIdx = strokes.length;
-      setStrokes([...strokes, newStroke]);
+      const newStrokes = [...strokes, newStroke];
+      setStrokes(newStrokes);
       setEditingTextIdx(newIdx);
       setInlineTextValue('');
       setInputPosition({ x: offsetX, y: offsetY, canvasX: 0, canvasY: 0, idx: newIdx });
-      setTimeout(() => inlineInputRef.current?.focus(), 0);
+      // Focus immediately without delay to capture keyboard input
+      requestAnimationFrame(() => {
+        inlineInputRef.current?.focus();
+      });
       return;
     }
 
@@ -645,7 +649,7 @@ export default function InteractiveWhiteboard({
       </GlassCard>
 
       {/* Inline Text Input on Canvas */}
-      {inputPosition && (
+      {inputPosition !== null && (
         <div
           className="fixed z-40"
           style={{
@@ -657,19 +661,22 @@ export default function InteractiveWhiteboard({
             <input
               ref={inlineInputRef}
               autoFocus
+              autoComplete="off"
               type="text"
               value={textInput}
               onChange={(e) => {
-                setTextInput(e.target.value);
-                // Update stroke width dynamically
-                if (inputPosition?.idx !== null && inputPosition?.idx !== undefined) {
+                const newText = e.target.value;
+                setTextInput(newText);
+                // Update stroke immediately as user types
+                if (inputPosition?.idx !== undefined) {
                   const newStrokes = [...strokes];
-                  newStrokes[inputPosition.idx].width = Math.max(50, e.target.value.length * (textFontSize * 0.6));
+                  newStrokes[inputPosition.idx].content = newText;
+                  newStrokes[inputPosition.idx].width = Math.max(150, newText.length * (textFontSize * 0.6));
                   setStrokes(newStrokes);
                 }
               }}
               onBlur={() => {
-                if (textInput.trim() && inputPosition?.idx !== undefined) {
+                if (inputPosition?.idx !== undefined) {
                   const newStrokes = [...strokes];
                   newStrokes[inputPosition.idx].content = textInput;
                   setStrokes(newStrokes);
@@ -680,7 +687,7 @@ export default function InteractiveWhiteboard({
               }}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
-                  if (textInput.trim() && inputPosition?.idx !== undefined) {
+                  if (inputPosition?.idx !== undefined) {
                     const newStrokes = [...strokes];
                     newStrokes[inputPosition.idx].content = textInput;
                     setStrokes(newStrokes);
@@ -696,7 +703,7 @@ export default function InteractiveWhiteboard({
                 }
               }}
               placeholder="Type text..."
-              className="w-full bg-white/5 border border-white/10 text-white rounded px-2 py-1 text-sm outline-none"
+              className="w-full bg-white/5 border border-white/10 text-white rounded px-2 py-1 text-sm outline-none focus:border-white/30"
               style={{ fontSize: textFontSize + 'px', fontFamily: textFont, color: textColor, width: Math.max(150, textInput.length * (textFontSize * 0.6)) + 'px' }}
             />
 
