@@ -451,17 +451,15 @@ export default function AssignmentBuilder() {
 
   const handleGlobalBankAdd = (mappedQuestions) => {
     if (!Array.isArray(mappedQuestions) || mappedQuestions.length === 0) return;
-    const startIdx = questions.length;
     const converted = mappedQuestions.map((q, i) => {
       const isWritten = q.question_type === 'short_answer' || q.question_type === 'written';
       return {
-        id: startIdx + i + 1,
+        id: i + 1,
         type: isWritten ? 'written' : (q.question_type || 'multiple_choice'),
         prompt: q.prompt || '',
         options: isWritten ? ['', '', '', ''] : (Array.isArray(q.options) ? q.options : ['', '', '', '']),
         correctIndex: isWritten ? null : (typeof q.correct_index === 'number' ? q.correct_index : 0),
         explanation: q.explanation || '',
-        // For written: use the pre-generated keyword variations from the bank dialog
         answerKeywords: isWritten
           ? (Array.isArray(q.answer_keywords) && q.answer_keywords.length > 0
               ? q.answer_keywords
@@ -471,8 +469,21 @@ export default function AssignmentBuilder() {
         workingKeywords: ['']
       };
     });
-    setQuestions(prev => [...prev, ...converted]);
-    setCurrentQuestionIndex(startIdx);
+
+    setQuestions(prev => {
+      // If there's only one empty placeholder question, replace it entirely
+      const hasOnlyEmptyPlaceholder = prev.length === 1 && !prev[0].prompt?.trim();
+      const base = hasOnlyEmptyPlaceholder ? [] : prev;
+      const startId = base.length + 1;
+      const withIds = converted.map((q, i) => ({ ...q, id: startId + i }));
+      return [...base, ...withIds];
+    });
+
+    // Navigate to the first added question
+    setCurrentQuestionIndex(prev => {
+      const hasOnlyEmptyPlaceholder = questions.length === 1 && !questions[0].prompt?.trim();
+      return hasOnlyEmptyPlaceholder ? 0 : questions.length;
+    });
   };
 
   // A question is "started" if it has any prompt text
