@@ -26,7 +26,8 @@ import {
   AlertCircle,
   Trash2,
   X,
-  Database
+  Database,
+  Zap
 } from 'lucide-react';
 import GlobalQuestionBankDialog from '@/components/quiz/GlobalQuestionBankDialog';
 
@@ -35,6 +36,8 @@ export default function AssignmentBuilder() {
   const urlParams = new URLSearchParams(window.location.search);
   const classId = urlParams.get('classId');
   const assignmentId = urlParams.get('assignmentId');
+  const mode = urlParams.get('mode'); // 'live' for live quiz mode
+  const isLiveMode = mode === 'live';
   const isEditMode = !!assignmentId;
   
   const [user, setUser] = useState(null);
@@ -199,32 +202,27 @@ export default function AssignmentBuilder() {
   };
 
   const isQuestionValid = (q) => {
-    if (q.prompt.trim() === '') return false;
-    
+    if (!q.prompt || q.prompt.trim() === '') return false;
     if (q.type === 'multiple_choice') {
       return q.options.filter(opt => opt.trim() !== '').length >= 2 && q.correctIndex !== null;
     } else if (q.type === 'written') {
       const hasAnswerKeywords = q.answerKeywords.filter(kw => kw.trim() !== '').length > 0;
       if (!hasAnswerKeywords) return false;
-      
       if (q.requireWorking) {
         return q.workingKeywords.filter(kw => kw.trim() !== '').length > 0;
       }
       return true;
     }
-    
     return false;
   };
 
   const isQuestionComplete = (q) => {
     if (!isQuestionValid(q)) return false;
-    
     if (q.type === 'multiple_choice') {
       return q.options.every(opt => opt.trim() !== '');
     } else if (q.type === 'written') {
       return q.answerKeywords.every(kw => kw.trim() !== '');
     }
-    
     return isQuestionValid(q);
   };
 
@@ -242,65 +240,50 @@ export default function AssignmentBuilder() {
     }
   };
 
+  // Build question data for DB
+  const buildQuestionData = (q, quizSetId, i) => {
+    const qd = {
+      quiz_set_id: quizSetId,
+      order: i,
+      prompt: q.prompt,
+      explanation: q.explanation || '',
+      question_type: q.type || 'multiple_choice'
+    };
+    if (q.type === 'multiple_choice') {
+      qd.options = q.options;
+      qd.correct_index = q.correctIndex;
+    } else if (q.type === 'written') {
+      let keywords = q.answerKeywords;
+      if (typeof keywords === 'string') keywords = keywords.split(',').map(kw => kw.trim()).filter(Boolean);
+      else keywords = (keywords || []).filter(kw => kw.trim() !== '');
+      qd.answer_keywords = keywords;
+      qd.require_working = q.requireWorking || false;
+      if (q.requireWorking) {
+        let workingKw = q.workingKeywords;
+        if (typeof workingKw === 'string') workingKw = workingKw.split(',').map(kw => kw.trim()).filter(Boolean);
+        else workingKw = (workingKw || []).filter(kw => kw.trim() !== '');
+        qd.working_keywords = workingKw;
+      }
+    }
+    return qd;
+  };
+
+  // ASSIGNMENT publish mutation
   const publishMutation = useMutation({
     mutationFn: async () => {
-      if (!user?.email || !classId) {
-        throw new Error('Missing user or class information');
-      }
+      if (!user?.email || !classId) throw new Error('Missing user or class information');
       
       if (isEditMode && originalQuizId) {
-        // Delete old questions
         const oldQuestions = await base44.entities.QuizQuestion.filter({ quiz_set_id: originalQuizId });
-        for (const oldQ of oldQuestions) {
-          await base44.entities.QuizQuestion.delete(oldQ.id);
-        }
-
-        // Create new questions
+        for (const oldQ of oldQuestions) await base44.entities.QuizQuestion.delete(oldQ.id);
         for (let i = 0; i < questions.length; i++) {
-          const q = questions[i];
-          const questionData = {
-            quiz_set_id: originalQuizId,
-            order: i,
-            prompt: q.prompt,
-            explanation: q.explanation || '',
-            question_type: q.type || 'multiple_choice'
-          };
-
-          if (q.type === 'multiple_choice') {
-            questionData.options = q.options;
-            questionData.correct_index = q.correctIndex;
-          } else if (q.type === 'written') {
-            // Normalize keywords: convert comma-separated string to array if needed
-            let keywords = q.answerKeywords;
-            if (typeof keywords === 'string') {
-              keywords = keywords.split(',').map(kw => kw.trim()).filter(kw => kw !== '');
-            } else if (Array.isArray(keywords)) {
-              keywords = keywords.filter(kw => kw.trim() !== '');
-            }
-            questionData.answer_keywords = keywords;
-            questionData.require_working = q.requireWorking || false;
-            
-            if (q.requireWorking) {
-              let workingKw = q.workingKeywords;
-              if (typeof workingKw === 'string') {
-                workingKw = workingKw.split(',').map(kw => kw.trim()).filter(kw => kw !== '');
-              } else if (Array.isArray(workingKw)) {
-                workingKw = workingKw.filter(kw => kw.trim() !== '');
-              }
-              questionData.working_keywords = workingKw;
-            }
-          }
-
-          await base44.entities.QuizQuestion.create(questionData);
+          await base44.entities.QuizQuestion.create(buildQuestionData(questions[i], originalQuizId, i));
         }
-
-        // Update assignment
         const assignmentData = {
           title: assignmentTitle,
           status: 'published',
           max_points: questions.length * 10
         };
-
         if (selectedTopic === 'custom' && customTopicName.trim()) {
           assignmentData.custom_topic_name = customTopicName.trim();
           assignmentData.topic_id = null;
@@ -308,64 +291,21 @@ export default function AssignmentBuilder() {
           assignmentData.topic_id = selectedTopic;
           assignmentData.custom_topic_name = null;
         }
-
-        if (dueDate) {
-          assignmentData.due_date = new Date(dueDate).toISOString();
-        } else {
-          assignmentData.due_date = null;
-        }
-
+        if (dueDate) assignmentData.due_date = new Date(dueDate).toISOString();
+        else assignmentData.due_date = null;
         await base44.entities.Assignment.update(assignmentId, assignmentData);
-
         return { assignment: existingAssignment };
       } else {
-        // Create mode
         const quizSet = await base44.entities.QuizSet.create({
           owner_email: user.email,
           title: assignmentTitle,
-          topic_id: selectedTopic || null,
+          topic_id: selectedTopic !== 'custom' ? (selectedTopic || null) : null,
           status: 'published',
           question_count: questions.length
         });
-
         for (let i = 0; i < questions.length; i++) {
-          const q = questions[i];
-          const questionData = {
-            quiz_set_id: quizSet.id,
-            order: i,
-            prompt: q.prompt,
-            explanation: q.explanation || '',
-            question_type: q.type || 'multiple_choice'
-          };
-
-          if (q.type === 'multiple_choice') {
-            questionData.options = q.options;
-            questionData.correct_index = q.correctIndex;
-          } else if (q.type === 'written') {
-            // Normalize keywords: convert comma-separated string to array if needed
-            let keywords = q.answerKeywords;
-            if (typeof keywords === 'string') {
-              keywords = keywords.split(',').map(kw => kw.trim()).filter(kw => kw !== '');
-            } else if (Array.isArray(keywords)) {
-              keywords = keywords.filter(kw => kw.trim() !== '');
-            }
-            questionData.answer_keywords = keywords;
-            questionData.require_working = q.requireWorking || false;
-            
-            if (q.requireWorking) {
-              let workingKw = q.workingKeywords;
-              if (typeof workingKw === 'string') {
-                workingKw = workingKw.split(',').map(kw => kw.trim()).filter(kw => kw !== '');
-              } else if (Array.isArray(workingKw)) {
-                workingKw = workingKw.filter(kw => kw.trim() !== '');
-              }
-              questionData.working_keywords = workingKw;
-            }
-          }
-
-          await base44.entities.QuizQuestion.create(questionData);
+          await base44.entities.QuizQuestion.create(buildQuestionData(questions[i], quizSet.id, i));
         }
-
         const assignmentData = {
           title: assignmentTitle,
           class_id: classId,
@@ -375,19 +315,13 @@ export default function AssignmentBuilder() {
           status: 'published',
           max_points: questions.length * 10
         };
-
         if (selectedTopic === 'custom' && customTopicName.trim()) {
           assignmentData.custom_topic_name = customTopicName.trim();
         } else if (selectedTopic && selectedTopic !== 'custom') {
           assignmentData.topic_id = selectedTopic;
         }
-
-        if (dueDate) {
-          assignmentData.due_date = new Date(dueDate).toISOString();
-        }
-
+        if (dueDate) assignmentData.due_date = new Date(dueDate).toISOString();
         const assignment = await base44.entities.Assignment.create(assignmentData);
-
         return { assignment, quizSet };
       }
     },
@@ -396,25 +330,87 @@ export default function AssignmentBuilder() {
     },
     onError: (error) => {
       console.error('Failed to publish assignment:', error);
-      console.error('Full error details:', JSON.stringify(error, null, 2));
-      const errorMessage = error?.message || error?.error || 'Unknown error occurred';
-      alert(`Failed to publish assignment:\n\n${errorMessage}\n\nCheck console for full details.`);
+      alert(`Failed to publish assignment:\n\n${error?.message || 'Unknown error'}`);
+    }
+  });
+
+  // LIVE QUIZ start mutation
+  const startLiveMutation = useMutation({
+    mutationFn: async () => {
+      if (!user?.email) throw new Error('Not signed in');
+
+      const generateCode = () => Math.random().toString(36).substr(2, 6).toUpperCase();
+      let joinCode = generateCode();
+      for (let attempts = 0; attempts < 10; attempts++) {
+        const existing = await base44.entities.LiveQuizSession.filter({ join_code: joinCode });
+        if (existing.length === 0) break;
+        joinCode = generateCode();
+      }
+
+      const session = await base44.entities.LiveQuizSession.create({
+        class_id: classId || '',
+        host_email: user.email,
+        live_quiz_set_id: assignmentTitle || 'manual-quiz',
+        status: 'lobby',
+        current_question_index: -1,
+        player_count: 0,
+        join_code: joinCode,
+        questions_json: JSON.stringify(
+          questions.filter(q => isQuestionValid(q)).map((q, i) => ({
+            order: i,
+            prompt: q.prompt,
+            question_type: q.type || 'multiple_choice',
+            options: q.type === 'multiple_choice' ? q.options : [],
+            correct_index: q.type === 'multiple_choice' ? q.correctIndex : 0,
+            correct_answer: q.type === 'multiple_choice' ? (q.options[q.correctIndex] || '') : (q.answerKeywords?.[0] || ''),
+            difficulty: 'medium',
+            explanation: q.explanation || '',
+          }))
+        ),
+        settings: {
+          time_per_question: 15000,
+          base_points: 500,
+          round_multiplier_increment: 0.25
+        }
+      });
+
+      // Also create individual LiveQuizQuestion records
+      const validQs = questions.filter(q => isQuestionValid(q));
+      for (let i = 0; i < validQs.length; i++) {
+        const q = validQs[i];
+        await base44.entities.LiveQuizQuestion.create({
+          live_quiz_set_id: session.id,
+          order: i,
+          prompt: q.prompt,
+          correct_answer: q.type === 'multiple_choice' ? (q.options[q.correctIndex] || '') : (q.answerKeywords?.[0] || ''),
+          allowed_forms: ['exact'],
+          difficulty: 'medium',
+          explanation: q.explanation || '',
+          type: q.type || 'multiple_choice',
+          hint: ''
+        });
+      }
+
+      return session;
+    },
+    onSuccess: (session) => {
+      navigate(createPageUrl(`TeacherLiveQuizLobby?sessionId=${session.id}`));
+    },
+    onError: (error) => {
+      console.error('Failed to start live quiz:', error);
+      alert(`Failed to start live quiz:\n\n${error?.message || 'Unknown error'}`);
     }
   });
 
   const saveDraftMutation = useMutation({
     mutationFn: async () => {
-      if (!user?.email || !classId) {
-        throw new Error('Missing user or class information');
-      }
-      
+      if (!user?.email || !classId) throw new Error('Missing user or class information');
       if (isEditMode) {
         const assignmentData = {
           title: assignmentTitle || 'Untitled Assignment',
           status: 'draft',
           max_points: questions.length * 10
         };
-
         if (selectedTopic === 'custom' && customTopicName.trim()) {
           assignmentData.custom_topic_name = customTopicName.trim();
           assignmentData.topic_id = null;
@@ -422,13 +418,8 @@ export default function AssignmentBuilder() {
           assignmentData.topic_id = selectedTopic;
           assignmentData.custom_topic_name = null;
         }
-
-        if (dueDate) {
-          assignmentData.due_date = new Date(dueDate).toISOString();
-        } else {
-          assignmentData.due_date = null;
-        }
-
+        if (dueDate) assignmentData.due_date = new Date(dueDate).toISOString();
+        else assignmentData.due_date = null;
         await base44.entities.Assignment.update(assignmentId, assignmentData);
       } else {
         const assignmentData = {
@@ -439,17 +430,12 @@ export default function AssignmentBuilder() {
           status: 'draft',
           max_points: questions.length * 10
         };
-
         if (selectedTopic === 'custom' && customTopicName.trim()) {
           assignmentData.custom_topic_name = customTopicName.trim();
         } else if (selectedTopic && selectedTopic !== 'custom') {
           assignmentData.topic_id = selectedTopic;
         }
-
-        if (dueDate) {
-          assignmentData.due_date = new Date(dueDate).toISOString();
-        }
-
+        if (dueDate) assignmentData.due_date = new Date(dueDate).toISOString();
         await base44.entities.Assignment.create(assignmentData);
       }
     },
@@ -464,8 +450,9 @@ export default function AssignmentBuilder() {
 
   const handleGlobalBankAdd = (mappedQuestions) => {
     if (!Array.isArray(mappedQuestions) || mappedQuestions.length === 0) return;
+    const startIdx = questions.length;
     const converted = mappedQuestions.map((q, i) => ({
-      id: questions.length + i + 1,
+      id: startIdx + i + 1,
       type: q.question_type === 'short_answer' ? 'written' : (q.question_type || 'multiple_choice'),
       prompt: q.prompt || '',
       options: Array.isArray(q.options) ? q.options : ['', '', '', ''],
@@ -476,66 +463,90 @@ export default function AssignmentBuilder() {
       workingKeywords: ['']
     }));
     setQuestions(prev => [...prev, ...converted]);
-    setCurrentQuestionIndex(questions.length); // jump to first newly added
+    setCurrentQuestionIndex(startIdx);
   };
 
-  const canPublish = assignmentTitle.trim() !== '' && 
-                     classId && 
-                     questions.length > 0 &&
-                     questions.every(isQuestionValid) &&
-                     (selectedTopic !== 'custom' || customTopicName.trim() !== '');
+  const canSubmit = assignmentTitle.trim() !== '' && 
+                    questions.length > 0 &&
+                    questions.every(isQuestionValid) &&
+                    (selectedTopic !== 'custom' || customTopicName.trim() !== '');
+
+  const pageTitle = isLiveMode ? 'Create Live Quiz' : (isEditMode ? 'Edit Assignment' : 'Create Assignment');
+  const backUrl = createPageUrl(`TeacherClassDetail?id=${classId}`);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900/20 to-slate-900 p-6">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
-        <div className="mb-6 flex items-center justify-between">
+        <div className="mb-6 flex items-center justify-between flex-wrap gap-3">
           <button
-            onClick={() => navigate(createPageUrl(`TeacherClassDetail?id=${classId}`))}
-            className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors"
+            onClick={() => navigate(backUrl)}
+            className="flex items-center gap-2 text-slate-300 hover:text-white transition-colors"
           >
             <ChevronLeft className="w-5 h-5" />
             Back to {classData?.name || 'Class'}
           </button>
 
-          <div className="flex gap-3">
-            <Button
-              onClick={() => saveDraftMutation.mutate()}
-              disabled={saveDraftMutation.isPending}
-              className="bg-gradient-to-r from-slate-600 to-slate-700 hover:from-slate-700 hover:to-slate-800 text-white shadow-lg shadow-slate-500/30"
-            >
-              {saveDraftMutation.isPending ? (
-                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />
-              ) : (
-                <Save className="w-4 h-4 mr-2" />
-              )}
-              Save Draft
-            </Button>
-            <Button
-              onClick={() => publishMutation.mutate()}
-              disabled={!canPublish || publishMutation.isPending}
-              className="bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 shadow-lg shadow-emerald-500/30"
-            >
-              {publishMutation.isPending ? (
-                <>
+          <div className="flex gap-3 items-center">
+            <h1 className="text-xl font-bold text-white hidden md:block">{pageTitle}</h1>
+            {!isLiveMode && (
+              <Button
+                onClick={() => saveDraftMutation.mutate()}
+                disabled={saveDraftMutation.isPending}
+                className="bg-slate-700 hover:bg-slate-600 text-white shadow-lg"
+              >
+                {saveDraftMutation.isPending ? (
                   <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />
-                  Publishing...
-                </>
-              ) : (
-                <>
-                  <CheckCircle2 className="w-4 h-4 mr-2" />
-                  {isEditMode ? 'Update Assignment' : 'Publish Assignment'}
-                </>
-              )}
-            </Button>
+                ) : (
+                  <Save className="w-4 h-4 mr-2" />
+                )}
+                Save Draft
+              </Button>
+            )}
+
+            {isLiveMode ? (
+              <Button
+                onClick={() => startLiveMutation.mutate()}
+                disabled={!canSubmit || startLiveMutation.isPending}
+                className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 shadow-lg shadow-amber-500/30"
+              >
+                {startLiveMutation.isPending ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />
+                    Starting...
+                  </>
+                ) : (
+                  <>
+                    <Zap className="w-4 h-4 mr-2" />
+                    Start Live Quiz
+                  </>
+                )}
+              </Button>
+            ) : (
+              <Button
+                onClick={() => publishMutation.mutate()}
+                disabled={!canSubmit || publishMutation.isPending}
+                className="bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 shadow-lg shadow-emerald-500/30"
+              >
+                {publishMutation.isPending ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />
+                    Publishing...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 className="w-4 h-4 mr-2" />
+                    {isEditMode ? 'Update Assignment' : 'Publish Assignment'}
+                  </>
+                )}
+              </Button>
+            )}
           </div>
         </div>
 
         {isEditMode && (
           <div className="mb-4 px-4 py-2 bg-blue-500/20 border border-blue-500/30 rounded-lg">
-            <p className="text-blue-400 text-sm">
-              Editing mode: Changes will apply to the existing assignment
-            </p>
+            <p className="text-blue-300 text-sm">Editing mode: Changes will apply to the existing assignment</p>
           </div>
         )}
 
@@ -543,12 +554,12 @@ export default function AssignmentBuilder() {
         <GlassCard className="p-6 mb-6">
           <div className="grid md:grid-cols-2 gap-6">
             <div>
-              <Label className="text-white mb-2">Assignment Title *</Label>
+              <Label className="text-white mb-2">{isLiveMode ? 'Quiz Title *' : 'Assignment Title *'}</Label>
               <Input
-                placeholder="e.g., Week 5 Fractions Quiz"
+                placeholder={isLiveMode ? 'e.g., Fractions Live Quiz' : 'e.g., Week 5 Fractions Quiz'}
                 value={assignmentTitle}
                 onChange={(e) => setAssignmentTitle(e.target.value)}
-                className="bg-white/5 border-white/10 text-white"
+                className="bg-white/5 border-white/10 text-white placeholder:text-slate-500"
               />
             </div>
             <div>
@@ -577,23 +588,23 @@ export default function AssignmentBuilder() {
                 placeholder="Enter custom topic name"
                 value={customTopicName}
                 onChange={(e) => setCustomTopicName(e.target.value)}
-                className="bg-white/5 border-white/10 text-white"
+                className="bg-white/5 border-white/10 text-white placeholder:text-slate-500"
               />
-              <p className="text-xs text-slate-400 mt-1">
-                This topic will only apply to this assignment
-              </p>
+              <p className="text-xs text-slate-400 mt-1">This topic will only apply to this assignment</p>
             </div>
           )}
 
-          <div className="mt-4">
-            <Label className="text-white mb-2">Due Date (Optional)</Label>
-            <Input
-              type="datetime-local"
-              value={dueDate}
-              onChange={(e) => setDueDate(e.target.value)}
-              className="bg-white/5 border-white/10 text-white"
-            />
-          </div>
+          {!isLiveMode && (
+            <div className="mt-4">
+              <Label className="text-white mb-2">Due Date (Optional)</Label>
+              <Input
+                type="datetime-local"
+                value={dueDate}
+                onChange={(e) => setDueDate(e.target.value)}
+                className="bg-white/5 border-white/10 text-white"
+              />
+            </div>
+          )}
         </GlassCard>
 
         {/* Horizontal Question Tabs */}
@@ -616,7 +627,7 @@ export default function AssignmentBuilder() {
                         ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
                         : isValid
                           ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
-                          : 'bg-white/5 text-slate-400 border border-white/10'
+                          : 'bg-white/5 text-slate-300 border border-white/10'
                     }
                   `}
                   whileHover={{ scale: 1.05 }}
@@ -703,11 +714,11 @@ export default function AssignmentBuilder() {
                     placeholder="Enter your question here..."
                     value={currentQuestion.prompt}
                     onChange={(e) => updateCurrentQuestion('prompt', e.target.value)}
-                    className="bg-white/5 border-white/10 text-white min-h-[100px]"
+                    className="bg-white/5 border-white/10 text-white placeholder:text-slate-500 min-h-[100px]"
                   />
                 </div>
 
-                {/* Conditional: Multiple Choice Options */}
+                {/* Multiple Choice Options */}
                 {currentQuestion.type === 'multiple_choice' && (
                   <div>
                     <Label className="text-white mb-3">Answer Options</Label>
@@ -717,10 +728,10 @@ export default function AssignmentBuilder() {
                           <button
                             onClick={() => updateCurrentQuestion('correctIndex', idx)}
                             className={`
-                              w-10 h-10 rounded-lg flex items-center justify-center font-bold transition-all
+                              w-10 h-10 rounded-lg flex items-center justify-center font-bold transition-all flex-shrink-0
                               ${currentQuestion.correctIndex === idx
                                 ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/50'
-                                : 'bg-white/5 text-slate-400 border border-white/10 hover:bg-white/10'
+                                : 'bg-white/5 text-slate-300 border border-white/10 hover:bg-white/10'
                               }
                             `}
                           >
@@ -730,24 +741,22 @@ export default function AssignmentBuilder() {
                             placeholder={`Option ${String.fromCharCode(65 + idx)}`}
                             value={option}
                             onChange={(e) => updateOption(idx, e.target.value)}
-                            className="bg-white/5 border-white/10 text-white flex-1"
+                            className="bg-white/5 border-white/10 text-white placeholder:text-slate-500 flex-1"
                           />
                         </div>
                       ))}
                     </div>
-                    <p className="text-xs text-slate-500 mt-2">
-                      Click the letter to mark it as the correct answer
-                    </p>
+                    <p className="text-xs text-slate-400 mt-2">Click the letter to mark it as the correct answer</p>
                   </div>
                 )}
 
-                {/* Conditional: Written Answer Keywords */}
+                {/* Written Answer Keywords */}
                 {currentQuestion.type === 'written' && (
                   <div className="space-y-6">
                     <div>
                       <Label className="text-white mb-2">Accepted Answer Keywords *</Label>
                       <p className="text-xs text-slate-400 mb-3">
-                        Student answers will be marked as correct if they match any of these keywords (case-insensitive, fuzzy match)
+                        Student answers will be marked as correct if they match any of these keywords (case-insensitive)
                       </p>
                       <div className="space-y-2">
                         {currentQuestion.answerKeywords.map((keyword, idx) => (
@@ -756,40 +765,27 @@ export default function AssignmentBuilder() {
                               placeholder="Enter keyword or phrase..."
                               value={keyword}
                               onChange={(e) => updateKeyword('answerKeywords', idx, e.target.value)}
-                              className="bg-white/5 border-white/10 text-white flex-1"
+                              className="bg-white/5 border-white/10 text-white placeholder:text-slate-500 flex-1"
                             />
                             {currentQuestion.answerKeywords.length > 1 && (
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => removeKeyword('answerKeywords', idx)}
-                                className="text-red-400 hover:text-red-300"
-                              >
+                              <Button size="sm" variant="ghost" onClick={() => removeKeyword('answerKeywords', idx)} className="text-red-400 hover:text-red-300">
                                 <X className="w-4 h-4" />
                               </Button>
                             )}
                           </div>
                         ))}
-                        <Button
-                          size="sm"
-                          onClick={() => addKeyword('answerKeywords')}
-                          variant="outline"
-                          className="border-white/20 text-white hover:bg-white/10 w-full"
-                        >
+                        <Button size="sm" onClick={() => addKeyword('answerKeywords')} variant="outline" className="border-white/20 text-white hover:bg-white/10 w-full">
                           <Plus className="w-4 h-4 mr-1" />
                           Add Keyword
                         </Button>
                       </div>
                     </div>
 
-                    {/* Working/Explanation Requirements */}
                     <div className="p-4 bg-white/5 rounded-xl border border-white/10">
                       <div className="flex items-center justify-between mb-3">
                         <div>
                           <Label className="text-white">Require Explanation/Working?</Label>
-                          <p className="text-xs text-slate-400 mt-1">
-                            Students must provide working to show how they got their answer
-                          </p>
+                          <p className="text-xs text-slate-400 mt-1">Students must provide working to show how they got their answer</p>
                         </div>
                         <Switch
                           checked={currentQuestion.requireWorking}
@@ -800,9 +796,7 @@ export default function AssignmentBuilder() {
                       {currentQuestion.requireWorking && (
                         <div className="mt-4 pt-4 border-t border-white/10">
                           <Label className="text-white mb-2">Required Working Keywords *</Label>
-                          <p className="text-xs text-slate-400 mb-3">
-                            All keywords must appear in the student's explanation for full credit
-                          </p>
+                          <p className="text-xs text-slate-400 mb-3">All keywords must appear in the student's explanation</p>
                           <div className="space-y-2">
                             {currentQuestion.workingKeywords.map((keyword, idx) => (
                               <div key={idx} className="flex items-center gap-2">
@@ -810,26 +804,16 @@ export default function AssignmentBuilder() {
                                   placeholder="Enter required keyword..."
                                   value={keyword}
                                   onChange={(e) => updateKeyword('workingKeywords', idx, e.target.value)}
-                                  className="bg-white/5 border-white/10 text-white flex-1"
+                                  className="bg-white/5 border-white/10 text-white placeholder:text-slate-500 flex-1"
                                 />
                                 {currentQuestion.workingKeywords.length > 1 && (
-                                  <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    onClick={() => removeKeyword('workingKeywords', idx)}
-                                    className="text-red-400 hover:text-red-300"
-                                  >
+                                  <Button size="sm" variant="ghost" onClick={() => removeKeyword('workingKeywords', idx)} className="text-red-400 hover:text-red-300">
                                     <X className="w-4 h-4" />
                                   </Button>
                                 )}
                               </div>
                             ))}
-                            <Button
-                              size="sm"
-                              onClick={() => addKeyword('workingKeywords')}
-                              variant="outline"
-                              className="border-white/20 text-white hover:bg-white/10 w-full"
-                            >
+                            <Button size="sm" onClick={() => addKeyword('workingKeywords')} variant="outline" className="border-white/20 text-white hover:bg-white/10 w-full">
                               <Plus className="w-4 h-4 mr-1" />
                               Add Working Keyword
                             </Button>
@@ -840,14 +824,14 @@ export default function AssignmentBuilder() {
                   </div>
                 )}
 
-                {/* Explanation (Optional) */}
+                {/* Explanation */}
                 <div>
                   <Label className="text-white mb-2">Explanation (Optional)</Label>
                   <Textarea
                     placeholder="Explain the answer or show working..."
                     value={currentQuestion.explanation}
                     onChange={(e) => updateCurrentQuestion('explanation', e.target.value)}
-                    className="bg-white/5 border-white/10 text-white"
+                    className="bg-white/5 border-white/10 text-white placeholder:text-slate-500"
                   />
                 </div>
 
@@ -862,7 +846,6 @@ export default function AssignmentBuilder() {
                     <ChevronLeft className="w-4 h-4 mr-2" />
                     Previous
                   </Button>
-
                   <Button
                     onClick={goToNextQuestion}
                     className="bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 shadow-lg shadow-purple-500/30"
@@ -880,8 +863,10 @@ export default function AssignmentBuilder() {
         <GlassCard className="p-6 mt-6">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-lg font-bold text-white mb-1">Assignment Progress</h3>
-              <p className="text-slate-400 text-sm">
+              <h3 className="text-lg font-bold text-white mb-1">
+                {isLiveMode ? 'Quiz Progress' : 'Assignment Progress'}
+              </h3>
+              <p className="text-slate-300 text-sm">
                 {questions.filter(isQuestionComplete).length} of {questions.length} questions complete
               </p>
             </div>

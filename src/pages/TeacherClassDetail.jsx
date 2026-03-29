@@ -523,14 +523,14 @@ export default function TeacherClassDetail() {
                       <p className="text-sm text-emerald-200/60">Write your own questions, add a rubric, attach resources and set a due date.</p>
                     </div>
                     <div
-                      onClick={() => navigate(createPageUrl('TeacherAssignmentLibrary'))}
+                      onClick={() => navigate(createPageUrl('QuizLibrary'))}
                       className="cursor-pointer rounded-2xl border border-blue-500/30 bg-blue-900/20 hover:bg-blue-900/40 hover:border-blue-400/50 p-6 transition-all group"
                     >
                       <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center mb-4">
                         <BookOpen className="w-5 h-5 text-white" />
                       </div>
-                      <h4 className="text-white font-semibold mb-1">From Question Library</h4>
-                      <p className="text-sm text-blue-200/60">Browse your saved question library and select questions to build an assignment.</p>
+                      <h4 className="text-white font-semibold mb-1">From Quiz Library</h4>
+                      <p className="text-sm text-blue-200/60">Browse your saved quizzes and drafts to reuse or launch existing content.</p>
                     </div>
                   </div>
                 </div>
@@ -794,14 +794,14 @@ export default function TeacherClassDetail() {
                   </div>
                   <div className="grid md:grid-cols-2 gap-4">
                     <div
-                      onClick={() => navigate(createPageUrl(`CreateQuiz?classId=${classId}`))}
+                      onClick={() => navigate(createPageUrl(`AssignmentBuilder?classId=${classId}&mode=live`))}
                       className="cursor-pointer rounded-2xl border border-teal-500/30 bg-teal-900/20 hover:bg-teal-900/40 hover:border-teal-400/50 p-6 transition-all"
                     >
                       <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-teal-500 to-emerald-500 flex items-center justify-center mb-4">
                         <Plus className="w-5 h-5 text-white" />
                       </div>
                       <h4 className="text-white font-semibold mb-1">Create Quiz from Scratch</h4>
-                      <p className="text-sm text-teal-200/60">Open the quiz builder and write your own questions for a live session.</p>
+                      <p className="text-sm text-teal-200/60">Build your own questions and launch instantly as a live session.</p>
                     </div>
                     <div
                       onClick={() => navigate(createPageUrl('QuizLibrary'))}
