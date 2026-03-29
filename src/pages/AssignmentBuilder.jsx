@@ -25,8 +25,10 @@ import {
   CheckCircle2,
   AlertCircle,
   Trash2,
-  X
+  X,
+  Database
 } from 'lucide-react';
+import GlobalQuestionBankDialog from '@/components/quiz/GlobalQuestionBankDialog';
 
 export default function AssignmentBuilder() {
   const navigate = useNavigate();
@@ -55,6 +57,7 @@ export default function AssignmentBuilder() {
     }
   ]);
   const [originalQuizId, setOriginalQuizId] = useState(null);
+  const [showGlobalBank, setShowGlobalBank] = useState(false);
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -459,6 +462,23 @@ export default function AssignmentBuilder() {
     }
   });
 
+  const handleGlobalBankAdd = (mappedQuestions) => {
+    if (!Array.isArray(mappedQuestions) || mappedQuestions.length === 0) return;
+    const converted = mappedQuestions.map((q, i) => ({
+      id: questions.length + i + 1,
+      type: q.question_type === 'short_answer' ? 'written' : (q.question_type || 'multiple_choice'),
+      prompt: q.prompt || '',
+      options: Array.isArray(q.options) ? q.options : ['', '', '', ''],
+      correctIndex: typeof q.correct_index === 'number' ? q.correct_index : 0,
+      explanation: q.explanation || '',
+      answerKeywords: q.answer_keywords?.length > 0 ? q.answer_keywords : [q.correct_answer || ''],
+      requireWorking: false,
+      workingKeywords: ['']
+    }));
+    setQuestions(prev => [...prev, ...converted]);
+    setCurrentQuestionIndex(questions.length); // jump to first newly added
+  };
+
   const canPublish = assignmentTitle.trim() !== '' && 
                      classId && 
                      questions.length > 0 &&
@@ -621,6 +641,14 @@ export default function AssignmentBuilder() {
               );
             })}
             
+            <Button
+              onClick={() => setShowGlobalBank(true)}
+              size="sm"
+              className="bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/50 text-emerald-300 flex-shrink-0"
+            >
+              <Database className="w-4 h-4 mr-1" />
+              Global Bank
+            </Button>
             <Button
               onClick={addQuestion}
               size="sm"
@@ -863,6 +891,12 @@ export default function AssignmentBuilder() {
             </div>
           </div>
         </GlassCard>
+
+        <GlobalQuestionBankDialog
+          open={showGlobalBank}
+          onClose={() => setShowGlobalBank(false)}
+          onAddQuestions={handleGlobalBankAdd}
+        />
       </div>
     </div>
   );
