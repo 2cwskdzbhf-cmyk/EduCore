@@ -37,7 +37,8 @@ import {
   Copy,
   Check,
   Trophy,
-  Sparkles
+  Sparkles,
+  BrainCircuit
 } from 'lucide-react';
 import GlassCard from '@/components/ui/GlassCard';
 import { StatCard } from '@/components/ui/GlassCard';
@@ -321,6 +322,22 @@ export default function TeacherDashboard() {
             value={assignments.length}
             delay={0.2}
           />
+        </div>
+
+        {/* Knowledge Gap Dashboard shortcut */}
+        <div className="mb-8">
+          <Link to={createPageUrl('ClassKnowledgeGaps')}>
+            <GlassCard className="p-5 flex items-center gap-4 hover:scale-[1.01]">
+              <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-yellow-500 to-orange-500 flex items-center justify-center flex-shrink-0">
+                <BrainCircuit className="w-6 h-6 text-white" />
+              </div>
+              <div className="flex-1">
+                <p className="font-semibold text-white">Class Knowledge Gap Dashboard</p>
+                <p className="text-sm text-slate-400">View AI-identified gaps, trigger analysis & override practice modules</p>
+              </div>
+              <ChevronRight className="w-5 h-5 text-slate-500" />
+            </GlassCard>
+          </Link>
         </div>
 
         {/* Notifications */}
