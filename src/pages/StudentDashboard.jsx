@@ -526,11 +526,59 @@ export default function StudentDashboard() {
           
         </div>
 
+        {/* Next Lesson Preview */}
+        {nextLesson && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+            className="mb-8">
+            <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2 drop-shadow-lg">
+              <Clock className="w-5 h-5 text-blue-400" />
+              Next Lesson
+            </h2>
+            <GlassCard className="p-6 bg-gradient-to-r from-blue-500/10 to-purple-500/10 border-2 border-blue-500/30">
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  <h3 className="text-2xl font-bold text-white mb-2">{nextLesson.lesson_name}</h3>
+                  <div className="space-y-2">
+                    <p className="text-sm text-slate-300">
+                      <span className="font-semibold">{nextLesson.subject}</span>
+                      {nextLesson.teacher_name && ` • ${nextLesson.teacher_name}`}
+                    </p>
+                    <p className="text-sm text-slate-300 flex items-center gap-2">
+                      <Clock className="w-4 h-4" />
+                      {nextLesson.start_time} ({nextLesson.duration_minutes} min)
+                    </p>
+                    {nextLesson.notes && (
+                      <p className="text-sm text-slate-400 italic">{nextLesson.notes}</p>
+                    )}
+                  </div>
+                </div>
+                <div className="text-right flex-shrink-0 ml-4">
+                  <p className="text-sm text-slate-400 mb-1">Time until lesson</p>
+                  <p className="text-3xl font-bold text-blue-400">{timeUntilNext || '—'}</p>
+                  {nextLesson.link && (
+                    <a
+                      href={nextLesson.link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-3 inline-block px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-sm font-medium transition-colors"
+                    >
+                      Join Session
+                    </a>
+                  )}
+                </div>
+              </div>
+            </GlassCard>
+          </motion.div>
+        )}
+
         {/* Personalized Learning Path */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
+          transition={{ delay: nextLesson ? 0.4 : 0.3 }}
           className="mb-8">
           
           
