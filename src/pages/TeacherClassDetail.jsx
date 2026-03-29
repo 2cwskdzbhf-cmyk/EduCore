@@ -43,6 +43,7 @@ export default function TeacherClassDetail() {
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [selectedAssignment, setSelectedAssignment] = useState(null);
   const [deleteConfirmAssignment, setDeleteConfirmAssignment] = useState(null);
+  const [deleteConfirmStudent, setDeleteConfirmStudent] = useState(null);
   const [createMode, setCreateMode] = useState(''); // 'manual' or 'ai'
 
   const copyJoinCode = (code) => {
@@ -365,6 +366,22 @@ export default function TeacherClassDetail() {
     }
   });
 
+  const removeStudentMutation = useMutation({
+    mutationFn: async (studentEmail) => {
+      const updated = (classData.student_emails || []).filter(e => e !== studentEmail);
+      await base44.entities.Class.update(classId, { student_emails: updated });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries(['class', classId]);
+      queryClient.invalidateQueries(['classStudents']);
+      setDeleteConfirmStudent(null);
+    },
+    onError: (error) => {
+      console.error('Failed to remove student:', error);
+      alert('Failed to remove student. Please try again.');
+    }
+  });
+
   if (!classData) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900/20 to-slate-900 p-6 flex items-center justify-center">
@@ -430,6 +447,9 @@ export default function TeacherClassDetail() {
               </TabsTrigger>
               <TabsTrigger value="live" className="text-slate-200 data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-500 data-[state=active]:to-blue-500 data-[state=active]:text-white">
                 ⚡ Live Quizzes
+              </TabsTrigger>
+              <TabsTrigger value="students" className="text-slate-200 data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-500 data-[state=active]:to-blue-500 data-[state=active]:text-white">
+                👥 Students
               </TabsTrigger>
               <TabsTrigger value="analytics" className="text-slate-200 data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-500 data-[state=active]:to-blue-500 data-[state=active]:text-white">
                 📊 Analytics
@@ -1104,6 +1124,41 @@ export default function TeacherClassDetail() {
               )}
             </TabsContent>
 
+            {/* Students Tab */}
+            <TabsContent value="students" className="space-y-6">
+              <h2 className="text-2xl font-bold text-white mb-6">Manage Students</h2>
+              {classStudents.length > 0 ? (
+                <div className="space-y-3">
+                  {classStudents.map((student) => (
+                    <div
+                      key={student.id}
+                      className="flex items-center justify-between p-4 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 transition-all"
+                    >
+                      <div>
+                        <p className="text-white font-medium">{student.full_name || student.email}</p>
+                        <p className="text-xs text-slate-400">{student.email}</p>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setDeleteConfirmStudent(student)}
+                        className="border-red-500/30 text-red-400 hover:bg-red-500/10"
+                      >
+                        <Trash2 className="w-4 h-4 mr-2" />
+                        Remove
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <GlassCard className="p-12 text-center">
+                  <Users className="w-12 h-12 text-slate-600 mx-auto mb-4" />
+                  <p className="text-slate-400 mb-2">No students in this class yet</p>
+                  <p className="text-slate-500 text-sm">Share the join code for students to enroll</p>
+                </GlassCard>
+              )}
+            </TabsContent>
+
             {/* Analytics Tab */}
             <TabsContent value="analytics" className="space-y-6">
               <ClassLeaderboard
@@ -1140,6 +1195,71 @@ export default function TeacherClassDetail() {
                 setSelectedStudent(student);
               }}
             />
+          )}
+        </AnimatePresence>
+
+        <AnimatePresence>
+          {deleteConfirmStudent && (
+            <motion.div
+              className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-6"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => !removeStudentMutation.isPending && setDeleteConfirmStudent(null)}
+            >
+              <motion.div
+                className="max-w-md w-full"
+                initial={{ scale: 0.9, y: 20 }}
+                animate={{ scale: 1, y: 0 }}
+                exit={{ scale: 0.9, y: 20 }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <GlassCard className="p-8">
+                  <div className="flex items-start gap-4 mb-6">
+                    <div className="w-12 h-12 rounded-full bg-red-500/20 flex items-center justify-center flex-shrink-0">
+                      <AlertTriangle className="w-6 h-6 text-red-400" />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-bold text-white mb-2">Remove Student?</h3>
+                      <p className="text-slate-400 text-sm mb-1">
+                        Remove <span className="text-white font-semibold">{deleteConfirmStudent.full_name || deleteConfirmStudent.email}</span> from this class?
+                      </p>
+                      <p className="text-red-400 text-sm">
+                        They will lose access to class materials and assignments.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-3 justify-end">
+                    <Button
+                      variant="outline"
+                      onClick={() => setDeleteConfirmStudent(null)}
+                      disabled={removeStudentMutation.isPending}
+                      className="border-white/20 text-white hover:bg-white/10"
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      onClick={() => removeStudentMutation.mutate(deleteConfirmStudent.email)}
+                      disabled={removeStudentMutation.isPending}
+                      className="bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white shadow-lg shadow-red-500/30"
+                    >
+                      {removeStudentMutation.isPending ? (
+                        <>
+                          <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />
+                          Removing...
+                        </>
+                      ) : (
+                        <>
+                          <Trash2 className="w-4 h-4 mr-2" />
+                          Remove Student
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </GlassCard>
+              </motion.div>
+            </motion.div>
           )}
         </AnimatePresence>
 

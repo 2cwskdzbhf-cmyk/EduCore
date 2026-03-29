@@ -38,7 +38,9 @@ import {
   Check,
   Trophy,
   Sparkles,
-  BrainCircuit
+  BrainCircuit,
+  Trash2,
+  X
 } from 'lucide-react';
 import GlassCard from '@/components/ui/GlassCard';
 import { StatCard } from '@/components/ui/GlassCard';
@@ -52,6 +54,7 @@ export default function TeacherDashboard() {
   const [selectedSubject, setSelectedSubject] = useState('');
   const [selectedYearGroup, setSelectedYearGroup] = useState('');
   const [copiedCode, setCopiedCode] = useState(null);
+  const [deleteConfirmClass, setDeleteConfirmClass] = useState(null);
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -135,6 +138,31 @@ export default function TeacherDashboard() {
     },
     onError: (error) => {
       alert(error.message || 'Failed to create class');
+    }
+  });
+
+  const deleteClassMutation = useMutation({
+    mutationFn: async (classId) => {
+      // Delete all assignments for this class
+      const classAssignments = await base44.entities.Assignment.filter({ class_id: classId });
+      for (const assignment of classAssignments) {
+        const submissions = await base44.entities.AssignmentSubmission.filter({ assignment_id: assignment.id });
+        for (const sub of submissions) {
+          await base44.entities.AssignmentSubmission.delete(sub.id);
+        }
+        await base44.entities.Assignment.delete(assignment.id);
+      }
+      
+      // Delete the class
+      await base44.entities.Class.delete(classId);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries(['teacherClasses']);
+      setDeleteConfirmClass(null);
+    },
+    onError: (error) => {
+      console.error('Failed to delete class:', error);
+      alert('Failed to delete class. Please try again.');
     }
   });
 
@@ -269,25 +297,34 @@ export default function TeacherDashboard() {
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: idx * 0.1, duration: 0.3 }}
                   >
-                    <Link to={createPageUrl(`TeacherClassDetail?id=${classObj.id}`)}>
-                      <GlassCard className="p-6 hover:scale-[1.02]">
-                        <div className="flex items-start justify-between mb-4">
+                    <GlassCard className="p-6">
+                      <div className="flex items-start justify-between mb-4">
+                        <Link to={createPageUrl(`TeacherClassDetail?id=${classObj.id}`)} className="flex-1">
                           <div>
-                            <h3 className="font-semibold text-white">{classObj.name}</h3>
+                            <h3 className="font-semibold text-white hover:text-purple-400 transition-colors">{classObj.name}</h3>
                             <p className="text-sm text-slate-400">{subject?.name || 'No subject'}</p>
                           </div>
-                          <div className="flex items-center gap-1 text-sm text-slate-400">
-                            <Users className="w-4 h-4" />
-                            {classObj.student_emails?.length || 0}
-                          </div>
-                        </div>
+                        </Link>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => setDeleteConfirmClass(classObj)}
+                          className="text-red-400 hover:text-red-300 hover:bg-red-500/10 ml-2"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
 
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="text-slate-400">Avg Accuracy: {stats.avgAccuracy}%</span>
-                          <ChevronRight className="w-4 h-4 text-slate-500" />
+                      <Link to={createPageUrl(`TeacherClassDetail?id=${classObj.id}`)}>
+                        <div className="flex items-center justify-between text-sm cursor-pointer group">
+                          <div className="flex items-center gap-3">
+                            <span className="text-slate-400"><Users className="w-4 h-4 inline mr-1" />{classObj.student_emails?.length || 0} students</span>
+                            <span className="text-slate-400">Avg: {stats.avgAccuracy}%</span>
+                          </div>
+                          <ChevronRight className="w-4 h-4 text-slate-500 group-hover:text-slate-400" />
                         </div>
-                      </GlassCard>
-                    </Link>
+                      </Link>
+                    </GlassCard>
                   </motion.div>
                 );
               })}
@@ -348,6 +385,70 @@ export default function TeacherDashboard() {
           <div className="mb-8">
             <NotificationPanel teacherEmail={user.email} />
           </div>
+        )}
+
+        {/* Delete Class Confirmation */}
+        {deleteConfirmClass && (
+          <motion.div
+            className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-6"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => !deleteClassMutation.isPending && setDeleteConfirmClass(null)}
+          >
+            <motion.div
+              className="max-w-md w-full"
+              initial={{ scale: 0.9, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.9, y: 20 }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <GlassCard className="p-8">
+                <div className="flex items-start gap-4 mb-6">
+                  <div className="w-12 h-12 rounded-full bg-red-500/20 flex items-center justify-center flex-shrink-0">
+                    <AlertTriangle className="w-6 h-6 text-red-400" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold text-white mb-2">Delete Class?</h3>
+                    <p className="text-slate-400 text-sm mb-1">
+                      Are you sure you want to delete <span className="text-white font-semibold">"{deleteConfirmClass.name}"</span>?
+                    </p>
+                    <p className="text-red-400 text-sm">
+                      This will permanently delete the class, all assignments, and student data.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex gap-3 justify-end">
+                  <Button
+                    variant="outline"
+                    onClick={() => setDeleteConfirmClass(null)}
+                    disabled={deleteClassMutation.isPending}
+                    className="border-white/20 text-white hover:bg-white/10"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={() => deleteClassMutation.mutate(deleteConfirmClass.id)}
+                    disabled={deleteClassMutation.isPending}
+                    className="bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white shadow-lg shadow-red-500/30"
+                  >
+                    {deleteClassMutation.isPending ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />
+                        Deleting...
+                      </>
+                    ) : (
+                      <>
+                        <Trash2 className="w-4 h-4 mr-2" />
+                        Delete Class
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </GlassCard>
+            </motion.div>
+          </motion.div>
         )}
 
       </div>
