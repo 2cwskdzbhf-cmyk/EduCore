@@ -370,7 +370,7 @@ export default function TestScores() {
           )}
         </AnimatePresence>
 
-        {/* Test Scores List */}
+        {/* Test Scores by Topic - Column Layout */}
         {isLoading ? (
           <div className="flex items-center justify-center py-12">
             <div className="w-8 h-8 border-4 border-purple-500 border-t-transparent rounded-full animate-spin" />
@@ -382,42 +382,63 @@ export default function TestScores() {
             <p className="text-slate-500 text-sm">Add your first test score to start tracking your progress</p>
           </GlassCard>
         ) : (
-          <div className="grid gap-4">
-            {testScores.map((test, index) => (
-              <motion.div
-                key={test.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.05 }}
-              >
-                <GlassCard className="p-6">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-3">
-                        <div
-                          className={`w-12 h-12 rounded-lg bg-gradient-to-br ${getSubjectColor(
-                            test.subject
-                          )} flex items-center justify-center flex-shrink-0 shadow-lg`}
-                        >
-                          <span className="text-white font-bold text-sm text-center px-1">
-                            {test.subject.split(' ').map(w => w[0]).join('')}
-                          </span>
-                        </div>
-                        <div>
-                          <h3 className="text-lg font-bold text-white">{test.test_name}</h3>
-                          <p className="text-sm text-slate-300">{test.subject}</p>
-                        </div>
-                      </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 auto-rows-max">
+            {Object.entries(
+              testScores.reduce((acc, test) => {
+                const topic = test.topic;
+                if (!acc[topic]) acc[topic] = [];
+                acc[topic].push(test);
+                return acc;
+              }, {})
+            )
+              .sort((a, b) => b[1][0].date.localeCompare(a[1][0].date))
+              .map(([topic, tests], colIndex) => (
+                <motion.div
+                  key={topic}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: colIndex * 0.05 }}
+                  className="flex flex-col gap-3"
+                >
+                  {/* Topic Header */}
+                  <div className="sticky top-0 z-10">
+                    <h3 className="text-lg font-bold text-white mb-3 px-3 py-2 rounded-lg bg-gradient-to-r from-purple-500/20 to-blue-500/20 border border-purple-500/30">
+                      {topic}
+                    </h3>
+                  </div>
 
-                      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mt-4">
-                        <div>
+                  {/* Tests in Column */}
+                  {tests.map((test, testIndex) => (
+                    <motion.div
+                      key={test.id}
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: (colIndex * 0.05) + (testIndex * 0.02) }}
+                    >
+                      <GlassCard className="p-4 h-full">
+                        {/* Subject Badge + Test Name */}
+                        <div className="flex items-start gap-2 mb-3">
+                          <div
+                            className={`w-8 h-8 rounded-lg bg-gradient-to-br ${getSubjectColor(
+                              test.subject
+                            )} flex items-center justify-center flex-shrink-0 shadow-lg`}
+                          >
+                            <span className="text-white font-bold text-xs text-center px-0.5">
+                              {test.subject.split(' ').map(w => w[0]).join('')}
+                            </span>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <h4 className="text-sm font-bold text-white truncate">{test.test_name}</h4>
+                            <p className="text-xs text-slate-400">{test.subject}</p>
+                          </div>
+                        </div>
+
+                        {/* Score Display */}
+                        <div className="mb-3 p-3 rounded-lg bg-white/5">
                           <p className="text-xs text-slate-400 mb-1">Score</p>
-                          <p className="text-lg font-bold text-white">
+                          <p className="text-xl font-bold text-white mb-1">
                             {test.score}/{test.total_marks}
                           </p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-slate-400 mb-1">Percentage</p>
                           <p
                             className={`text-lg font-bold ${
                               test.percentage >= 70
@@ -430,54 +451,53 @@ export default function TestScores() {
                             {test.percentage}%
                           </p>
                         </div>
+
+                        {/* Grade */}
                         {test.grade && (
-                          <div>
-                            <p className="text-xs text-slate-400 mb-1">Grade</p>
-                            <p className="text-lg font-bold text-white">{test.grade}</p>
+                          <div className="mb-3 p-2 rounded-lg bg-white/5 text-center">
+                            <p className="text-xs text-slate-400">Grade</p>
+                            <p className="text-sm font-bold text-white">{test.grade}</p>
                           </div>
                         )}
-                        <div>
-                          <p className="text-xs text-slate-400 mb-1">Topic</p>
-                          <p className="text-sm text-slate-200">{test.topic}</p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-slate-400 mb-1">Date</p>
-                          <p className="text-sm text-slate-200">
-                            {new Date(test.date).toLocaleDateString()}
-                          </p>
-                        </div>
-                      </div>
 
-                      {test.notes && (
-                        <div className="mt-3 p-3 rounded-lg bg-white/5 border border-white/10">
-                          <p className="text-xs text-slate-400 mb-1">Notes</p>
-                          <p className="text-sm text-slate-300">{test.notes}</p>
+                        {/* Date */}
+                        <div className="mb-3 text-center text-xs text-slate-400">
+                          {new Date(test.date).toLocaleDateString()}
                         </div>
-                      )}
-                    </div>
 
-                    <div className="flex gap-2 flex-shrink-0">
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        onClick={() => handleEdit(test)}
-                        className="text-blue-400 hover:text-blue-300 hover:bg-blue-500/20"
-                      >
-                        <Edit2 className="w-4 h-4" />
-                      </Button>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        onClick={() => deleteMutation.mutate(test.id)}
-                        className="text-red-400 hover:text-red-300 hover:bg-red-500/20"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  </div>
-                </GlassCard>
-              </motion.div>
-            ))}
+                        {/* Notes */}
+                        {test.notes && (
+                          <div className="mb-3 p-2 rounded-lg bg-blue-500/10 border border-blue-500/20">
+                            <p className="text-xs text-blue-300 leading-tight">{test.notes}</p>
+                          </div>
+                        )}
+
+                        {/* Actions */}
+                        <div className="flex gap-2 justify-center pt-2 border-t border-white/10">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handleEdit(test)}
+                            className="flex-1 text-xs h-8 text-blue-400 hover:text-blue-300 hover:bg-blue-500/20"
+                          >
+                            <Edit2 className="w-3 h-3 mr-1" />
+                            Edit
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => deleteMutation.mutate(test.id)}
+                            className="flex-1 text-xs h-8 text-red-400 hover:text-red-300 hover:bg-red-500/20"
+                          >
+                            <Trash2 className="w-3 h-3 mr-1" />
+                            Delete
+                          </Button>
+                        </div>
+                      </GlassCard>
+                    </motion.div>
+                  ))}
+                </motion.div>
+              ))}
           </div>
         )}
       </div>
