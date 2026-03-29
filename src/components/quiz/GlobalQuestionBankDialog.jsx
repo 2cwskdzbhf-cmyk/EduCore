@@ -311,7 +311,15 @@ export default function GlobalQuestionBankDialog({ open, onClose, onAddQuestions
               {loadingTopics ? <Spinner /> : topics.length === 0 ? (
                 <p className="text-slate-500 text-sm">No topics found. Run the seed function from the Admin Panel first.</p>
               ) : topics.map(t => (
-                <NavCard key={t.id} icon={<FolderOpen className="w-5 h-5 text-purple-400" />} title={t.name} subtitle={t.description || 'Browse subtopics →'} onClick={() => { setTopic(t); setScreen('subtopics'); }} />
+                <NavCard key={t.id} icon={<FolderOpen className="w-5 h-5 text-purple-400" />} title={t.name} subtitle={t.description || 'Browse subtopics →'} onClick={async () => {
+                  setTopic(t);
+                  const children = await base44.entities.GlobalTopic.filter({ parent_topic_id: t.id });
+                  if (children.length > 0) {
+                    setScreen('subtopics');
+                  } else {
+                    setScreen('difficulty');
+                  }
+                }} />
               ))}
             </div>
           )}
@@ -323,10 +331,10 @@ export default function GlobalQuestionBankDialog({ open, onClose, onAddQuestions
               {loadingSubtopics ? <Spinner /> : subtopics.length === 0 ? (
                 <div className="text-center py-8">
                   <p className="text-slate-400 text-sm mb-4">No subtopics — continue with all questions in this topic</p>
-                  <Button onClick={() => setScreen('yeargroup')} className="bg-gradient-to-r from-purple-500 to-blue-500">Continue</Button>
+                  <Button onClick={() => setScreen('difficulty')} className="bg-gradient-to-r from-purple-500 to-blue-500">Continue</Button>
                 </div>
               ) : subtopics.map(st => (
-                <NavCard key={st.id} icon={<BookOpen className="w-5 h-5 text-emerald-400" />} title={st.name} subtitle={st.description || ''} onClick={() => { setSubtopic(st); setScreen('yeargroup'); }} />
+                <NavCard key={st.id} icon={<BookOpen className="w-5 h-5 text-emerald-400" />} title={st.name} subtitle={st.description || ''} onClick={() => { setSubtopic(st); setScreen('difficulty'); }} />
               ))}
             </div>
           )}
