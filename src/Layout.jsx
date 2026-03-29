@@ -162,7 +162,7 @@ export default function Layout({ children, currentPageName }) {
         onMouseLeave={() => setSidebarExpanded(false)}
       >
         <div className="p-6 border-b border-white/10">
-          <Link to={createPageUrl('Landing')} className="flex items-center gap-3 overflow-hidden">
+          <Link to={createPageUrl('Landing')} className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center flex-shrink-0 shadow-lg shadow-purple-500/50">
               <GraduationCap className="w-6 h-6 text-white" />
             </div>
