@@ -142,22 +142,29 @@ export default function InteractiveWhiteboard({
         });
         context.stroke();
       } else if (stroke.type === 'text') {
+        // Draw textbox background
+        context.fillStyle = 'rgba(255, 255, 255, 0.05)';
+        context.fillRect(stroke.x - 5, stroke.y - stroke.size - 5, stroke.width + 10, stroke.height + 10);
+        
+        // Draw textbox border
+        context.strokeStyle = selectedIndices.includes(idx) ? '#fbbf24' : 'rgba(255, 255, 255, 0.2)';
+        context.lineWidth = selectedIndices.includes(idx) ? 2 : 1;
+        context.strokeRect(stroke.x - 5, stroke.y - stroke.size - 5, stroke.width + 10, stroke.height + 10);
+        
+        // Draw text
         context.fillStyle = stroke.color || '#ffffff';
         context.font = `${stroke.size || 16}px ${stroke.font || 'Arial'}`;
-        context.fillText(stroke.content, stroke.x, stroke.y);
+        const lines = stroke.content.split('\n');
+        lines.forEach((line, lineIdx) => {
+          context.fillText(line, stroke.x, stroke.y + (lineIdx * stroke.size));
+        });
         
-        if (selectedIndices.includes(idx)) {
-          context.strokeStyle = '#fbbf24';
-          context.lineWidth = 2;
-          context.strokeRect(stroke.x - 5, stroke.y - stroke.size - 5, stroke.width, stroke.height + 5);
-          
-          // Draw resize handle only if single selection
-          if (selectedIndices.length === 1) {
-            const handleX = stroke.x + stroke.width - 5;
-            const handleY = stroke.y + stroke.height;
-            context.fillStyle = '#fbbf24';
-            context.fillRect(handleX, handleY, 10, 10);
-          }
+        // Draw resize handle only if single selection
+        if (selectedIndices.includes(idx) && selectedIndices.length === 1) {
+          const handleX = stroke.x + stroke.width + 5;
+          const handleY = stroke.y + stroke.height + 5;
+          context.fillStyle = '#fbbf24';
+          context.fillRect(handleX, handleY, 10, 10);
         }
       } else if (stroke.type === 'image' && stroke.src) {
         const img = new Image();
@@ -206,10 +213,14 @@ export default function InteractiveWhiteboard({
       let clickedIdx = -1;
       for (let i = strokes.length - 1; i >= 0; i--) {
         const stroke = strokes[i];
-        const padding = 8;
+        const padding = 10;
         if (stroke.type === 'text') {
-          if (offsetX >= stroke.x - padding && offsetX <= stroke.x + stroke.width + padding && 
-              offsetY >= stroke.y - stroke.size - padding && offsetY <= stroke.y + padding) {
+          const textTop = stroke.y - stroke.size - 5;
+          const textLeft = stroke.x - 5;
+          const textRight = stroke.x + stroke.width + 5;
+          const textBottom = stroke.y + stroke.height + 5;
+          if (offsetX >= textLeft && offsetX <= textRight && 
+              offsetY >= textTop && offsetY <= textBottom) {
             clickedIdx = i;
             break;
           }
@@ -799,7 +810,7 @@ export default function InteractiveWhiteboard({
           onMouseDown={(e) => e.stopPropagation()}
           onContextMenu={(e) => e.stopPropagation()}
         >
-          <div className="bg-slate-950 border-2 border-purple-500/50 rounded p-2 shadow-xl shadow-purple-500/20 space-y-2">
+          <div className="bg-slate-950 border-2 border-purple-500/60 rounded-lg p-3 shadow-xl shadow-purple-500/30 space-y-2">
             <textarea
               ref={inlineInputRef}
               autoFocus
@@ -813,7 +824,9 @@ export default function InteractiveWhiteboard({
                 if (inputPosition?.idx !== undefined) {
                   const newStrokes = [...strokes];
                   newStrokes[inputPosition.idx].content = newText;
-                  newStrokes[inputPosition.idx].width = Math.max(150, newText.split('\n')[0].length * (textFontSize * 0.6));
+                  const maxLineLength = Math.max(...newText.split('\n').map(line => line.length));
+                  newStrokes[inputPosition.idx].width = Math.max(150, maxLineLength * (textFontSize * 0.65));
+                  newStrokes[inputPosition.idx].height = Math.max(textFontSize, newText.split('\n').length * textFontSize);
                   setStrokes(newStrokes);
                 }
               }}
@@ -829,13 +842,24 @@ export default function InteractiveWhiteboard({
               onKeyDown={(e) => {
                 e.stopPropagation();
                 if (e.key === 'Escape') {
+                  if (inputPosition?.idx !== undefined) {
+                    const newStrokes = [...strokes];
+                    newStrokes[inputPosition.idx].content = textInput;
+                    setStrokes(newStrokes);
+                  }
                   setInputPosition(null);
                   setEditingTextIdx(null);
                 }
               }}
-              placeholder="Type text... (Press Escape to finish)"
-              className="w-full bg-white/5 border border-white/10 text-white rounded px-2 py-1 text-sm outline-none focus:border-purple-400/50 focus:ring-1 focus:ring-purple-400/30 resize-none"
-              style={{ fontSize: textFontSize + 'px', fontFamily: textFont, color: textColor, width: Math.max(150, textInput.length * (textFontSize * 0.6)) + 'px', minHeight: textFontSize * 3 + 'px' }}
+              placeholder="Click to type... (Escape to finish)"
+              className="w-full bg-white/10 border border-purple-400/40 text-white rounded px-3 py-2 text-sm outline-none focus:border-purple-400 focus:ring-2 focus:ring-purple-400/30 resize-none"
+              style={{ 
+                fontSize: textFontSize + 'px', 
+                fontFamily: textFont, 
+                color: textColor, 
+                width: Math.max(180, textInput.length * (textFontSize * 0.65)) + 'px', 
+                minHeight: Math.max(textFontSize * 3, (textInput.split('\n').length * textFontSize) + 16) + 'px' 
+              }}
             />
 
             {/* Font Size */}
