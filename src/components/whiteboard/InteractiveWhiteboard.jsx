@@ -154,7 +154,8 @@ export default function InteractiveWhiteboard({
         // Draw text
         context.fillStyle = stroke.color || '#ffffff';
         context.font = `${stroke.size || 16}px ${stroke.font || 'Arial'}`;
-        const lines = stroke.content.split('\n');
+        const content = stroke.content || '';
+        const lines = content.split('\n');
         lines.forEach((line, lineIdx) => {
           context.fillText(line, stroke.x, stroke.y + (lineIdx * stroke.size));
         });
