@@ -21,6 +21,7 @@ import KnowledgeGapReport from "./pages/KnowledgeGapReport";
 import ClassKnowledgeGaps from "./pages/ClassKnowledgeGaps";
 import AssignmentResults from "./pages/AssignmentResults";
 import TestScores from "./pages/TestScores";
+import ExamForecast from "./pages/ExamForecast";
 
 const { Pages, Layout, mainPage } = pagesConfig;
 
@@ -87,6 +88,7 @@ const AuthenticatedApp = () => {
       <Route path="/ClassKnowledgeGaps" element={<LayoutWrapper currentPageName="ClassKnowledgeGaps"><ClassKnowledgeGaps /></LayoutWrapper>} />
       <Route path="/AssignmentResults" element={<LayoutWrapper currentPageName="AssignmentResults"><AssignmentResults /></LayoutWrapper>} />
       <Route path="/TestScores" element={<LayoutWrapper currentPageName="TestScores"><TestScores /></LayoutWrapper>} />
+      <Route path="/ExamForecast" element={<LayoutWrapper currentPageName="ExamForecast"><ExamForecast /></LayoutWrapper>} />
       <Route path="*" element={<PageNotFound />} />
     </Routes>
   );

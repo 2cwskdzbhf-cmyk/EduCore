@@ -16,7 +16,8 @@ import {
   Shield,
   BarChart3,
   User as UserIcon,
-  TrendingUp
+  TrendingUp,
+  Brain
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -116,6 +117,7 @@ export default function Layout({ children, currentPageName }) {
     { name: 'Dashboard', icon: LayoutDashboard, page: 'StudentDashboard' },
     { name: 'Portfolio', icon: Users, page: 'StudentPortfolio' },
     { name: 'Test Scores', icon: TrendingUp, page: 'TestScores' },
+    { name: 'Exam Forecast', icon: Brain, page: 'ExamForecast' },
     { name: 'AI Tutor', icon: MessageSquare, page: 'AITutor' },
   ];
 
