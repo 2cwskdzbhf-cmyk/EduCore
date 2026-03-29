@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { base44 } from '@/api/base44Client';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import GlassCard from '@/components/ui/GlassCard';
 import ClassMessaging from '@/components/class/ClassMessaging';
+import InteractiveWhiteboard from '@/components/whiteboard/InteractiveWhiteboard';
 import {
   ChevronLeft,
   ClipboardList,
@@ -21,6 +22,7 @@ import {
 
 export default function StudentClassDetail() {
   const [user, setUser] = useState(null);
+  const queryClient = useQueryClient();
   const urlParams = new URLSearchParams(window.location.search);
   const classId = urlParams.get('classId');
 
@@ -93,6 +95,17 @@ export default function StudentClassDetail() {
     enabled: !!classId && !!classData?.student_emails
   });
 
+  const { data: whiteboard } = useQuery({
+    queryKey: ['classWhiteboard', classId],
+    queryFn: async () => {
+      if (!classId) return null;
+      const boards = await base44.entities.LiveSessionWhiteboard.filter({ session_id: classId });
+      return boards[0] || null;
+    },
+    enabled: !!classId,
+    refetchInterval: 2000
+  });
+
   const getSubmissionStatus = (assignmentId) => {
     const submission = submissions.find(s => s.assignment_id === assignmentId);
     if (!submission) return 'not_started';
@@ -145,6 +158,9 @@ export default function StudentClassDetail() {
             <TabsTrigger value="messaging" className="data-[state=active]:bg-white/10">
               <MessageCircle className="w-4 h-4 mr-2" />
               Messages
+            </TabsTrigger>
+            <TabsTrigger value="whiteboard" className="data-[state=active]:bg-white/10">
+              ✏️ Whiteboard
             </TabsTrigger>
           </TabsList>
 
@@ -264,6 +280,21 @@ export default function StudentClassDetail() {
                 user={user}
                 classData={classData}
               />
+            )}
+          </TabsContent>
+
+          <TabsContent value="whiteboard">
+            {whiteboard && user && (
+              <InteractiveWhiteboard
+                whiteboard={whiteboard}
+                canEdit={whiteboard.allow_all_edits || whiteboard.student_edit_permissions?.[user.email] || false}
+                isTeacher={false}
+              />
+            )}
+            {!whiteboard && (
+              <GlassCard className="p-12 text-center">
+                <p className="text-slate-400">Whiteboard not available for this class yet</p>
+              </GlassCard>
             )}
           </TabsContent>
         </Tabs>

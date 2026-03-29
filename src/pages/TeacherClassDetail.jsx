@@ -17,6 +17,8 @@ import {
   Calendar, Clock, Target, TrendingUp, Eye, X, AlertTriangle, BookOpen, MessageCircle
 } from 'lucide-react';
 import ClassMessaging from '@/components/class/ClassMessaging';
+import InteractiveWhiteboard from '@/components/whiteboard/InteractiveWhiteboard';
+import WhiteboardPermissions from '@/components/whiteboard/WhiteboardPermissions';
 import StudentStatsModal from '@/components/teacher/StudentStatsModal';
 import { AnimatePresence } from 'framer-motion';
 
@@ -46,6 +48,7 @@ export default function TeacherClassDetail() {
   const [deleteConfirmAssignment, setDeleteConfirmAssignment] = useState(null);
   const [deleteConfirmStudent, setDeleteConfirmStudent] = useState(null);
   const [createMode, setCreateMode] = useState(''); // 'manual' or 'ai'
+  const [whiteboardPerms, setWhiteboardPerms] = useState({});
 
   const copyJoinCode = (code) => {
     navigator.clipboard.writeText(code);
@@ -147,6 +150,35 @@ export default function TeacherClassDetail() {
       return students;
     },
     enabled: !!classData?.student_emails && classData.student_emails.length > 0
+  });
+
+  const { data: whiteboard } = useQuery({
+    queryKey: ['classWhiteboard', classId],
+    queryFn: async () => {
+      if (!classId) return null;
+      const boards = await base44.entities.LiveSessionWhiteboard.filter({ session_id: classId });
+      if (boards.length > 0) return boards[0];
+      
+      // Create new whiteboard if it doesn't exist
+      return base44.entities.LiveSessionWhiteboard.create({
+        session_id: classId,
+        teacher_email: user?.email,
+        student_edit_permissions: {},
+        allow_all_edits: false,
+        is_enabled: true
+      });
+    },
+    enabled: !!classId && !!user?.email
+  });
+
+  const updateWhiteboardMutation = useMutation({
+    mutationFn: async (data) => {
+      if (!whiteboard?.id) throw new Error('Whiteboard not found');
+      return base44.entities.LiveSessionWhiteboard.update(whiteboard.id, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries(['classWhiteboard', classId]);
+    }
   });
 
   const generatePracticeMutation = useMutation({
@@ -457,6 +489,9 @@ export default function TeacherClassDetail() {
               </TabsTrigger>
               <TabsTrigger value="messaging" className="text-slate-200 data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-500 data-[state=active]:to-blue-500 data-[state=active]:text-white">
                 💬 Messaging
+              </TabsTrigger>
+              <TabsTrigger value="whiteboard" className="text-slate-200 data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-500 data-[state=active]:to-blue-500 data-[state=active]:text-white">
+                ✏️ Whiteboard
               </TabsTrigger>
             </TabsList>
 
@@ -1182,6 +1217,43 @@ export default function TeacherClassDetail() {
                   classData={classData}
                 />
               )}
+            </TabsContent>
+
+            {/* Whiteboard Tab */}
+            <TabsContent value="whiteboard" className="space-y-6">
+              <div className="grid lg:grid-cols-3 gap-6">
+                <div className="lg:col-span-2">
+                  {whiteboard && user && (
+                    <InteractiveWhiteboard
+                      whiteboard={whiteboard}
+                      canEdit={true}
+                      isTeacher={true}
+                    />
+                  )}
+                </div>
+                <div>
+                  {whiteboard && classStudents.length > 0 && (
+                    <WhiteboardPermissions
+                      students={classStudents}
+                      permissions={whiteboardPerms}
+                      onPermissionChange={(email, allowed) => {
+                        const newPerms = { ...whiteboardPerms, [email]: allowed };
+                        setWhiteboardPerms(newPerms);
+                        updateWhiteboardMutation.mutate({
+                          student_edit_permissions: newPerms
+                        });
+                      }}
+                      allowAllEdits={whiteboard.allow_all_edits}
+                      onToggleAllEdits={(allowed) => {
+                        updateWhiteboardMutation.mutate({
+                          allow_all_edits: allowed,
+                          student_edit_permissions: allowed ? {} : whiteboardPerms
+                        });
+                      }}
+                    />
+                  )}
+                </div>
+              </div>
             </TabsContent>
           </Tabs>
         </motion.div>
