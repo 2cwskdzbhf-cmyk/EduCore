@@ -522,7 +522,7 @@ export default function AssignmentBuilder() {
               <Button
                 onClick={() => saveDraftMutation.mutate()}
                 disabled={saveDraftMutation.isPending}
-                className="bg-slate-700 hover:bg-slate-600 text-white shadow-lg"
+                className="bg-slate-600/80 hover:bg-slate-500/80 text-slate-200 border border-slate-500/40 shadow-lg"
               >
                 {saveDraftMutation.isPending ? (
                   <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />
@@ -797,7 +797,7 @@ export default function AssignmentBuilder() {
                             )}
                           </div>
                         ))}
-                        <Button size="sm" onClick={() => addKeyword('answerKeywords')} variant="outline" className="border-white/20 text-white hover:bg-white/10 w-full">
+                        <Button size="sm" onClick={() => addKeyword('answerKeywords')} variant="outline" className="border-purple-500/40 text-purple-300 hover:bg-purple-500/20 w-full">
                           <Plus className="w-4 h-4 mr-1" />
                           Add Keyword
                         </Button>
@@ -836,7 +836,7 @@ export default function AssignmentBuilder() {
                                 )}
                               </div>
                             ))}
-                            <Button size="sm" onClick={() => addKeyword('workingKeywords')} variant="outline" className="border-white/20 text-white hover:bg-white/10 w-full">
+                            <Button size="sm" onClick={() => addKeyword('workingKeywords')} variant="outline" className="border-purple-500/40 text-purple-300 hover:bg-purple-500/20 w-full">
                               <Plus className="w-4 h-4 mr-1" />
                               Add Working Keyword
                             </Button>
@@ -864,7 +864,7 @@ export default function AssignmentBuilder() {
                     onClick={goToPreviousQuestion}
                     disabled={currentQuestionIndex === 0}
                     variant="outline"
-                    className="border-white/20 text-white hover:bg-white/10"
+                    className="border-slate-500/50 text-slate-300 hover:bg-slate-500/20 disabled:opacity-30"
                   >
                     <ChevronLeft className="w-4 h-4 mr-2" />
                     Previous
