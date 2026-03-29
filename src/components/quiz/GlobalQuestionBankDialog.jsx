@@ -50,10 +50,9 @@ export default function GlobalQuestionBankDialog({ open, onClose, onAddQuestions
         // Auto-set year groups from class
         if (classYearGroup) {
           setYearGroups([String(classYearGroup)]);
-          setScreen('difficulty');
-        } else {
-          setScreen('topics');
         }
+        // Always start with topics
+        setScreen('topics');
       } else {
         setScreen('subjects');
         setSubject(null);
