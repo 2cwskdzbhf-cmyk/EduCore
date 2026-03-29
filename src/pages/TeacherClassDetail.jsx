@@ -1228,6 +1228,7 @@ export default function TeacherClassDetail() {
                       whiteboard={whiteboard}
                       canEdit={true}
                       isTeacher={true}
+                      whiteboardId={whiteboard.id}
                     />
                   )}
                 </div>

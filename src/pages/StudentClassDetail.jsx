@@ -289,6 +289,7 @@ export default function StudentClassDetail() {
                 whiteboard={whiteboard}
                 canEdit={whiteboard.allow_all_edits || whiteboard.student_edit_permissions?.[user.email] || false}
                 isTeacher={false}
+                whiteboardId={whiteboard.id}
               />
             )}
             {!whiteboard && (
