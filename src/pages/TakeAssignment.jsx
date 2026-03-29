@@ -27,6 +27,7 @@ export default function TakeAssignment() {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [answers, setAnswers] = useState({});
   const [workings, setWorkings] = useState({});
+  const [feedback, setFeedback] = useState(null);
   const [startTime] = useState(Date.now());
 
   useEffect(() => {
@@ -174,6 +175,55 @@ export default function TakeAssignment() {
     }
   };
 
+  const playSound = (type) => {
+    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    const oscillator = audioContext.createOscillator();
+    const gain = audioContext.createGain();
+    oscillator.connect(gain);
+    gain.connect(audioContext.destination);
+    
+    if (type === 'correct') {
+      oscillator.frequency.value = 800;
+      oscillator.frequency.setValueAtTime(1000, audioContext.currentTime + 0.1);
+      gain.gain.setValueAtTime(0.3, audioContext.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+      oscillator.start(audioContext.currentTime);
+      oscillator.stop(audioContext.currentTime + 0.3);
+    } else {
+      oscillator.frequency.value = 300;
+      gain.gain.setValueAtTime(0.3, audioContext.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.4);
+      oscillator.start(audioContext.currentTime);
+      oscillator.stop(audioContext.currentTime + 0.4);
+    }
+  };
+
+  const handleAnswer = (selectedIndex) => {
+    if (feedback) return; // Prevent answering while feedback is shown
+    
+    const correctIndex = currentQuestion.correct_index;
+    const isCorrect = selectedIndex === correctIndex;
+    
+    setFeedback({
+      selectedIndex,
+      correctIndex,
+      isCorrect
+    });
+    
+    playSound(isCorrect ? 'correct' : 'incorrect');
+    
+    // Auto-advance after 2 seconds if correct
+    if (isCorrect) {
+      setTimeout(() => {
+        setAnswer(selectedIndex);
+        setFeedback(null);
+        if (currentQuestionIndex < questions.length - 1) {
+          setCurrentQuestionIndex(currentQuestionIndex + 1);
+        }
+      }, 2000);
+    }
+  };
+
   const setAnswer = (value) => {
     setAnswers({ ...answers, [currentQuestionIndex]: value });
   };
@@ -246,22 +296,46 @@ export default function TakeAssignment() {
               <div className="space-y-3">
                 {currentQuestion.options?.map((option, idx) => {
                   const isSelected = answers[currentQuestionIndex] === idx;
+                  const showFeedback = feedback !== null;
+                  const isClickedOption = feedback?.selectedIndex === idx;
+                  const isCorrectOption = idx === feedback?.correctIndex;
+                  
+                  let bgColor = 'bg-white/5 text-white border border-white/10 hover:bg-white/10';
+                  if (showFeedback) {
+                    if (isClickedOption && !feedback.isCorrect) {
+                      bgColor = 'bg-red-500/30 text-white border border-red-500';
+                    } else if (isCorrectOption) {
+                      bgColor = 'bg-emerald-500/30 text-white border border-emerald-500';
+                    } else if (!feedback.isCorrect) {
+                      bgColor = 'bg-red-500/20 text-white border border-red-500/50';
+                    }
+                  } else if (isSelected) {
+                    bgColor = 'bg-purple-500 text-white border border-purple-400 shadow-lg shadow-purple-500/30';
+                  }
+                  
                   return (
                     <motion.button
                       key={idx}
-                      onClick={() => setAnswer(idx)}
-                      animate={isSelected ? { scale: 1.02 } : {}}
+                      onClick={() => !feedback && handleAnswer(idx)}
+                      animate={
+                        isClickedOption && !feedback.isCorrect && showFeedback
+                          ? { x: [-10, 10, -10, 10, 0], transition: { duration: 0.4 } }
+                          : isSelected ? { scale: 1.02 } : {}
+                      }
                       className={`
                         w-full p-4 rounded-xl text-left transition-all
-                        ${isSelected
-                          ? 'bg-purple-500 text-white border border-purple-400 shadow-lg shadow-purple-500/30'
-                          : 'bg-white/5 text-white border border-white/10 hover:bg-white/10'
-                        }
+                        ${bgColor}
                       `}
                     >
                       <div className="flex items-center gap-3">
                         <span className="font-bold">{String.fromCharCode(65 + idx)}</span>
                         <span>{option}</span>
+                        {showFeedback && isClickedOption && feedback.isCorrect && (
+                          <span className="ml-auto text-lg">✓</span>
+                        )}
+                        {showFeedback && isCorrectOption && !feedback.isCorrect && (
+                          <span className="ml-auto text-lg">✓</span>
+                        )}
                       </div>
                     </motion.button>
                   );
@@ -317,7 +391,16 @@ export default function TakeAssignment() {
 
           {currentQuestionIndex === questions.length - 1 ? (
             <Button
-              onClick={() => submitMutation.mutate()}
+              onClick={() => {
+                if (feedback && !feedback.isCorrect) {
+                  setAnswer(feedback.selectedIndex);
+                  setFeedback(null);
+                } else if (feedback) {
+                  submitMutation.mutate();
+                } else {
+                  submitMutation.mutate();
+                }
+              }}
               disabled={!isAllAnswered || submitMutation.isPending}
               className="bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 shadow-lg shadow-emerald-500/30"
             >
@@ -332,10 +415,17 @@ export default function TakeAssignment() {
             </Button>
           ) : (
             <Button
-              onClick={handleNext}
+              onClick={() => {
+                if (feedback) {
+                  setAnswer(feedback.selectedIndex);
+                  setFeedback(null);
+                } else {
+                  handleNext();
+                }
+              }}
               className="bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 shadow-lg shadow-purple-500/30"
             >
-              Next
+              {feedback ? 'Continue' : 'Next'}
               <ChevronRight className="w-4 h-4 ml-2" />
             </Button>
           )}
