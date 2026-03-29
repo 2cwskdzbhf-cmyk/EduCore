@@ -48,9 +48,13 @@ export default function InteractiveWhiteboard({
   const [selectedStroke, setSelectedStroke] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState(null);
+  const [resizeHandle, setResizeHandle] = useState(null);
   const [textFontSize, setTextFontSize] = useState(16);
   const [textColor, setTextColor] = useState('#ffffff');
   const [textFont, setTextFont] = useState('Arial');
+  const [editingTextIdx, setEditingTextIdx] = useState(null);
+  const [inlineTextValue, setInlineTextValue] = useState('');
+  const inlineInputRef = useRef(null);
 
   const saveWhiteboardMutation = useMutation({
     mutationFn: async () => {
@@ -113,10 +117,15 @@ export default function InteractiveWhiteboard({
         context.fillText(stroke.content, stroke.x, stroke.y);
         
         if (selectedStroke === idx) {
-          const metrics = context.measureText(stroke.content);
           context.strokeStyle = '#fbbf24';
           context.lineWidth = 2;
-          context.strokeRect(stroke.x - 5, stroke.y - stroke.size - 5, metrics.width + 10, stroke.size + 10);
+          context.strokeRect(stroke.x - 5, stroke.y - stroke.size - 5, stroke.width, stroke.height + 5);
+          
+          // Draw resize handle
+          const handleX = stroke.x + stroke.width - 5;
+          const handleY = stroke.y + stroke.height;
+          context.fillStyle = '#fbbf24';
+          context.fillRect(handleX, handleY, 10, 10);
         }
       } else if (stroke.type === 'image' && stroke.src) {
         const img = new Image();
@@ -127,6 +136,10 @@ export default function InteractiveWhiteboard({
             context.strokeStyle = '#fbbf24';
             context.lineWidth = 2;
             context.strokeRect(stroke.x, stroke.y, stroke.width, stroke.height);
+            
+            // Draw resize handle
+            context.fillStyle = '#fbbf24';
+            context.fillRect(stroke.x + stroke.width - 5, stroke.y + stroke.height - 5, 10, 10);
           }
         };
       }
@@ -138,6 +151,20 @@ export default function InteractiveWhiteboard({
 
     if (tool === 'select' && selectedStroke !== null) {
       const { offsetX, offsetY } = event.nativeEvent;
+      const stroke = strokes[selectedStroke];
+      
+      // Check if clicking on resize handle
+      if (stroke.type === 'image' || stroke.type === 'text') {
+        const handleX = stroke.x + stroke.width;
+        const handleY = stroke.y + stroke.height;
+        if (Math.abs(offsetX - handleX) < 10 && Math.abs(offsetY - handleY) < 10) {
+          setResizeHandle('br');
+          setIsDragging(true);
+          setDragStart({ x: offsetX, y: offsetY });
+          return;
+        }
+      }
+      
       setIsDragging(true);
       setDragStart({ x: offsetX, y: offsetY });
       return;
@@ -159,6 +186,7 @@ export default function InteractiveWhiteboard({
     setIsDrawing(false);
     setIsDragging(false);
     setDragStart(null);
+    setResizeHandle(null);
   };
 
   const handleDragMove = (event) => {
@@ -169,11 +197,20 @@ export default function InteractiveWhiteboard({
     const dy = offsetY - dragStart.y;
 
     const newStrokes = [...strokes];
-    newStrokes[selectedStroke] = {
-      ...newStrokes[selectedStroke],
-      x: newStrokes[selectedStroke].x + dx,
-      y: newStrokes[selectedStroke].y + dy
-    };
+    const stroke = newStrokes[selectedStroke];
+
+    if (resizeHandle) {
+      // Resize operation
+      if (resizeHandle === 'br' && (stroke.type === 'image' || stroke.type === 'text')) {
+        stroke.width = Math.max(30, stroke.width + dx);
+        stroke.height = Math.max(20, stroke.height + dy);
+      }
+    } else {
+      // Move operation
+      stroke.x += dx;
+      stroke.y += dy;
+    }
+
     setStrokes(newStrokes);
     setDragStart({ x: offsetX, y: offsetY });
   };
@@ -276,17 +313,34 @@ export default function InteractiveWhiteboard({
     const y = e.clientY - rect.top;
 
     if (textMode) {
+      // Start inline text editing
       setTextPosition({ x, y });
-      setTimeout(() => textInputRef.current?.focus(), 0);
+      setInlineTextValue('');
+      setEditingTextIdx(null);
+      setTimeout(() => inlineInputRef.current?.focus(), 0);
     } else if (tool === 'select') {
-      // Check if clicking on a stroke
-      const clicked = strokes.findIndex(stroke => {
-        if (stroke.type === 'text' && stroke.x && stroke.y) {
-          return x >= stroke.x && x <= stroke.x + stroke.width && y >= stroke.y - stroke.size && y <= stroke.y;
+      // Check if clicking on a text or image
+      let found = false;
+      for (let i = 0; i < strokes.length; i++) {
+        const stroke = strokes[i];
+        if (stroke.type === 'text') {
+          if (x >= stroke.x && x <= stroke.x + stroke.width && y >= stroke.y - stroke.size && y <= stroke.y) {
+            setSelectedStroke(i);
+            setEditingTextIdx(i);
+            setInlineTextValue(stroke.content);
+            found = true;
+            break;
+          }
+        } else if (stroke.type === 'image') {
+          if (x >= stroke.x && x <= stroke.x + stroke.width && y >= stroke.y && y <= stroke.y + stroke.height) {
+            setSelectedStroke(i);
+            setEditingTextIdx(null);
+            found = true;
+            break;
+          }
         }
-        return false;
-      });
-      setSelectedStroke(clicked >= 0 ? clicked : null);
+      }
+      if (!found) setSelectedStroke(null);
     }
   };
 
@@ -479,107 +533,189 @@ export default function InteractiveWhiteboard({
         )}
       </GlassCard>
 
-      {/* Text Input Modal */}
-      <AnimatePresence>
-        {textMode && textPosition && (
-          <motion.div
-            className="fixed inset-0 flex items-center justify-center z-40 bg-black/50"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={() => setTextMode(false)}
-          >
-            <motion.div
-              className="bg-slate-950 border border-white/20 rounded-lg p-6 shadow-lg max-w-sm w-full mx-4"
-              initial={{ scale: 0.9 }}
-              animate={{ scale: 1 }}
-              exit={{ scale: 0.9 }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <Input
-                ref={textInputRef}
-                autoFocus
-                value={textInput}
-                onChange={(e) => setTextInput(e.target.value)}
-                onKeyPress={(e) => {
-                  if (e.key === 'Enter') {
-                    handleTextAdd(textPosition.x, textPosition.y);
-                  }
-                }}
-                placeholder="Type text..."
-                className="bg-white/5 border-white/10 text-white mb-4"
+      {/* Inline Text Editing */}
+      {textMode && textPosition && (
+        <motion.div
+          className="fixed z-40 bg-slate-950 border border-white/20 rounded-lg p-4 shadow-lg"
+          style={{
+            left: textPosition.x + 'px',
+            top: textPosition.y + 'px',
+            transform: 'translate(-50%, -50%)'
+          }}
+          initial={{ scale: 0.8, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          exit={{ scale: 0.8, opacity: 0 }}
+        >
+          <div className="w-48 space-y-2">
+            <input
+              ref={inlineInputRef}
+              autoFocus
+              type="text"
+              value={textInput}
+              onChange={(e) => setTextInput(e.target.value)}
+              onBlur={() => {
+                if (textInput.trim()) handleTextAdd(textPosition.x, textPosition.y);
+                else setTextMode(false);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  if (textInput.trim()) handleTextAdd(textPosition.x, textPosition.y);
+                  else setTextMode(false);
+                }
+                if (e.key === 'Escape') setTextMode(false);
+              }}
+              placeholder="Type text..."
+              className="w-full bg-white/5 border border-white/10 text-white rounded px-2 py-1 text-sm"
+            />
+
+            {/* Font Size */}
+            <div className="text-xs">
+              <label className="text-slate-400 block mb-1">Size: {textFontSize}px</label>
+              <input
+                type="range"
+                min="8"
+                max="48"
+                value={textFontSize}
+                onChange={(e) => setTextFontSize(parseInt(e.target.value))}
+                className="w-full"
               />
+            </div>
 
-              <div className="space-y-3 mb-4">
-                {/* Font Size */}
-                <div>
-                  <label className="text-xs text-slate-400 mb-2 block">Size: {textFontSize}px</label>
-                  <input
-                    type="range"
-                    min="8"
-                    max="48"
-                    value={textFontSize}
-                    onChange={(e) => setTextFontSize(parseInt(e.target.value))}
-                    className="w-full"
+            {/* Font */}
+            <div className="text-xs">
+              <label className="text-slate-400 block mb-1">Font</label>
+              <select
+                value={textFont}
+                onChange={(e) => setTextFont(e.target.value)}
+                className="w-full bg-white/5 border border-white/10 text-white rounded px-2 py-1 text-xs"
+                style={{ color: textFont }}
+              >
+                <option value="Arial" style={{ fontFamily: 'Arial' }}>Arial</option>
+                <option value="Georgia" style={{ fontFamily: 'Georgia' }}>Georgia</option>
+                <option value="Times New Roman" style={{ fontFamily: 'Times New Roman' }}>Times New Roman</option>
+                <option value="Courier New" style={{ fontFamily: 'Courier New' }}>Courier New</option>
+                <option value="Verdana" style={{ fontFamily: 'Verdana' }}>Verdana</option>
+              </select>
+            </div>
+
+            {/* Color */}
+            <div className="text-xs">
+              <label className="text-slate-400 block mb-1">Color</label>
+              <div className="flex gap-1">
+                {['#ffffff', '#ff6b6b', '#4ecdc4', '#45b7d1', '#96ceb4', '#ffeaa7', '#000000'].map((c) => (
+                  <button
+                    key={c}
+                    onClick={() => setTextColor(c)}
+                    className={cn(
+                      'w-6 h-6 rounded-full border-2 transition-all',
+                      textColor === c ? 'border-white scale-110' : 'border-white/30'
+                    )}
+                    style={{ backgroundColor: c }}
                   />
-                </div>
-
-                {/* Font */}
-                <div>
-                  <label className="text-xs text-slate-400 mb-2 block">Font</label>
-                  <select
-                    value={textFont}
-                    onChange={(e) => setTextFont(e.target.value)}
-                    className="w-full bg-white/5 border border-white/10 text-white rounded px-3 py-2 text-sm"
-                  >
-                    <option value="Arial">Arial</option>
-                    <option value="Georgia">Georgia</option>
-                    <option value="Times New Roman">Times New Roman</option>
-                    <option value="Courier New">Courier New</option>
-                    <option value="Verdana">Verdana</option>
-                  </select>
-                </div>
-
-                {/* Color */}
-                <div>
-                  <label className="text-xs text-slate-400 mb-2 block">Color</label>
-                  <div className="flex gap-2">
-                    {['#ffffff', '#ff6b6b', '#4ecdc4', '#45b7d1', '#96ceb4', '#ffeaa7', '#000000'].map((c) => (
-                      <button
-                        key={c}
-                        onClick={() => setTextColor(c)}
-                        className={cn(
-                          'w-8 h-8 rounded-full border-2 transition-all',
-                          textColor === c ? 'border-white scale-110' : 'border-white/30 hover:border-white'
-                        )}
-                        style={{ backgroundColor: c }}
-                      />
-                    ))}
-                  </div>
-                </div>
+                ))}
               </div>
+            </div>
+          </div>
+        </motion.div>
+      )}
 
-              <div className="flex gap-2">
-                <Button
-                  size="sm"
-                  onClick={() => handleTextAdd(textPosition.x, textPosition.y)}
-                  className="flex-1 bg-purple-500"
-                >
-                  Add
-                </Button>
-                <Button
-                  size="sm"
-                  onClick={() => setTextMode(false)}
-                  variant="outline"
-                  className="flex-1 border-white/20"
-                >
-                  Cancel
-                </Button>
+      {/* Text Edit for Selected Text */}
+      {editingTextIdx !== null && selectedStroke === editingTextIdx && tool === 'select' && (
+        <motion.div
+          className="fixed z-40 bg-slate-950 border border-white/20 rounded-lg p-4 shadow-lg"
+          style={{
+            left: strokes[editingTextIdx].x + 'px',
+            top: (strokes[editingTextIdx].y - 60) + 'px'
+          }}
+          initial={{ scale: 0.8, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          exit={{ scale: 0.8, opacity: 0 }}
+        >
+          <div className="w-48 space-y-2">
+            <input
+              ref={inlineInputRef}
+              autoFocus
+              type="text"
+              value={inlineTextValue}
+              onChange={(e) => setInlineTextValue(e.target.value)}
+              onBlur={() => {
+                const newStrokes = [...strokes];
+                newStrokes[editingTextIdx].content = inlineTextValue;
+                setStrokes(newStrokes);
+                setEditingTextIdx(null);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === 'Escape') {
+                  const newStrokes = [...strokes];
+                  newStrokes[editingTextIdx].content = inlineTextValue;
+                  setStrokes(newStrokes);
+                  setEditingTextIdx(null);
+                }
+              }}
+              className="w-full bg-white/5 border border-white/10 text-white rounded px-2 py-1 text-sm"
+            />
+
+            {/* Font Size */}
+            <div className="text-xs">
+              <label className="text-slate-400 block mb-1">Size: {strokes[editingTextIdx]?.size || 16}px</label>
+              <input
+                type="range"
+                min="8"
+                max="48"
+                value={strokes[editingTextIdx]?.size || 16}
+                onChange={(e) => {
+                  const newStrokes = [...strokes];
+                  newStrokes[editingTextIdx].size = parseInt(e.target.value);
+                  setStrokes(newStrokes);
+                }}
+                className="w-full"
+              />
+            </div>
+
+            {/* Font */}
+            <div className="text-xs">
+              <label className="text-slate-400 block mb-1">Font</label>
+              <select
+                value={strokes[editingTextIdx]?.font || 'Arial'}
+                onChange={(e) => {
+                  const newStrokes = [...strokes];
+                  newStrokes[editingTextIdx].font = e.target.value;
+                  setStrokes(newStrokes);
+                }}
+                className="w-full bg-white/5 border border-white/10 text-white rounded px-2 py-1 text-xs"
+              >
+                <option value="Arial" style={{ fontFamily: 'Arial' }}>Arial</option>
+                <option value="Georgia" style={{ fontFamily: 'Georgia' }}>Georgia</option>
+                <option value="Times New Roman" style={{ fontFamily: 'Times New Roman' }}>Times New Roman</option>
+                <option value="Courier New" style={{ fontFamily: 'Courier New' }}>Courier New</option>
+                <option value="Verdana" style={{ fontFamily: 'Verdana' }}>Verdana</option>
+              </select>
+            </div>
+
+            {/* Color */}
+            <div className="text-xs">
+              <label className="text-slate-400 block mb-1">Color</label>
+              <div className="flex gap-1">
+                {['#ffffff', '#ff6b6b', '#4ecdc4', '#45b7d1', '#96ceb4', '#ffeaa7', '#000000'].map((c) => (
+                  <button
+                    key={c}
+                    onClick={() => {
+                      const newStrokes = [...strokes];
+                      newStrokes[editingTextIdx].color = c;
+                      setStrokes(newStrokes);
+                    }}
+                    className={cn(
+                      'w-6 h-6 rounded-full border-2 transition-all',
+                      (strokes[editingTextIdx]?.color || '#ffffff') === c ? 'border-white scale-110' : 'border-white/30'
+                    )}
+                    style={{ backgroundColor: c }}
+                  />
+                ))}
               </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+            </div>
+          </div>
+        </motion.div>
+      )}
     </>
   );
 }
