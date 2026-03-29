@@ -7,6 +7,7 @@ import { createPageUrl } from '@/utils';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import GlassCard from '@/components/ui/GlassCard';
+import ClassMessaging from '@/components/class/ClassMessaging';
 import {
   ChevronLeft,
   ClipboardList,
@@ -14,7 +15,8 @@ import {
   Medal,
   Target,
   CheckCircle2,
-  Clock
+  Clock,
+  MessageCircle
 } from 'lucide-react';
 
 export default function StudentClassDetail() {
@@ -140,6 +142,10 @@ export default function StudentClassDetail() {
               <Trophy className="w-4 h-4 mr-2" />
               Leaderboard
             </TabsTrigger>
+            <TabsTrigger value="messaging" className="data-[state=active]:bg-white/10">
+              <MessageCircle className="w-4 h-4 mr-2" />
+              Messages
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="assignments">
@@ -248,6 +254,16 @@ export default function StudentClassDetail() {
                 <h3 className="font-semibold text-white mb-2">No data yet</h3>
                 <p className="text-slate-400 text-sm">Complete quizzes to see the leaderboard.</p>
               </GlassCard>
+            )}
+          </TabsContent>
+
+          <TabsContent value="messaging">
+            {user && (
+              <ClassMessaging
+                classId={classId}
+                user={user}
+                classData={classData}
+              />
             )}
           </TabsContent>
         </Tabs>

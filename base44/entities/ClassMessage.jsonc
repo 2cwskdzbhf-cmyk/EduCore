@@ -1,0 +1,66 @@
+{
+  "name": "ClassMessage",
+  "type": "object",
+  "properties": {
+    "class_id": {
+      "type": "string",
+      "description": "Reference to Class"
+    },
+    "sender_email": {
+      "type": "string",
+      "description": "Email of the message sender"
+    },
+    "sender_name": {
+      "type": "string",
+      "description": "Display name of the sender"
+    },
+    "sender_type": {
+      "type": "string",
+      "enum": [
+        "teacher",
+        "student"
+      ],
+      "description": "Type of sender"
+    },
+    "message_type": {
+      "type": "string",
+      "enum": [
+        "announcement",
+        "question",
+        "reply"
+      ],
+      "default": "reply",
+      "description": "Type of message"
+    },
+    "content": {
+      "type": "string",
+      "description": "Message content"
+    },
+    "recipient_email": {
+      "type": "string",
+      "description": "For private messages: recipient email. For announcements/questions: null"
+    },
+    "is_pinned": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether announcement is pinned"
+    },
+    "reactions": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "description": "Emoji reactions with list of user emails"
+    }
+  },
+  "required": [
+    "class_id",
+    "sender_email",
+    "sender_type",
+    "message_type",
+    "content"
+  ]
+}

@@ -14,8 +14,9 @@ import GlassCard from '@/components/ui/GlassCard';
 import { 
   ChevronLeft, Users, Sparkles, Loader2, Trophy, ClipboardList, 
   BarChart3, Plus, Trash2, RefreshCw, Save, CheckCircle2, Edit2, Zap,
-  Calendar, Clock, Target, TrendingUp, Eye, X, AlertTriangle, BookOpen
+  Calendar, Clock, Target, TrendingUp, Eye, X, AlertTriangle, BookOpen, MessageCircle
 } from 'lucide-react';
+import ClassMessaging from '@/components/class/ClassMessaging';
 import StudentStatsModal from '@/components/teacher/StudentStatsModal';
 import { AnimatePresence } from 'framer-motion';
 
@@ -453,6 +454,9 @@ export default function TeacherClassDetail() {
               </TabsTrigger>
               <TabsTrigger value="analytics" className="text-slate-200 data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-500 data-[state=active]:to-blue-500 data-[state=active]:text-white">
                 📊 Analytics
+              </TabsTrigger>
+              <TabsTrigger value="messaging" className="text-slate-200 data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-500 data-[state=active]:to-blue-500 data-[state=active]:text-white">
+                💬 Messaging
               </TabsTrigger>
             </TabsList>
 
@@ -1167,6 +1171,17 @@ export default function TeacherClassDetail() {
                 assignments={assignments}
                 onSelectStudent={setSelectedStudent}
               />
+            </TabsContent>
+
+            {/* Messaging Tab */}
+            <TabsContent value="messaging">
+              {user && (
+                <ClassMessaging
+                  classId={classId}
+                  user={user}
+                  classData={classData}
+                />
+              )}
             </TabsContent>
           </Tabs>
         </motion.div>
