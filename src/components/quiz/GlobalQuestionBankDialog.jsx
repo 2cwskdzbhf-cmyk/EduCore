@@ -336,7 +336,7 @@ export default function GlobalQuestionBankDialog({ open, onClose, onAddQuestions
           {/* DIFFICULTY — multi-select */}
           {screen === 'difficulty' && (
             <div>
-              <StepLabel step={5} label="Choose difficulty level(s)" hint="Select one or more" />
+              <StepLabel step={classYearGroup ? 4 : 5} label="Choose difficulty level(s)" hint="Select one or more" />
               <div className="grid grid-cols-3 gap-3 mt-4">
                 {DIFFICULTIES.map(d => {
                   const active = difficulties.includes(d.value);
@@ -359,13 +359,20 @@ export default function GlobalQuestionBankDialog({ open, onClose, onAddQuestions
                   );
                 })}
               </div>
-              <MultiSelectFooter
-                count={difficulties.length}
-                label="difficulty"
-                onNext={() => setScreen('questiontype')}
-                onSelectAll={() => setDifficulties(DIFFICULTIES.map(d => d.value))}
-                onClear={() => setDifficulties([])}
-              />
+              <div className="mt-6 flex items-center justify-between gap-3 pt-4 border-t border-white/10">
+                <div className="flex items-center gap-3 text-xs text-slate-500">
+                  <button onClick={() => setDifficulties(DIFFICULTIES.map(d => d.value))} className="hover:text-white transition-colors">Select all</button>
+                  {difficulties.length > 0 && <button onClick={() => setDifficulties([])} className="hover:text-white transition-colors">Clear</button>}
+                  {difficulties.length > 0 && <span className="text-purple-300">{difficulties.length} selected</span>}
+                </div>
+                <Button
+                  onClick={() => setScreen('questiontype')}
+                  disabled={difficulties.length === 0}
+                  className="bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 h-9 px-6"
+                >
+                  Next <ChevronRight className="w-4 h-4 ml-1" />
+                </Button>
+              </div>
             </div>
           )}
 
