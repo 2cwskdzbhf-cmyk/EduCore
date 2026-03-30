@@ -52,27 +52,25 @@ const setId = urlParams.get('quizSetId') || urlParams.get('setId');
       if (!quizSet) throw new Error('Quiz set not loaded');
       if (!questions || questions.length === 0) throw new Error('This quiz has no questions');
 
-      // ✅ Create a session using quiz_set_id (not live_quiz_set_id)
-     const session = await base44.entities.LiveQuizSession.create({
-  class_id: classId,
-  host_email: user.email,
+      const session = await base44.entities.LiveQuizSession.create({
+        class_id: classId,
+        host_email: user.email,
+        quiz_set_id: setId,
+        live_quiz_set_id: setId,
+        status: 'lobby',
+        current_question_index: -1,
+        player_count: 0,
+        // Cache questions on session so backend finds them instantly
+        questions: questions,
+        current_question_id: questions[0]?.id || null,
+        settings: {
+          time_per_question: quizSet.time_limit_per_question || 15000,
+          base_points: 500,
+          round_multiplier_increment: 0.25
+        }
+      });
 
-  // ✅ store BOTH ids for full compatibility
-  quiz_set_id: setId,
-  live_quiz_set_id: setId,
 
-  status: 'lobby',
-  current_question_index: -1,
-  player_count: 0,
-  settings: {
-    time_per_question: quizSet.time_limit_per_question || 15000,
-    base_points: 500,
-    round_multiplier_increment: 0.25
-  }
-});
-
-
-      console.log('LIVE QUIZ SESSION CREATED:', session);
       return session;
     },
     onSuccess: (session) => {

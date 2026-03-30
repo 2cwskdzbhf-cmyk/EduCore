@@ -340,10 +340,45 @@ export default function AssignmentBuilder() {
   });
 
   // LIVE QUIZ start mutation
+  // Step 1: Save a real QuizSet + QuizQuestion records
+  // Step 2: Create the LiveQuizSession with quiz_set_id pointing to that QuizSet
+  // Step 3: Cache questions on the session so the backend finds them instantly
   const startLiveMutation = useMutation({
     mutationFn: async () => {
       if (!user?.email) throw new Error('Not signed in');
 
+      const validQs = questions.filter(q => isQuestionValid(q));
+      if (validQs.length === 0) throw new Error('Please add at least one valid question');
+
+      // Step 1: Save a real QuizSet to the database
+      const quizSet = await base44.entities.QuizSet.create({
+        owner_email: user.email,
+        title: assignmentTitle || 'Live Quiz',
+        topic_id: selectedTopic !== 'custom' ? (selectedTopic || null) : null,
+        status: 'published',
+        question_count: validQs.length
+      });
+
+      // Step 2: Save each question with quiz_set_id = quizSet.id
+      const savedQuestions = [];
+      for (let i = 0; i < validQs.length; i++) {
+        const q = validQs[i];
+        const saved = await base44.entities.QuizQuestion.create({
+          quiz_set_id: quizSet.id,
+          order: i,
+          prompt: q.prompt,
+          question_type: q.type || 'multiple_choice',
+          options: q.type === 'multiple_choice' ? q.options : [],
+          correct_index: q.type === 'multiple_choice' ? q.correctIndex : null,
+          correct_answer: q.type === 'multiple_choice' ? (q.options[q.correctIndex] || '') : (q.answerKeywords?.[0] || ''),
+          answer_keywords: q.type === 'written' ? (q.answerKeywords || []) : [],
+          explanation: q.explanation || '',
+          difficulty: 'medium',
+        });
+        savedQuestions.push(saved);
+      }
+
+      // Step 3: Generate unique join code
       const generateCode = () => Math.random().toString(36).substr(2, 6).toUpperCase();
       let joinCode = generateCode();
       for (let attempts = 0; attempts < 10; attempts++) {
@@ -352,49 +387,25 @@ export default function AssignmentBuilder() {
         joinCode = generateCode();
       }
 
+      // Step 4: Create the session with real quiz_set_id and cache questions
       const session = await base44.entities.LiveQuizSession.create({
         class_id: classId || '',
         host_email: user.email,
-        live_quiz_set_id: assignmentTitle || 'manual-quiz',
+        quiz_set_id: quizSet.id,
+        live_quiz_set_id: quizSet.id,
         status: 'lobby',
         current_question_index: -1,
         player_count: 0,
         join_code: joinCode,
-        questions_json: JSON.stringify(
-          questions.filter(q => isQuestionValid(q)).map((q, i) => ({
-            order: i,
-            prompt: q.prompt,
-            question_type: q.type || 'multiple_choice',
-            options: q.type === 'multiple_choice' ? q.options : [],
-            correct_index: q.type === 'multiple_choice' ? q.correctIndex : 0,
-            correct_answer: q.type === 'multiple_choice' ? (q.options[q.correctIndex] || '') : (q.answerKeywords?.[0] || ''),
-            difficulty: 'medium',
-            explanation: q.explanation || '',
-          }))
-        ),
+        // Cache full question objects so backend finds them instantly
+        questions: savedQuestions,
+        current_question_id: savedQuestions[0]?.id || null,
         settings: {
           time_per_question: 15000,
           base_points: 500,
           round_multiplier_increment: 0.25
         }
       });
-
-      // Also create individual LiveQuizQuestion records
-      const validQs = questions.filter(q => isQuestionValid(q));
-      for (let i = 0; i < validQs.length; i++) {
-        const q = validQs[i];
-        await base44.entities.LiveQuizQuestion.create({
-          live_quiz_set_id: session.id,
-          order: i,
-          prompt: q.prompt,
-          correct_answer: q.type === 'multiple_choice' ? (q.options[q.correctIndex] || '') : (q.answerKeywords?.[0] || ''),
-          allowed_forms: ['exact'],
-          difficulty: 'medium',
-          explanation: q.explanation || '',
-          type: q.type || 'multiple_choice',
-          hint: ''
-        });
-      }
 
       return session;
     },
