@@ -202,7 +202,7 @@ export default function InteractiveWhiteboard({
 
   const handleTextBoxBlur = (id) => {
     // Remove empty textboxes on blur
-    setTextBoxes(prev => prev.filter(tb => tb.id !== id || tb.content.trim() !== ''));
+    setTextBoxes(prev => prev.filter(tb => tb.id !== id || (tb.content || '').trim() !== ''));
     if (editingId === id) setEditingId(null);
   };
 
@@ -437,7 +437,7 @@ export default function InteractiveWhiteboard({
               top: tb.y,
               minWidth: 80,
               cursor: editingId === tb.id ? 'text' : (tool === 'select' ? 'move' : 'text'),
-              outline: selectedId === tb.id ? '2px solid #a78bfa' : tb.content ? '1px dashed rgba(255,255,255,0.2)' : '1px dashed rgba(255,255,255,0.4)',
+              outline: selectedId === tb.id ? '2px solid #a78bfa' : (tb.content || '') ? '1px dashed rgba(255,255,255,0.2)' : '1px dashed rgba(255,255,255,0.4)',
               borderRadius: 4,
               padding: '2px 4px',
               boxSizing: 'border-box',
@@ -447,7 +447,7 @@ export default function InteractiveWhiteboard({
             <textarea
               autoFocus={editingId === tb.id}
               readOnly={editingId !== tb.id}
-              value={tb.content}
+              value={tb.content || ''}
               onChange={e => handleTextChange(tb.id, e.target.value)}
               onBlur={() => handleTextBoxBlur(tb.id)}
               onClick={e => { e.stopPropagation(); setSelectedId(tb.id); setEditingId(tb.id); }}
