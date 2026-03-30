@@ -34,11 +34,11 @@ async function discoverQuestions(base44: any, ids: string[]) {
   );
 
   const linkFields = [
-    'quiz_id',
-    'quiz_set_id',
-    'live_quiz_set_id',
-    'set_id',
     'session_id',
+    'live_quiz_set_id',
+    'quiz_set_id',
+    'quiz_id',
+    'set_id',
     'live_session_id',
   ];
 
@@ -132,13 +132,15 @@ Deno.serve(async (req) => {
 
     if (action === 'start') {
       const q = questions[0];
+      // Ensure the question has an id — use its index-based key as fallback
+      const qId = q?.id ?? q?.question_id ?? `q-0`;
       updates = {
         status: 'live',
         current_question_index: 0,
         question_started_at: now,
         started_at: session.started_at || now,
-        current_question: q,
-        current_question_id: q?.id ?? null,
+        current_question: { ...q, id: qId },
+        current_question_id: qId,
       };
     } else if (action === 'nextQuestion') {
       const nextIndex = (session.current_question_index ?? -1) + 1;
@@ -146,12 +148,13 @@ Deno.serve(async (req) => {
         updates = { status: 'ended', ended_at: now, end_reason: 'completed_all_questions' };
       } else {
         const q = questions[nextIndex];
+        const qId = q?.id ?? q?.question_id ?? `q-${nextIndex}`;
         updates = {
           status: 'live',
           current_question_index: nextIndex,
           question_started_at: now,
-          current_question: q,
-          current_question_id: q?.id ?? null,
+          current_question: { ...q, id: qId },
+          current_question_id: qId,
         };
       }
     } else if (action === 'showLeaderboard') {

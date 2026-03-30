@@ -327,11 +327,10 @@ export default function TeacherClassDetail() {
         attempts++;
       }
 
-      // Create session
+      // Create session — quiz_set_id will be patched to the session's own ID after creation
       const session = await base44.entities.LiveQuizSession.create({
         class_id: classId,
         host_email: user.email,
-        live_quiz_set_id: 'temp-' + Date.now(), // temporary placeholder
         status: 'lobby',
         current_question_index: -1,
         player_count: 0,
@@ -343,13 +342,19 @@ export default function TeacherClassDetail() {
         }
       });
 
-      console.log('[DEBUG] Session created:', session.id);
+      // Patch quiz_set_id to the session's own ID so the backend can discover questions
+      await base44.entities.LiveQuizSession.update(session.id, {
+        quiz_set_id: session.id,
+        live_quiz_set_id: session.id
+      });
 
-      // Create questions linked to session
+      // Create questions linked by BOTH session_id AND live_quiz_set_id for maximum discoverability
+      const createdQuestions = [];
       for (let i = 0; i < generatedLiveQuestions.length; i++) {
         const q = generatedLiveQuestions[i];
-        await base44.entities.LiveQuizQuestion.create({
-          live_quiz_set_id: session.id, // Link to session instead of quiz set
+        const created = await base44.entities.LiveQuizQuestion.create({
+          session_id: session.id,
+          live_quiz_set_id: session.id,
           order: i,
           prompt: q.prompt,
           correct_answer: q.correct_answer,
@@ -359,9 +364,15 @@ export default function TeacherClassDetail() {
           type: q.type || 'fraction',
           hint: q.hint || ''
         });
+        createdQuestions.push(created);
       }
 
-      console.log('[DEBUG] Created', generatedLiveQuestions.length, 'questions for session');
+      // Cache questions directly on the session so updateLiveQuizSession finds them instantly
+      const firstQuestion = createdQuestions[0];
+      await base44.entities.LiveQuizSession.update(session.id, {
+        questions: createdQuestions,
+        current_question_id: firstQuestion?.id || null
+      });
 
       return session;
     },

@@ -9,15 +9,37 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-    // Get question to check correctness
-    const questions = await base44.asServiceRole.entities.QuizQuestion.filter({ id: questionId });
-    const question = questions[0];
+    // Get question to check correctness — try QuizQuestion first, fall back to LiveQuizQuestion
+    let question = null;
+    try {
+      const qs = await base44.asServiceRole.entities.QuizQuestion.filter({ id: questionId });
+      question = qs?.[0] || null;
+    } catch {}
+
+    if (!question) {
+      try {
+        const lqs = await base44.asServiceRole.entities.LiveQuizQuestion.filter({ id: questionId });
+        question = lqs?.[0] || null;
+      } catch {}
+    }
+
+    // If still not found by id, try fetching from session's cached current_question
+    if (!question) {
+      const sessions = await base44.asServiceRole.entities.LiveQuizSession.filter({ id: sessionId });
+      const sess = sessions?.[0];
+      if (sess?.current_question && (sess.current_question.id === questionId || !questionId)) {
+        question = sess.current_question;
+      }
+    }
 
     if (!question) {
       return Response.json({ error: 'Question not found' }, { status: 404 });
     }
 
-    const isCorrect = question.correct_index === selectedOption;
+    // Support both MCQ (correct_index) and text-answer questions (correct_answer)
+    const isCorrect = question.correct_index !== undefined && question.correct_index !== null
+      ? question.correct_index === selectedOption
+      : String(question.correct_answer || '').trim().toLowerCase() === String(selectedOption || '').trim().toLowerCase();
 
     // Get session for scoring settings
     const sessions = await base44.asServiceRole.entities.LiveQuizSession.filter({ id: sessionId });
@@ -90,7 +112,7 @@ Deno.serve(async (req) => {
       answer,
       pointsAwarded,
       isCorrect,
-      correctAnswer: question.correct_index
+      correctAnswer: question.correct_index ?? question.correct_answer ?? null
     });
 
   } catch (error) {
