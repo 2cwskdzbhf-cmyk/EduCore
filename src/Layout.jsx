@@ -18,7 +18,8 @@ import {
   User as UserIcon,
   TrendingUp,
   Brain,
-  Calendar
+  Calendar,
+  Wrench
 } from 'lucide-react';
 // Note: BookOpen, ClipboardList, TrendingUp, Brain, Users already imported above
 import { Button } from '@/components/ui/button';
@@ -123,6 +124,7 @@ export default function Layout({ children, currentPageName }) {
     { name: 'Portfolio', icon: Brain, page: 'StudentPortfolio' },
     { name: 'Test Scores', icon: ClipboardList, page: 'TestScores' },
     { name: 'AI Tutor', icon: MessageSquare, page: 'AITutor' },
+    { name: 'Useful Tools', icon: Wrench, page: 'UsefulTools' },
   ];
 
   const teacherNav = [
@@ -131,6 +133,7 @@ export default function Layout({ children, currentPageName }) {
     { name: 'Curriculum', icon: BookOpen, page: 'CurriculumManager' },
     { name: 'Grading', icon: ClipboardList, page: 'GradingCenter' },
     { name: 'Analytics', icon: BarChart3, page: 'Analytics' },
+    { name: 'Useful Tools', icon: Wrench, page: 'UsefulTools' },
   ];
 
   const adminNav = [

@@ -4,6 +4,44 @@ import { Input } from '@/components/ui/input';
 import { Plus, X } from 'lucide-react';
 import GlassCard from '@/components/ui/GlassCard';
 
+function OptionRow({ opt, color, onChange, onDelete }) {
+  const [editing, setEditing] = useState(false);
+  const [val, setVal] = useState(opt);
+
+  const commit = () => {
+    setEditing(false);
+    if (val.trim()) onChange(val.trim());
+    else setVal(opt);
+  };
+
+  return (
+    <div className="flex items-center gap-2 group">
+      <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: color }} />
+      {editing ? (
+        <input
+          autoFocus
+          value={val}
+          onChange={e => setVal(e.target.value)}
+          onBlur={commit}
+          onKeyDown={e => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') { setVal(opt); setEditing(false); } }}
+          className="flex-1 bg-white/10 border border-white/20 rounded px-2 py-0.5 text-white text-sm outline-none"
+        />
+      ) : (
+        <span
+          className="text-white flex-1 text-sm cursor-pointer hover:text-purple-300 transition-colors"
+          onClick={() => setEditing(true)}
+          title="Click to edit"
+        >
+          {opt}
+        </span>
+      )}
+      <button onClick={onDelete} className="text-slate-500 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100">
+        <X className="w-4 h-4" />
+      </button>
+    </div>
+  );
+}
+
 const COLORS = [
   '#8b5cf6', '#3b82f6', '#10b981', '#f59e0b',
   '#ef4444', '#ec4899', '#06b6d4', '#84cc16',
@@ -150,13 +188,17 @@ export default function SpinWheel() {
           <p className="text-slate-300 text-sm font-semibold mb-3">Options ({entries.length})</p>
           <div className="space-y-2 mb-4 max-h-64 overflow-y-auto">
             {options.map((opt, i) => (
-              <div key={i} className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: COLORS[i % COLORS.length] }} />
-                <span className="text-white flex-1 text-sm">{opt}</span>
-                <button onClick={() => removeOption(i)} className="text-slate-400 hover:text-red-400 transition-colors">
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
+              <OptionRow
+                key={i}
+                opt={opt}
+                color={COLORS[i % COLORS.length]}
+                onChange={val => {
+                  const updated = [...options];
+                  updated[i] = val;
+                  setOptions(updated);
+                }}
+                onDelete={() => removeOption(i)}
+              />
             ))}
           </div>
           <div className="flex gap-2">
