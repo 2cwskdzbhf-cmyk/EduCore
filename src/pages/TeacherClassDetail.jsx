@@ -1236,19 +1236,6 @@ export default function TeacherClassDetail() {
                   {whiteboard && (
                     <WhiteboardPermissions
                       students={classStudents}
-                      permissions={whiteboardPerms}
-                      onPermissionChange={(email, allowed) => {
-                        const newPerms = { ...whiteboardPerms, [email]: allowed };
-                        setWhiteboardPerms(newPerms);
-                        updateWhiteboardMutation.mutate({ student_edit_permissions: newPerms });
-                      }}
-                      allowAllEdits={whiteboard.allow_all_edits}
-                      onToggleAllEdits={(allowed) => {
-                        updateWhiteboardMutation.mutate({
-                          allow_all_edits: allowed,
-                          student_edit_permissions: allowed ? {} : whiteboardPerms
-                        });
-                      }}
                       showToAll={whiteboard.show_to_students ?? true}
                       onToggleShowToAll={(val) => {
                         updateWhiteboardMutation.mutate({ show_to_students: val });
@@ -1257,6 +1244,11 @@ export default function TeacherClassDetail() {
                       onStudentVisibilityChange={(email, visible) => {
                         const newVis = { ...(whiteboard.student_visibility || {}), [email]: visible };
                         updateWhiteboardMutation.mutate({ student_visibility: newVis });
+                      }}
+                      studentEdit={whiteboard.student_edit_permissions || {}}
+                      onStudentEditChange={(email, allowed) => {
+                        const newEdit = { ...(whiteboard.student_edit_permissions || {}), [email]: allowed };
+                        updateWhiteboardMutation.mutate({ student_edit_permissions: newEdit });
                       }}
                     />
                   )}

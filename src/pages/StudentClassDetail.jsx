@@ -289,6 +289,8 @@ export default function StudentClassDetail() {
               const globalVisible = whiteboard.show_to_students ?? true;
               const studentVisible = whiteboard.student_visibility?.[user.email] ?? true;
               const canSee = globalVisible && studentVisible;
+              // canEdit: must be able to see AND have edit permission
+              const canEditBoard = canSee && (whiteboard.student_edit_permissions?.[user.email] ?? false);
               if (!canSee) return (
                 <GlassCard className="p-12 text-center">
                   <p className="text-2xl mb-2">🚫</p>
@@ -299,7 +301,7 @@ export default function StudentClassDetail() {
               return (
                 <InteractiveWhiteboard
                   whiteboard={whiteboard}
-                  canEdit={whiteboard.allow_all_edits || whiteboard.student_edit_permissions?.[user.email] || false}
+                  canEdit={canEditBoard}
                   isTeacher={false}
                   whiteboardId={whiteboard.id}
                 />
