@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import GlassCard from '@/components/ui/GlassCard';
 import ClassMessaging from '@/components/class/ClassMessaging';
 import InteractiveWhiteboard from '@/components/whiteboard/InteractiveWhiteboard';
+import WhiteboardChat from '@/components/whiteboard/WhiteboardChat';
 import {
   ChevronLeft,
   ClipboardList,
@@ -299,12 +300,19 @@ export default function StudentClassDetail() {
                 </GlassCard>
               );
               return (
-                <InteractiveWhiteboard
-                  whiteboard={whiteboard}
-                  canEdit={canEditBoard}
-                  isTeacher={false}
-                  whiteboardId={whiteboard.id}
-                />
+                <div className="grid lg:grid-cols-3 gap-4">
+                  <div className="lg:col-span-2">
+                    <InteractiveWhiteboard
+                      whiteboard={whiteboard}
+                      canEdit={canEditBoard}
+                      isTeacher={false}
+                      whiteboardId={whiteboard.id}
+                    />
+                  </div>
+                  <div>
+                    <WhiteboardChat classId={classId} user={user} />
+                  </div>
+                </div>
               );
             })()}
             {!whiteboard && (

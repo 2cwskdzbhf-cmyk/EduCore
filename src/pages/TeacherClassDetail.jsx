@@ -19,6 +19,7 @@ import {
 import ClassMessaging from '@/components/class/ClassMessaging';
 import InteractiveWhiteboard from '@/components/whiteboard/InteractiveWhiteboard';
 import WhiteboardPermissions from '@/components/whiteboard/WhiteboardPermissions';
+import WhiteboardChat from '@/components/whiteboard/WhiteboardChat';
 import StudentStatsModal from '@/components/teacher/StudentStatsModal';
 import { AnimatePresence } from 'framer-motion';
 
@@ -1232,7 +1233,11 @@ export default function TeacherClassDetail() {
                     />
                   )}
                 </div>
-                <div>
+                <div className="flex flex-col gap-4">
+                  {/* Chat sidebar */}
+                  {user && (
+                    <WhiteboardChat classId={classId} user={user} />
+                  )}
                   {whiteboard && (
                     <WhiteboardPermissions
                       students={classStudents}
