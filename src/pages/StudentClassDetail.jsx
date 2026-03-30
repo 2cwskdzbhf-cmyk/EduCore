@@ -10,6 +10,8 @@ import GlassCard from '@/components/ui/GlassCard';
 import ClassMessaging from '@/components/class/ClassMessaging';
 import InteractiveWhiteboard from '@/components/whiteboard/InteractiveWhiteboard';
 import WhiteboardChat from '@/components/whiteboard/WhiteboardChat';
+import ClassPoll from '@/components/class/ClassPoll';
+import YesNoButton from '@/components/class/YesNoButton';
 import {
   ChevronLeft,
   ClipboardList,
@@ -18,7 +20,9 @@ import {
   Target,
   CheckCircle2,
   Clock,
-  MessageCircle
+  MessageCircle,
+  BarChart3,
+  ToggleLeft
 } from 'lucide-react';
 
 export default function StudentClassDetail() {
@@ -163,6 +167,9 @@ export default function StudentClassDetail() {
             <TabsTrigger value="whiteboard" className="data-[state=active]:bg-white/10">
               ✏️ Whiteboard
             </TabsTrigger>
+            <TabsTrigger value="tools" className="data-[state=active]:bg-white/10">
+              🛠 Tools
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="assignments">
@@ -274,7 +281,7 @@ export default function StudentClassDetail() {
             )}
           </TabsContent>
 
-          <TabsContent value="messaging">
+          <TabsContent value="messaging" className="space-y-6">
             {user && (
               <ClassMessaging
                 classId={classId}
@@ -282,6 +289,23 @@ export default function StudentClassDetail() {
                 classData={classData}
               />
             )}
+            {user && (
+              <GlassCard className="p-6">
+                <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                  <BarChart3 className="w-5 h-5 text-purple-400" /> Class Poll
+                </h3>
+                <ClassPoll classId={classId} user={user} isTeacher={false} />
+              </GlassCard>
+            )}
+          </TabsContent>
+
+          <TabsContent value="tools" className="space-y-6">
+            <GlassCard className="p-6">
+              <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                <ToggleLeft className="w-5 h-5 text-purple-400" /> Yes / No Decision
+              </h3>
+              <YesNoButton />
+            </GlassCard>
           </TabsContent>
 
           <TabsContent value="whiteboard">

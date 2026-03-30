@@ -14,13 +14,15 @@ import GlassCard from '@/components/ui/GlassCard';
 import { 
   ChevronLeft, Users, Sparkles, Loader2, Trophy, ClipboardList, 
   BarChart3, Plus, Trash2, RefreshCw, Save, CheckCircle2, Edit2, Zap,
-  Calendar, Clock, Target, TrendingUp, Eye, X, AlertTriangle, BookOpen, MessageCircle
+  Calendar, Clock, Target, TrendingUp, Eye, X, AlertTriangle, BookOpen, MessageCircle, Wrench
 } from 'lucide-react';
 import ClassMessaging from '@/components/class/ClassMessaging';
 import InteractiveWhiteboard from '@/components/whiteboard/InteractiveWhiteboard';
 import WhiteboardPermissions from '@/components/whiteboard/WhiteboardPermissions';
 import WhiteboardChat from '@/components/whiteboard/WhiteboardChat';
 import StudentStatsModal from '@/components/teacher/StudentStatsModal';
+import ClassToolsPanel from '@/components/class/ClassToolsPanel';
+import ClassPoll from '@/components/class/ClassPoll';
 import { AnimatePresence } from 'framer-motion';
 
 export default function TeacherClassDetail() {
@@ -50,6 +52,7 @@ export default function TeacherClassDetail() {
   const [deleteConfirmStudent, setDeleteConfirmStudent] = useState(null);
   const [createMode, setCreateMode] = useState(''); // 'manual' or 'ai'
   const [whiteboardPerms, setWhiteboardPerms] = useState({});
+  const [showClassTools, setShowClassTools] = useState(false);
 
   const copyJoinCode = (code) => {
     navigator.clipboard.writeText(code);
@@ -506,6 +509,14 @@ export default function TeacherClassDetail() {
                 ✏️ Whiteboard
               </TabsTrigger>
             </TabsList>
+            <div className="flex justify-end">
+              <Button
+                onClick={() => setShowClassTools(true)}
+                className="bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 shadow-lg shadow-purple-500/30"
+              >
+                <Wrench className="w-4 h-4 mr-2" /> Useful Tools
+              </Button>
+            </div>
 
             {/* Create Tab */}
             <TabsContent value="practice" className="space-y-6">
@@ -1221,13 +1232,21 @@ export default function TeacherClassDetail() {
             </TabsContent>
 
             {/* Messaging Tab */}
-            <TabsContent value="messaging">
+            <TabsContent value="messaging" className="space-y-6">
               {user && (
                 <ClassMessaging
                   classId={classId}
                   user={user}
                   classData={classData}
                 />
+              )}
+              {user && (
+                <GlassCard className="p-6">
+                  <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                    <BarChart3 className="w-5 h-5 text-purple-400" /> Class Poll
+                  </h3>
+                  <ClassPoll classId={classId} user={user} isTeacher={true} />
+                </GlassCard>
               )}
             </TabsContent>
 
@@ -1273,6 +1292,15 @@ export default function TeacherClassDetail() {
             </TabsContent>
           </Tabs>
         </motion.div>
+
+        <AnimatePresence>
+          {showClassTools && (
+            <ClassToolsPanel
+              students={classStudents}
+              onClose={() => setShowClassTools(false)}
+            />
+          )}
+        </AnimatePresence>
 
         <AnimatePresence>
           {selectedStudent && (

@@ -4,6 +4,8 @@ import SpinWheel from '@/components/tools/SpinWheel';
 import Stopwatch from '@/components/tools/Stopwatch';
 import CountdownTimer from '@/components/tools/CountdownTimer';
 import QuickLinks from '@/components/tools/QuickLinks';
+import YesNoButton from '@/components/class/YesNoButton';
+import GlassCard from '@/components/ui/GlassCard';
 import { Wrench } from 'lucide-react';
 
 export default function UsefulTools() {
@@ -40,6 +42,13 @@ export default function UsefulTools() {
           </motion.div>
 
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
+            <GlassCard className="p-6">
+              <h2 className="text-xl font-bold text-white mb-4">❓ Yes / No Decision</h2>
+              <YesNoButton />
+            </GlassCard>
+          </motion.div>
+
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}>
             <QuickLinks />
           </motion.div>
         </div>

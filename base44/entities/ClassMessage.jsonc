@@ -27,7 +27,8 @@
       "enum": [
         "announcement",
         "question",
-        "reply"
+        "reply",
+        "poll"
       ],
       "default": "reply",
       "description": "Type of message"
