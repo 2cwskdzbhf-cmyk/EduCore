@@ -15,6 +15,8 @@ import UserNotRegisteredError from "@/components/UserNotRegisteredError";
 
 import mathsContent from "@/components/data/mathsContent";
 import TeacherResults from "./pages/TeacherResults";
+import StudentLiveQuizPlay from "./pages/StudentLiveQuizPlay.jsx";
+import TeacherLiveQuizPlay from "./pages/TeacherLiveQuizPlay.jsx";
 import LiveClassroomView from "./pages/LiveClassroomView";
 import QuizScheduler from "./pages/QuizScheduler";
 import KnowledgeGapReport from "./pages/KnowledgeGapReport";
@@ -99,6 +101,8 @@ const AuthenticatedApp = () => {
       <Route path="/GradingCenter" element={<LayoutWrapper currentPageName="GradingCenter"><GradingCenter /></LayoutWrapper>} />
       <Route path="/StudentGrades" element={<LayoutWrapper currentPageName="StudentGrades"><StudentGrades /></LayoutWrapper>} />
       <Route path="/CollaborationHub" element={<LayoutWrapper currentPageName="CollaborationHub"><CollaborationHub /></LayoutWrapper>} />
+      <Route path="/StudentLiveQuizPlay" element={<LayoutWrapper currentPageName="StudentLiveQuizPlay"><StudentLiveQuizPlay /></LayoutWrapper>} />
+      <Route path="/TeacherLiveQuizPlay" element={<LayoutWrapper currentPageName="TeacherLiveQuizPlay"><TeacherLiveQuizPlay /></LayoutWrapper>} />
       <Route path="*" element={<PageNotFound />} />
     </Routes>
   );

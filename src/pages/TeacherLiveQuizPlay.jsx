@@ -1,414 +1,336 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { base44 } from '@/api/base44Client';
-
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import { Button } from '@/components/ui/button';
 import GlassCard from '@/components/ui/GlassCard';
-import { ChevronRight, Trophy, Loader2, Clock, X, AlertTriangle, CheckCircle2, Circle } from 'lucide-react';
+import { ChevronRight, Trophy, Loader2, Clock, X, CheckCircle2, Circle, Zap } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+
+const QUESTION_TIME = 15; // seconds
+const LEADERBOARD_AUTO_ADVANCE_SEC = 8; // auto-advance after N seconds on leaderboard
 
 export default function TeacherLiveQuizPlay() {
   const navigate = useNavigate();
   const params = new URLSearchParams(window.location.search);
   const sessionId = params.get('sessionId');
 
-  const [timeLeft, setTimeLeft] = useState(15);
-  const [showLeaderboard, setShowLeaderboard] = useState(false);
-  const [quizStartTime, setQuizStartTime] = useState(null);
-  const [totalQuizTime, setTotalQuizTime] = useState(0);
-  const [showPlayerStats, setShowPlayerStats] = useState(false);
-  const [selectedPlayer, setSelectedPlayer] = useState(null);
+  const [timeLeft, setTimeLeft] = useState(QUESTION_TIME);
+  const [leaderboardCountdown, setLeaderboardCountdown] = useState(LEADERBOARD_AUTO_ADVANCE_SEC);
 
-  const lastSessionRef = useRef(null);
+  // prevent double-advancing
+  const advancingRef = useRef(false);
+  const lastStartedAtRef = useRef(null);
 
-  const { data: sessionRaw } = useQuery({
-    queryKey: ['liveQuizSession', sessionId],
+  const { data: session } = useQuery({
+    queryKey: ['teacherSession', sessionId],
     queryFn: async () => {
       const s = await base44.entities.LiveQuizSession.filter({ id: sessionId });
       return s?.[0] || null;
     },
     enabled: !!sessionId,
     refetchInterval: 1000,
-    staleTime: 500
+    staleTime: 500,
   });
 
-  const session = useMemo(() => {
-    if (sessionRaw) lastSessionRef.current = sessionRaw;
-    return sessionRaw || lastSessionRef.current;
-  }, [sessionRaw]);
-
-  useEffect(() => {
-    if (session?.status === 'ended') {
-      navigate(createPageUrl('TeacherDashboard'), { replace: true });
-    }
-  }, [session?.status, navigate]);
-
-  // Track total quiz time
-  useEffect(() => {
-    if (session?.status === 'live' && session?.started_at && !quizStartTime) {
-      setQuizStartTime(new Date(session.started_at).getTime());
-    }
-  }, [session?.status, session?.started_at, quizStartTime]);
-
-  useEffect(() => {
-    if (!quizStartTime) return;
-    const interval = setInterval(() => {
-      setTotalQuizTime(Math.floor((Date.now() - quizStartTime) / 1000));
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [quizStartTime]);
-
-  // timer
-  useEffect(() => {
-    if (!session || session.status !== 'live' || !session.question_started_at) return;
-    const start = new Date(session.question_started_at).getTime();
-    setShowLeaderboard(false);
-
-    const interval = setInterval(() => {
-      const elapsed = Math.floor((Date.now() - start) / 1000);
-      const remaining = Math.max(0, 15 - elapsed);
-      setTimeLeft(remaining);
-      if (remaining === 0) setShowLeaderboard(true);
-    }, 200);
-
-    return () => clearInterval(interval);
-  }, [session?.status, session?.question_started_at]);
-
   const { data: players = [] } = useQuery({
-    queryKey: ['liveQuizPlayers', sessionId],
+    queryKey: ['teacherPlayers', sessionId],
     queryFn: () => base44.entities.LiveQuizPlayer.filter({ session_id: sessionId }),
     enabled: !!sessionId,
-    refetchInterval: 1200,
-    staleTime: 800
+    refetchInterval: 1500,
   });
 
   const idx = session?.current_question_index ?? -1;
 
   const { data: answers = [] } = useQuery({
-    queryKey: ['liveQuizAnswers', sessionId, idx],
-    queryFn: () =>
-      base44.entities.LiveQuizAnswer.filter({
-        session_id: sessionId,
-        question_index: idx
-      }),
+    queryKey: ['teacherAnswers', sessionId, idx],
+    queryFn: () => base44.entities.LiveQuizAnswer.filter({ session_id: sessionId, question_index: idx }),
     enabled: !!sessionId && idx >= 0,
-    refetchInterval: 1200,
-    staleTime: 800
+    refetchInterval: 1000,
   });
 
-  const { data: allAnswers = [] } = useQuery({
-    queryKey: ['allLiveQuizAnswers', sessionId],
-    queryFn: () => base44.entities.LiveQuizAnswer.filter({ session_id: sessionId }),
-    enabled: !!sessionId && showPlayerStats,
-    refetchInterval: showPlayerStats ? 2000 : false
+  // Redirect when ended
+  useEffect(() => {
+    if (session?.status === 'ended') {
+      navigate(createPageUrl(`TeacherLiveQuizResults?sessionId=${sessionId}`), { replace: true });
+    }
+  }, [session?.status, navigate, sessionId]);
+
+  // Question countdown — reset when question changes
+  useEffect(() => {
+    const startedAt = session?.question_started_at;
+    if (!startedAt || session?.status !== 'live') return;
+    if (startedAt === lastStartedAtRef.current) return;
+    lastStartedAtRef.current = startedAt;
+    advancingRef.current = false;
+    setTimeLeft(QUESTION_TIME);
+    setLeaderboardCountdown(LEADERBOARD_AUTO_ADVANCE_SEC);
+
+    const start = new Date(startedAt).getTime();
+    const interval = setInterval(() => {
+      const remaining = Math.max(0, QUESTION_TIME - Math.floor((Date.now() - start) / 1000));
+      setTimeLeft(remaining);
+      if (remaining === 0) clearInterval(interval);
+    }, 200);
+    return () => clearInterval(interval);
+  }, [session?.question_started_at, session?.status]);
+
+  const showLeaderboardMutation = useMutation({
+    mutationFn: async () => {
+      const res = await base44.functions.invoke('updateLiveQuizSession', { sessionId, action: 'showLeaderboard' });
+      if (res.data?.error) throw new Error(res.data.error);
+    },
   });
 
   const nextQuestionMutation = useMutation({
     mutationFn: async () => {
       const res = await base44.functions.invoke('updateLiveQuizSession', { sessionId, action: 'nextQuestion' });
+      if (res.data?.error) throw new Error(res.data.error);
       return res.data?.session;
     },
-    onSuccess: (s) => {
-      if (s?.status === 'ended') {
-        navigate(createPageUrl(`TeacherLiveQuizResults?sessionId=${sessionId}`));
-      } else {
-        setShowLeaderboard(false);
-        setTimeLeft(15);
-      }
-    }
+    onSuccess: () => {
+      advancingRef.current = false;
+      setLeaderboardCountdown(LEADERBOARD_AUTO_ADVANCE_SEC);
+    },
   });
 
-  const endNowMutation = useMutation({
+  const endQuizMutation = useMutation({
     mutationFn: async () => {
       await base44.functions.invoke('updateLiveQuizSession', { sessionId, action: 'end' });
     },
-    onSuccess: () => navigate(createPageUrl('TeacherDashboard'))
+    onSuccess: () => navigate(createPageUrl(`TeacherLiveQuizResults?sessionId=${sessionId}`)),
   });
+
+  // Auto show leaderboard when timer hits 0 (and all answered or time's up)
+  useEffect(() => {
+    if (session?.status !== 'live') return;
+    const allAnswered = players.length > 0 && answers.length >= players.length;
+    if ((timeLeft === 0 || allAnswered) && !advancingRef.current) {
+      advancingRef.current = true;
+      setTimeout(() => showLeaderboardMutation.mutate(), 1500);
+    }
+  }, [timeLeft, answers.length, players.length, session?.status]);
+
+  // Auto advance from leaderboard after N seconds
+  useEffect(() => {
+    if (session?.status !== 'intermission') return;
+    setLeaderboardCountdown(LEADERBOARD_AUTO_ADVANCE_SEC);
+    const interval = setInterval(() => {
+      setLeaderboardCountdown(prev => {
+        if (prev <= 1) {
+          clearInterval(interval);
+          if (!advancingRef.current) {
+            advancingRef.current = true;
+            nextQuestionMutation.mutate();
+          }
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [session?.status, session?.current_question_index]);
+
+  const leaderboard = useMemo(() =>
+    [...players].sort((a, b) => (b.total_points || 0) - (a.total_points || 0)).map((p, i) => ({ ...p, rank: i + 1 })),
+    [players]
+  );
+
+  const questions = useMemo(() => {
+    const raw = session?.questions || [];
+    return Array.isArray(raw) ? raw : [];
+  }, [session?.questions]);
 
   if (!session) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900/20 to-slate-900 flex items-center justify-center">
         <Loader2 className="w-12 h-12 animate-spin text-purple-400" />
       </div>
     );
   }
 
-  if (session.status !== 'live') {
-    return (
-      <div className="min-h-screen flex items-center justify-center p-6">
-        <GlassCard className="p-8 text-center max-w-md">
-          <AlertTriangle className="w-10 h-10 text-amber-400 mx-auto mb-3" />
-          <p className="text-white font-semibold mb-2">Quiz not live yet</p>
-          <p className="text-slate-400 mb-6">
-            Status: <span className="font-mono">{session.status}</span>
-          </p>
-          <Button onClick={() => navigate(createPageUrl(`TeacherLiveQuizLobby?sessionId=${sessionId}`))}>
-            Back to Lobby
-          </Button>
-        </GlassCard>
-      </div>
-    );
-  }
-
   const q = session.current_question;
-
-  // ✅ Don’t error. If the backend is still discovering/caching questions, show loading.
-  if (!q) {
-    return (
-      <div className="min-h-screen flex items-center justify-center p-6">
-        <GlassCard className="p-8 text-center max-w-md">
-          <Loader2 className="w-10 h-10 animate-spin text-purple-400 mx-auto mb-3" />
-          <p className="text-white font-semibold mb-2">Loading question…</p>
-          <p className="text-slate-400 text-sm">Syncing questions for this session.</p>
-        </GlassCard>
-      </div>
-    );
-  }
-
-  const prompt = q?.prompt || q?.question || q?.question_text || q?.text || 'Question';
+  const prompt = q?.prompt || q?.question || q?.question_text || q?.text || '';
   const answeredCount = answers.length;
-  const answeredPlayerIds = new Set(answers.map(a => a.player_id));
-
-  const leaderboard = players
-    .slice()
-    .sort((a, b) => (b.total_points || 0) - (a.total_points || 0))
-    .map((p, i) => ({ ...p, rank: i + 1 }));
-
+  const answeredIds = new Set(answers.map(a => a.player_id));
   const allAnswered = players.length > 0 && answeredCount >= players.length;
+  const medals = ['🥇', '🥈', '🥉'];
 
-  const getPlayerStats = (playerId) => {
-    const playerAnswers = allAnswers.filter(a => a.player_id === playerId);
-    const correctAnswers = playerAnswers.filter(a => a.is_correct).length;
-    const avgResponseTime = playerAnswers.length > 0
-      ? Math.round(playerAnswers.reduce((sum, a) => sum + (a.response_time_ms || 0), 0) / playerAnswers.length)
-      : 0;
-    return {
-      totalAnswers: playerAnswers.length,
-      correctAnswers,
-      accuracy: playerAnswers.length > 0 ? Math.round((correctAnswers / playerAnswers.length) * 100) : 0,
-      avgResponseTime
-    };
-  };
-
-  if (showPlayerStats && selectedPlayer) {
-    const stats = getPlayerStats(selectedPlayer.id);
+  // ── LEADERBOARD / INTERMISSION ──────────────────────────────────────────────
+  if (session.status === 'intermission') {
     return (
-      <div className="min-h-screen p-6 flex items-center justify-center">
-        <GlassCard className="p-8 max-w-2xl w-full">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-bold text-white">{selectedPlayer.nickname}'s Stats</h2>
-            <Button variant="ghost" onClick={() => { setShowPlayerStats(false); setSelectedPlayer(null); }}>
-              <X className="w-5 h-5" />
-            </Button>
-          </div>
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900/20 to-slate-900 p-6 flex items-center justify-center">
+        <div className="max-w-2xl w-full space-y-4">
+          <GlassCard className="p-8 text-center">
+            <Trophy className="w-14 h-14 text-amber-400 mx-auto mb-3" />
+            <h2 className="text-3xl font-bold text-white mb-1">Leaderboard</h2>
+            <p className="text-slate-400 mb-6">After question {idx + 1}</p>
 
-          <div className="grid grid-cols-2 gap-4 mb-6">
-            <div className="bg-white/5 p-4 rounded-lg text-center">
-              <div className="text-3xl font-bold text-purple-400">{selectedPlayer.total_points || 0}</div>
-              <div className="text-sm text-slate-400">Total Points</div>
-            </div>
-            <div className="bg-white/5 p-4 rounded-lg text-center">
-              <div className="text-3xl font-bold text-emerald-400">{stats.accuracy}%</div>
-              <div className="text-sm text-slate-400">Accuracy</div>
-            </div>
-            <div className="bg-white/5 p-4 rounded-lg text-center">
-              <div className="text-3xl font-bold text-blue-400">{stats.correctAnswers}/{stats.totalAnswers}</div>
-              <div className="text-sm text-slate-400">Correct Answers</div>
-            </div>
-            <div className="bg-white/5 p-4 rounded-lg text-center">
-              <div className="text-3xl font-bold text-amber-400">{(stats.avgResponseTime / 1000).toFixed(1)}s</div>
-              <div className="text-sm text-slate-400">Avg Response Time</div>
-            </div>
-          </div>
-
-          <div className="bg-white/5 p-4 rounded-lg">
-            <h3 className="text-white font-semibold mb-3">Recent Performance</h3>
-            <div className="space-y-2">
-              {allAnswers.filter(a => a.player_id === selectedPlayer.id).slice(-5).reverse().map((answer, i) => (
-                <div key={i} className="flex items-center justify-between text-sm">
-                  <span className="text-slate-300">Question {answer.question_index + 1}</span>
+            <div className="space-y-3 mb-6">
+              {leaderboard.slice(0, 10).map((p, i) => (
+                <motion.div
+                  key={p.id}
+                  initial={{ x: -30, opacity: 0 }}
+                  animate={{ x: 0, opacity: 1 }}
+                  transition={{ delay: i * 0.08 }}
+                  className="flex items-center justify-between bg-white/5 p-4 rounded-xl"
+                >
                   <div className="flex items-center gap-3">
-                    <span className={answer.is_correct ? 'text-emerald-400' : 'text-red-400'}>
-                      {answer.is_correct ? '✓' : '✗'}
-                    </span>
-                    <span className="text-slate-400">{(answer.response_time_ms / 1000).toFixed(1)}s</span>
-                    <span className="text-amber-400">+{answer.points_awarded}</span>
+                    <span className="text-2xl w-8 text-center">{medals[i] || `#${i + 1}`}</span>
+                    <span className="text-white font-semibold">{p.nickname}</span>
                   </div>
-                </div>
+                  <span className="text-amber-400 font-bold text-lg">{p.total_points || 0}</span>
+                </motion.div>
               ))}
             </div>
-          </div>
-        </GlassCard>
+
+            {/* Auto-advance countdown */}
+            <div className="mb-4 text-center">
+              <p className="text-slate-400 text-sm">Next question in</p>
+              <p className="text-4xl font-bold text-purple-400">{leaderboardCountdown}s</p>
+            </div>
+
+            <div className="flex gap-3">
+              <Button
+                onClick={() => { advancingRef.current = true; nextQuestionMutation.mutate(); }}
+                disabled={nextQuestionMutation.isPending}
+                className="flex-1 bg-gradient-to-r from-purple-500 to-blue-500 py-4 text-lg"
+              >
+                {nextQuestionMutation.isPending ? <Loader2 className="w-5 h-5 animate-spin" /> : (
+                  <><ChevronRight className="w-5 h-5 mr-2" /> Next Question Now</>
+                )}
+              </Button>
+              <Button
+                onClick={() => endQuizMutation.mutate()}
+                disabled={endQuizMutation.isPending}
+                variant="outline"
+                className="border-red-500/30 text-red-400 hover:bg-red-500/10 py-4"
+              >
+                <X className="w-5 h-5 mr-2" /> End Quiz
+              </Button>
+            </div>
+          </GlassCard>
+        </div>
       </div>
     );
   }
 
-  if (showLeaderboard) {
+  // ── LIVE QUESTION ────────────────────────────────────────────────────────────
+  if (session.status === 'live' && !q) {
     return (
-      <div className="min-h-screen p-6 flex items-center justify-center">
-        <GlassCard className="p-8 max-w-4xl w-full">
-          <div className="text-center mb-6">
-            <Trophy className="w-14 h-14 text-amber-400 mx-auto mb-3" />
-            <h2 className="text-3xl font-bold text-white">Leaderboard</h2>
-            <p className="text-slate-400">
-              Question {idx + 1}
-            </p>
-          </div>
-
-          <div className="space-y-3 mb-6">
-            {leaderboard.map((p) => (
-              <div key={p.id} className="flex justify-between bg-white/5 p-4 rounded-lg text-white">
-                <span>{p.rank}. {p.nickname}</span>
-                <span>{p.total_points || 0}</span>
-              </div>
-            ))}
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <Button onClick={() => nextQuestionMutation.mutate()} className="py-6" disabled={nextQuestionMutation.isPending}>
-              <ChevronRight className="w-5 h-5 mr-2" />
-              Next Question
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => endNowMutation.mutate()}
-              className="py-6 border-red-500/30 text-red-400"
-            >
-              <X className="w-5 h-5 mr-2" />
-              End Quiz Now
-            </Button>
-          </div>
-        </GlassCard>
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900/20 to-slate-900 flex items-center justify-center">
+        <Loader2 className="w-10 h-10 animate-spin text-purple-400" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen p-6">
-      <div className="max-w-6xl mx-auto">
-        <div className="flex justify-between items-center mb-6 text-white">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900/20 to-slate-900 p-4 md:p-6">
+      <div className="max-w-5xl mx-auto space-y-4">
+        {/* Header bar */}
+        <div className="flex items-center justify-between">
           <div>
-            <p className="text-sm text-slate-400">Question {idx + 1}</p>
-            <p className="text-lg font-bold">{players.length} players</p>
+            <p className="text-slate-400 text-sm">Question {idx + 1} {questions.length > 0 ? `of ${questions.length}` : ''}</p>
+            <p className="text-white font-bold">{players.length} players</p>
           </div>
-
           <div className="flex items-center gap-3">
-            <div className="text-center px-4 py-2 bg-white/5 rounded-lg">
-              <div className="text-xs text-slate-400">Quiz Duration</div>
-              <div className="text-xl font-bold">{Math.floor(totalQuizTime / 60)}:{String(totalQuizTime % 60).padStart(2, '0')}</div>
+            {/* Timer */}
+            <div className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-2xl ${timeLeft <= 5 ? 'bg-red-500/20 text-red-400' : 'bg-white/10 text-white'}`}>
+              <Clock className="w-5 h-5" />
+              <span className="tabular-nums">{timeLeft}s</span>
             </div>
-            <div className="flex items-center gap-2 bg-purple-500/20 px-4 py-2 rounded-lg">
-              <Clock className="w-5 h-5 text-amber-400" />
-              <span className="text-2xl font-bold">{timeLeft}s</span>
-            </div>
-            <Button variant="outline" onClick={() => setShowLeaderboard(true)} className="border-purple-500/30">
-              View Leaderboard
+            <Button
+              onClick={() => endQuizMutation.mutate()}
+              variant="outline"
+              size="sm"
+              className="border-red-500/30 text-red-400 hover:bg-red-500/10"
+            >
+              <X className="w-4 h-4 mr-1" /> End
             </Button>
           </div>
         </div>
 
-        <GlassCard className="p-8 mb-6">
-          <h2 className="text-3xl font-bold text-white text-center mb-4">{prompt}</h2>
-          <div className="flex justify-center items-center gap-6 text-slate-300">
-            <div className="flex items-center gap-2">
-              <span className="text-lg">{answeredCount}</span>
-              <span className="text-sm">/ {players.length} answered</span>
-            </div>
+        {/* Question */}
+        <GlassCard className="p-8 text-center">
+          <h2 className="text-3xl font-bold text-white">{prompt}</h2>
+          <div className="mt-4 flex items-center justify-center gap-6 text-slate-300">
+            <span>{answeredCount} / {players.length} answered</span>
+            {allAnswered && (
+              <span className="text-emerald-400 font-semibold flex items-center gap-1">
+                <CheckCircle2 className="w-4 h-4" /> All answered!
+              </span>
+            )}
           </div>
         </GlassCard>
 
-        {/* Player Progress Grid */}
-        <GlassCard className="p-6 mb-6">
-          <h3 className="text-lg font-semibold text-white mb-4">Player Responses</h3>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-            {players.map((player) => {
-              const hasAnswered = answeredPlayerIds.has(player.id);
-              return (
-                <div
-                  key={player.id}
-                  onClick={() => { setSelectedPlayer(player); setShowPlayerStats(true); }}
-                  className={`flex items-center gap-2 p-3 rounded-lg border cursor-pointer hover:bg-white/10 transition-colors ${
-                    hasAnswered
-                      ? 'bg-green-500/10 border-green-500/30'
-                      : 'bg-white/5 border-white/10'
-                  }`}
-                >
-                  {hasAnswered ? (
-                    <CheckCircle2 className="w-5 h-5 text-green-400 flex-shrink-0" />
-                  ) : (
-                    <Circle className="w-5 h-5 text-slate-400 flex-shrink-0" />
-                  )}
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium text-white truncate">
-                      {player.nickname}
-                    </p>
-                    <p className="text-xs text-slate-400">
-                      {player.total_points || 0} pts
-                    </p>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </GlassCard>
-
-        {/* Live Leaderboard */}
-        <GlassCard className="p-6 mb-6">
-          <div className="flex items-center gap-2 mb-4">
-            <Trophy className="w-5 h-5 text-amber-400" />
-            <h3 className="text-lg font-semibold text-white">Live Leaderboard</h3>
-          </div>
-          <div className="space-y-2">
-            {leaderboard.slice(0, 10).map((player) => (
-              <div
-                key={player.id}
-                className="flex items-center justify-between bg-white/5 p-3 rounded-lg"
-              >
-                <div className="flex items-center gap-3">
-                  <span
-                    className={`w-8 h-8 rounded-full flex items-center justify-center font-bold ${
-                      player.rank === 1
-                        ? 'bg-amber-500 text-white'
-                        : player.rank === 2
-                        ? 'bg-slate-400 text-white'
-                        : player.rank === 3
-                        ? 'bg-orange-600 text-white'
-                        : 'bg-white/10 text-slate-300'
+        {/* Player grid */}
+        <GlassCard className="p-5">
+          <h3 className="text-white font-semibold mb-3">Responses</h3>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+            <AnimatePresence>
+              {players.map(player => {
+                const answered = answeredIds.has(player.id);
+                return (
+                  <motion.div
+                    key={player.id}
+                    initial={{ scale: 0.9, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    className={`flex items-center gap-2 p-3 rounded-lg border transition-all ${
+                      answered ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-white/5 border-white/10'
                     }`}
                   >
-                    {player.rank}
-                  </span>
-                  <span className="text-white font-medium">{player.nickname}</span>
-                  {answeredPlayerIds.has(player.id) && (
-                    <CheckCircle2 className="w-4 h-4 text-green-400" />
-                  )}
+                    {answered ? (
+                      <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                    ) : (
+                      <Circle className="w-4 h-4 text-slate-500 flex-shrink-0" />
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <p className="text-white text-sm font-medium truncate">{player.nickname}</p>
+                      <p className="text-xs text-amber-400">{player.total_points || 0} pts</p>
+                    </div>
+                  </motion.div>
+                );
+              })}
+            </AnimatePresence>
+          </div>
+        </GlassCard>
+
+        {/* Leaderboard side-panel */}
+        <GlassCard className="p-5">
+          <div className="flex items-center gap-2 mb-3">
+            <Trophy className="w-5 h-5 text-amber-400" />
+            <h3 className="text-white font-semibold">Leaderboard</h3>
+          </div>
+          <div className="space-y-2">
+            {leaderboard.slice(0, 5).map((p, i) => (
+              <div key={p.id} className="flex items-center justify-between bg-white/5 p-3 rounded-lg">
+                <div className="flex items-center gap-3">
+                  <span className="text-lg w-6 text-center">{medals[i] || `${i + 1}`}</span>
+                  <span className="text-white">{p.nickname}</span>
+                  {answeredIds.has(p.id) && <CheckCircle2 className="w-4 h-4 text-emerald-400" />}
                 </div>
-                <span className="text-white font-bold">{player.total_points || 0}</span>
+                <span className="text-amber-400 font-bold">{p.total_points || 0}</span>
               </div>
             ))}
           </div>
         </GlassCard>
 
-        <div className="flex flex-col sm:flex-row gap-3 justify-center">
+        {/* Manual override: show results early */}
+        <div className="flex gap-3">
           <Button
-            onClick={() => setShowLeaderboard(true)}
-            disabled={timeLeft > 0 && !allAnswered}
-            size="lg"
-            className="px-8 py-6 text-lg bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600"
+            onClick={() => { advancingRef.current = true; showLeaderboardMutation.mutate(); }}
+            disabled={showLeaderboardMutation.isPending || (!allAnswered && timeLeft > 0)}
+            className="flex-1 py-4 text-lg bg-gradient-to-r from-purple-500 to-blue-500 disabled:opacity-50"
           >
-            {timeLeft > 0 && !allAnswered ? `Wait ${timeLeft}s or all players` : 'Show Results & Next'}
+            {showLeaderboardMutation.isPending ? (
+              <Loader2 className="w-5 h-5 animate-spin" />
+            ) : allAnswered ? (
+              <><Zap className="w-5 h-5 mr-2" /> All Answered — Show Results</>
+            ) : (
+              `Waiting… (${timeLeft}s)`
+            )}
           </Button>
-          {allAnswered && timeLeft > 0 && (
-            <Button
-              onClick={() => setShowLeaderboard(true)}
-              size="lg"
-              variant="outline"
-              className="px-8 py-6 text-lg border-green-500/30 text-green-400 hover:bg-green-500/10"
-            >
-              All Answered - Continue
-            </Button>
-          )}
         </div>
       </div>
     </div>
