@@ -60,9 +60,23 @@ export default function ClassToolsPanel({ students = [], onClose }) {
             ))}
           </div>
 
-          {activeTab === 'picker' && <RandomStudentPicker students={students} />}
-          {activeTab === 'groups' && <RandomGroupGenerator students={students} />}
-          {activeTab === 'yesno' && <YesNoButton />}
+          <AnimatePresence mode="wait">
+            {activeTab === 'picker' && (
+              <motion.div key="picker" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.25, ease: 'easeOut' }}>
+                <RandomStudentPicker students={students} />
+              </motion.div>
+            )}
+            {activeTab === 'groups' && (
+              <motion.div key="groups" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.25, ease: 'easeOut' }}>
+                <RandomGroupGenerator students={students} />
+              </motion.div>
+            )}
+            {activeTab === 'yesno' && (
+              <motion.div key="yesno" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.25, ease: 'easeOut' }}>
+                <YesNoButton />
+              </motion.div>
+            )}
+          </AnimatePresence>
         </GlassCard>
       </motion.div>
     </motion.div>

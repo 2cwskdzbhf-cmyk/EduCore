@@ -27,28 +27,28 @@ export default function UsefulTools() {
         </motion.div>
 
         <div className="space-y-8">
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
+          <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1, duration: 0.5, ease: 'easeOut' }}>
             <SpinWheel />
           </motion.div>
 
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
+            transition={{ delay: 0.2, duration: 0.5, ease: 'easeOut' }}
             className="grid md:grid-cols-2 gap-8"
           >
             <Stopwatch />
             <CountdownTimer />
           </motion.div>
 
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
+          <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3, duration: 0.5, ease: 'easeOut' }}>
             <GlassCard className="p-6">
               <h2 className="text-xl font-bold text-white mb-4">❓ Yes / No Decision</h2>
               <YesNoButton />
             </GlassCard>
           </motion.div>
 
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}>
+          <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4, duration: 0.5, ease: 'easeOut' }}>
             <QuickLinks />
           </motion.div>
         </div>

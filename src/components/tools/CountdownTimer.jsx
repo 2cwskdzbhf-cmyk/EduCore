@@ -146,7 +146,7 @@ export default function CountdownTimer() {
             <Pause className="w-5 h-5 mr-2" /> Pause
           </Button>
         )}
-        <Button onClick={reset} variant="outline" className="border-white/20 text-white hover:bg-white/10 px-8">
+        <Button onClick={reset} className="bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 shadow-lg shadow-purple-500/30 px-8">
           <RotateCcw className="w-5 h-5 mr-2" /> Reset
         </Button>
       </div>

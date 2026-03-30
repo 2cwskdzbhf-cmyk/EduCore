@@ -9,10 +9,12 @@ export default function RandomStudentPicker({ students = [] }) {
   const [result, setResult] = useState(null);
   const [spinning, setSpinning] = useState(false);
 
-  // sync when students list changes
+  // sync when students list changes - always select all
   React.useEffect(() => {
-    setSelected(new Set(students.map(s => s.email || s)));
-  }, [students.length]);
+    if (students.length > 0) {
+      setSelected(new Set(students.map(s => s.email || s)));
+    }
+  }, [JSON.stringify(students.map(s => s.email || s))]);
 
   const toggle = (key) => {
     setSelected(prev => {

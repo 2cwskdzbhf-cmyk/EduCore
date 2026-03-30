@@ -35,8 +35,8 @@ function OptionRow({ opt, color, onChange, onDelete }) {
           {opt}
         </span>
       )}
-      <button onClick={onDelete} className="text-slate-500 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100">
-        <X className="w-4 h-4" />
+      <button onClick={onDelete} className="flex items-center justify-center w-7 h-7 rounded-lg bg-red-500/20 hover:bg-red-500/40 text-red-400 hover:text-red-300 transition-all border border-red-500/30 flex-shrink-0">
+        <X className="w-3.5 h-3.5" />
       </button>
     </div>
   );
@@ -50,7 +50,7 @@ const COLORS = [
 
 export default function SpinWheel() {
   const canvasRef = useRef(null);
-  const [options, setOptions] = useState(['Alfie', 'Jack', 'Sarah', 'Emma']);
+  const [options, setOptions] = useState(['Yes', 'No']);
   const [newOption, setNewOption] = useState('');
   const [spinning, setSpinning] = useState(false);
   const [result, setResult] = useState(null);
