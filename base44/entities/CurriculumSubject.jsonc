@@ -1,0 +1,30 @@
+{
+  "name": "CurriculumSubject",
+  "type": "object",
+  "properties": {
+    "teacher_email": {
+      "type": "string"
+    },
+    "name": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string"
+    },
+    "color": {
+      "type": "string",
+      "default": "purple"
+    },
+    "icon": {
+      "type": "string"
+    },
+    "order_index": {
+      "type": "number",
+      "default": 0
+    }
+  },
+  "required": [
+    "teacher_email",
+    "name"
+  ]
+}

@@ -1,0 +1,66 @@
+{
+  "name": "Grade",
+  "type": "object",
+  "properties": {
+    "assignment_id": {
+      "type": "string"
+    },
+    "submission_id": {
+      "type": "string"
+    },
+    "student_email": {
+      "type": "string"
+    },
+    "class_id": {
+      "type": "string"
+    },
+    "teacher_email": {
+      "type": "string"
+    },
+    "grade_value": {
+      "type": "string",
+      "description": "e.g. 85, 92%, A, B+"
+    },
+    "grade_type": {
+      "type": "string",
+      "enum": [
+        "number",
+        "percentage",
+        "letter"
+      ],
+      "default": "percentage"
+    },
+    "max_score": {
+      "type": "number"
+    },
+    "written_feedback": {
+      "type": "string"
+    },
+    "audio_feedback_url": {
+      "type": "string"
+    },
+    "video_feedback_url": {
+      "type": "string"
+    },
+    "submission_status": {
+      "type": "string",
+      "enum": [
+        "submitted",
+        "late",
+        "missing",
+        "graded"
+      ],
+      "default": "submitted"
+    },
+    "graded_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "assignment_id",
+    "student_email",
+    "class_id",
+    "teacher_email"
+  ]
+}

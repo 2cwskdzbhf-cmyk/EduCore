@@ -23,6 +23,10 @@ import AssignmentResults from "./pages/AssignmentResults";
 import TestScores from "./pages/TestScores";
 import ExamForecast from "./pages/ExamForecast";
 import MyTimetable from "./pages/MyTimetable";
+import CurriculumManager from "./pages/CurriculumManager";
+import GradingCenter from "./pages/GradingCenter";
+import StudentGrades from "./pages/StudentGrades";
+import CollaborationHub from "./pages/CollaborationHub";
 
 const { Pages, Layout, mainPage } = pagesConfig;
 
@@ -91,6 +95,10 @@ const AuthenticatedApp = () => {
       <Route path="/TestScores" element={<LayoutWrapper currentPageName="TestScores"><TestScores /></LayoutWrapper>} />
       <Route path="/ExamForecast" element={<LayoutWrapper currentPageName="ExamForecast"><ExamForecast /></LayoutWrapper>} />
       <Route path="/MyTimetable" element={<LayoutWrapper currentPageName="MyTimetable"><MyTimetable /></LayoutWrapper>} />
+      <Route path="/CurriculumManager" element={<LayoutWrapper currentPageName="CurriculumManager"><CurriculumManager /></LayoutWrapper>} />
+      <Route path="/GradingCenter" element={<LayoutWrapper currentPageName="GradingCenter"><GradingCenter /></LayoutWrapper>} />
+      <Route path="/StudentGrades" element={<LayoutWrapper currentPageName="StudentGrades"><StudentGrades /></LayoutWrapper>} />
+      <Route path="/CollaborationHub" element={<LayoutWrapper currentPageName="CollaborationHub"><CollaborationHub /></LayoutWrapper>} />
       <Route path="*" element={<PageNotFound />} />
     </Routes>
   );

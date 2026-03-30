@@ -1,0 +1,72 @@
+{
+  "name": "CurriculumLesson",
+  "type": "object",
+  "properties": {
+    "topic_id": {
+      "type": "string"
+    },
+    "subject_id": {
+      "type": "string"
+    },
+    "teacher_email": {
+      "type": "string"
+    },
+    "title": {
+      "type": "string"
+    },
+    "instructions": {
+      "type": "string",
+      "description": "Text instructions for the lesson"
+    },
+    "order_index": {
+      "type": "number",
+      "default": 0
+    },
+    "lesson_type": {
+      "type": "string",
+      "enum": [
+        "lesson",
+        "assignment",
+        "whiteboard"
+      ],
+      "default": "lesson"
+    },
+    "files": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "links": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "required": [
+    "topic_id",
+    "subject_id",
+    "teacher_email",
+    "title"
+  ]
+}

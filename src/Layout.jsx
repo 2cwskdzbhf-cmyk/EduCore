@@ -20,6 +20,7 @@ import {
   Brain,
   Calendar
 } from 'lucide-react';
+// Note: BookOpen, ClipboardList, TrendingUp, Brain, Users already imported above
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import ProfileModal from '@/components/profile/ProfileModal';
@@ -34,8 +35,8 @@ export default function Layout({ children, currentPageName }) {
 
   const publicPages = ['Landing'];
   const authOnlyPages = ['Onboarding'];
-  const studentPages = ['StudentDashboard', 'StudentPortfolio', 'Subject', 'Topic', 'Lesson', 'Quiz', 'AITutor', 'JoinClass', 'StudentClassDetail'];
-  const teacherPages = ['TeacherDashboard', 'ClassDetails', 'CreateAssignment', 'QuizLibrary', 'CreateQuiz', 'StartLiveQuiz', 'StudentStats'];
+  const studentPages = ['StudentDashboard', 'StudentPortfolio', 'Subject', 'Topic', 'Lesson', 'Quiz', 'AITutor', 'JoinClass', 'StudentClassDetail', 'StudentGrades', 'CollaborationHub', 'MyTimetable', 'TestScores', 'ExamForecast'];
+  const teacherPages = ['TeacherDashboard', 'ClassDetails', 'CreateAssignment', 'QuizLibrary', 'CreateQuiz', 'StartLiveQuiz', 'StudentStats', 'CurriculumManager', 'GradingCenter', 'Analytics'];
   const adminPages = ['AdminPanel'];
 
   useEffect(() => {
@@ -117,15 +118,18 @@ export default function Layout({ children, currentPageName }) {
   const studentNav = [
     { name: 'Dashboard', icon: LayoutDashboard, page: 'StudentDashboard' },
     { name: 'Timetable', icon: Calendar, page: 'MyTimetable' },
-    { name: 'Portfolio', icon: Users, page: 'StudentPortfolio' },
-    { name: 'Test Scores', icon: TrendingUp, page: 'TestScores' },
-    { name: 'Exam Forecast', icon: Brain, page: 'ExamForecast' },
+    { name: 'Grades', icon: TrendingUp, page: 'StudentGrades' },
+    { name: 'Collaborate', icon: Users, page: 'CollaborationHub' },
+    { name: 'Portfolio', icon: Brain, page: 'StudentPortfolio' },
+    { name: 'Test Scores', icon: ClipboardList, page: 'TestScores' },
     { name: 'AI Tutor', icon: MessageSquare, page: 'AITutor' },
   ];
 
   const teacherNav = [
     { name: 'Dashboard', icon: LayoutDashboard, page: 'TeacherDashboard' },
     { name: 'Classes', icon: Users, page: 'TeacherDashboard' },
+    { name: 'Curriculum', icon: BookOpen, page: 'CurriculumManager' },
+    { name: 'Grading', icon: ClipboardList, page: 'GradingCenter' },
     { name: 'Analytics', icon: BarChart3, page: 'Analytics' },
   ];
 

@@ -1,0 +1,50 @@
+{
+  "name": "CollaborationRequest",
+  "type": "object",
+  "properties": {
+    "requester_email": {
+      "type": "string",
+      "description": "Student who sent the request"
+    },
+    "requester_name": {
+      "type": "string"
+    },
+    "recipient_email": {
+      "type": "string",
+      "description": "Student who received the request"
+    },
+    "assignment_id": {
+      "type": "string",
+      "description": "Assignment to collaborate on"
+    },
+    "assignment_title": {
+      "type": "string"
+    },
+    "class_id": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "accepted",
+        "declined"
+      ],
+      "default": "pending"
+    },
+    "message": {
+      "type": "string",
+      "description": "Optional message from requester"
+    },
+    "shared_notes": {
+      "type": "string",
+      "description": "Shared collaborative notes"
+    }
+  },
+  "required": [
+    "requester_email",
+    "recipient_email",
+    "assignment_id",
+    "class_id"
+  ]
+}
