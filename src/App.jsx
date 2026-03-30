@@ -29,6 +29,7 @@ import CurriculumManager from "./pages/CurriculumManager";
 import GradingCenter from "./pages/GradingCenter";
 import StudentGrades from "./pages/StudentGrades";
 import CollaborationHub from "./pages/CollaborationHub";
+import UsefulTools from "./pages/UsefulTools";
 
 const { Pages, Layout, mainPage } = pagesConfig;
 
@@ -103,6 +104,7 @@ const AuthenticatedApp = () => {
       <Route path="/CollaborationHub" element={<LayoutWrapper currentPageName="CollaborationHub"><CollaborationHub /></LayoutWrapper>} />
       <Route path="/StudentLiveQuizPlay" element={<LayoutWrapper currentPageName="StudentLiveQuizPlay"><StudentLiveQuizPlay /></LayoutWrapper>} />
       <Route path="/TeacherLiveQuizPlay" element={<LayoutWrapper currentPageName="TeacherLiveQuizPlay"><TeacherLiveQuizPlay /></LayoutWrapper>} />
+      <Route path="/UsefulTools" element={<LayoutWrapper currentPageName="UsefulTools"><UsefulTools /></LayoutWrapper>} />
       <Route path="*" element={<PageNotFound />} />
     </Routes>
   );
