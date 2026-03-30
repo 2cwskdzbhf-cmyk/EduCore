@@ -284,14 +284,27 @@ export default function StudentClassDetail() {
           </TabsContent>
 
           <TabsContent value="whiteboard">
-            {whiteboard && user && (
-              <InteractiveWhiteboard
-                whiteboard={whiteboard}
-                canEdit={whiteboard.allow_all_edits || whiteboard.student_edit_permissions?.[user.email] || false}
-                isTeacher={false}
-                whiteboardId={whiteboard.id}
-              />
-            )}
+            {whiteboard && user && (() => {
+              // Visibility check: global toggle + per-student toggle
+              const globalVisible = whiteboard.show_to_students ?? true;
+              const studentVisible = whiteboard.student_visibility?.[user.email] ?? true;
+              const canSee = globalVisible && studentVisible;
+              if (!canSee) return (
+                <GlassCard className="p-12 text-center">
+                  <p className="text-2xl mb-2">🚫</p>
+                  <p className="text-slate-300 font-medium">Whiteboard is hidden</p>
+                  <p className="text-slate-500 text-sm mt-1">Your teacher has hidden the whiteboard for now.</p>
+                </GlassCard>
+              );
+              return (
+                <InteractiveWhiteboard
+                  whiteboard={whiteboard}
+                  canEdit={whiteboard.allow_all_edits || whiteboard.student_edit_permissions?.[user.email] || false}
+                  isTeacher={false}
+                  whiteboardId={whiteboard.id}
+                />
+              );
+            })()}
             {!whiteboard && (
               <GlassCard className="p-12 text-center">
                 <p className="text-slate-400">Whiteboard not available for this class yet</p>

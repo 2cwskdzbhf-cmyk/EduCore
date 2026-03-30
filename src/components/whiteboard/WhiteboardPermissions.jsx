@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { motion } from 'framer-motion';
 import GlassCard from '@/components/ui/GlassCard';
-import { Users, Check, X } from 'lucide-react';
+import { Users, Check, X, Eye, EyeOff } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export default function WhiteboardPermissions({
@@ -11,12 +11,30 @@ export default function WhiteboardPermissions({
   permissions,
   onPermissionChange,
   allowAllEdits,
-  onToggleAllEdits
+  onToggleAllEdits,
+  // Visibility props
+  showToAll,
+  onToggleShowToAll,
+  studentVisibility,       // { [email]: boolean }
+  onStudentVisibilityChange, // (email, visible) => void
 }) {
   return (
     <GlassCard className="p-4">
       <div className="space-y-4">
-        {/* Select All Button */}
+
+        {/* ── Visibility: show/hide for all ── */}
+        <div className="flex items-center justify-between p-4 bg-white/5 rounded-lg border border-white/10">
+          <div>
+            <p className="font-semibold text-white text-sm flex items-center gap-2">
+              <Eye className="w-4 h-4 text-blue-400" />
+              Students can see the whiteboard
+            </p>
+            <p className="text-xs text-slate-400 mt-1">Toggle visibility for all students at once</p>
+          </div>
+          <Switch checked={showToAll ?? true} onCheckedChange={onToggleShowToAll} />
+        </div>
+
+        {/* ── Edit: allow all to edit ── */}
         <div className="flex items-center justify-between p-4 bg-white/5 rounded-lg border border-white/10">
           <div>
             <p className="font-semibold text-white text-sm flex items-center gap-2">
@@ -25,17 +43,15 @@ export default function WhiteboardPermissions({
             </p>
             <p className="text-xs text-slate-400 mt-1">Enable editing for everyone at once</p>
           </div>
-          <Switch
-            checked={allowAllEdits}
-            onCheckedChange={onToggleAllEdits}
-          />
+          <Switch checked={allowAllEdits} onCheckedChange={onToggleAllEdits} />
         </div>
 
-        {/* Individual Student Permissions */}
+        {/* ── Per-student controls ── */}
         <div className="space-y-2">
           <p className="text-xs font-semibold text-slate-300 uppercase tracking-wide">Student Permissions</p>
           {students.map((student, idx) => {
-            const hasAccess = allowAllEdits || permissions[student.email];
+            const canSee = (showToAll ?? true) && (studentVisibility?.[student.email] ?? true);
+            const canEditStudent = allowAllEdits || permissions[student.email];
             return (
               <motion.div
                 key={student.email}
@@ -44,24 +60,43 @@ export default function WhiteboardPermissions({
                 transition={{ delay: idx * 0.05 }}
                 className="flex items-center justify-between p-3 bg-white/[0.03] hover:bg-white/[0.08] rounded-lg border border-white/10 transition-all"
               >
-                <div className="flex-1">
-                  <p className="text-white text-sm font-medium">{student.full_name || student.email}</p>
-                  <p className="text-xs text-slate-400">{student.email}</p>
+                <div className="flex-1 min-w-0">
+                  <p className="text-white text-sm font-medium truncate">{student.full_name || student.email}</p>
+                  <p className="text-xs text-slate-400 truncate">{student.email}</p>
                 </div>
 
-                <div className="flex items-center gap-2">
-                  {hasAccess ? (
+                <div className="flex items-center gap-2 ml-2">
+                  {/* Visibility badge */}
+                  <span className={cn(
+                    'flex items-center gap-1 text-xs px-2 py-1 rounded-full',
+                    canSee ? 'text-blue-400 bg-blue-500/20' : 'text-slate-500 bg-white/5'
+                  )}>
+                    {canSee ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
+                    {canSee ? 'Visible' : 'Hidden'}
+                  </span>
+
+                  {/* Edit badge */}
+                  {canEditStudent ? (
                     <span className="flex items-center gap-1 text-xs text-emerald-400 px-2 py-1 bg-emerald-500/20 rounded-full">
                       <Check className="w-3 h-3" />
-                      Can Edit
+                      Edit
                     </span>
                   ) : (
                     <span className="flex items-center gap-1 text-xs text-slate-400 px-2 py-1 bg-white/5 rounded-full">
                       <X className="w-3 h-3" />
-                      View Only
+                      View
                     </span>
                   )}
 
+                  {/* Individual visibility toggle */}
+                  {(showToAll ?? true) && (
+                    <Switch
+                      checked={studentVisibility?.[student.email] ?? true}
+                      onCheckedChange={(val) => onStudentVisibilityChange?.(student.email, val)}
+                    />
+                  )}
+
+                  {/* Individual edit toggle */}
                   {!allowAllEdits && (
                     <Button
                       size="sm"

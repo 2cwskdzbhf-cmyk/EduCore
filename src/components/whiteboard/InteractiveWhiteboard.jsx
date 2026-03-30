@@ -126,29 +126,38 @@ export default function InteractiveWhiteboard({
     });
   };
 
+  // Helper: get mouse position relative to canvas, correct regardless of scroll/zoom
+  const getCanvasPos = (e) => {
+    const rect = canvasRef.current.getBoundingClientRect();
+    return {
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top,
+    };
+  };
+
   // --- Canvas mouse events (pen/eraser) ---
   const handleMouseDown = (e) => {
     if (!canEdit || tool === 'text' || tool === 'select') return;
-    const { offsetX, offsetY } = e.nativeEvent;
+    const { x, y } = getCanvasPos(e);
     contextRef.current.beginPath();
-    contextRef.current.moveTo(offsetX, offsetY);
+    contextRef.current.moveTo(x, y);
     setIsDrawing(true);
-    setCurrentPath([{ x: offsetX, y: offsetY }]);
+    setCurrentPath([{ x, y }]);
   };
 
   const handleMouseMove = (e) => {
     if (!isDrawing) return;
-    const { offsetX, offsetY } = e.nativeEvent;
+    const { x, y } = getCanvasPos(e);
     const ctx = contextRef.current;
     if (tool === 'pen') {
       ctx.strokeStyle = color;
       ctx.lineWidth = brushSize;
-      ctx.lineTo(offsetX, offsetY);
+      ctx.lineTo(x, y);
       ctx.stroke();
     } else if (tool === 'eraser') {
-      ctx.clearRect(offsetX - eraserSize / 2, offsetY - eraserSize / 2, eraserSize, eraserSize);
+      ctx.clearRect(x - eraserSize / 2, y - eraserSize / 2, eraserSize, eraserSize);
     }
-    setCurrentPath(prev => [...prev, { x: offsetX, y: offsetY }]);
+    setCurrentPath(prev => [...prev, { x, y }]);
   };
 
   const handleMouseUp = () => {
@@ -216,6 +225,15 @@ export default function InteractiveWhiteboard({
 
   const handleTextChange = (id, value) => {
     setTextBoxes(prev => prev.map(tb => tb.id === id ? { ...tb, content: value } : tb));
+    // Auto-expand after state update
+    setTimeout(() => {
+      const el = textareaRefs.current[id];
+      if (!el) return;
+      el.style.height = 'auto';
+      el.style.width = 'auto';
+      el.style.height = el.scrollHeight + 'px';
+      el.style.width = Math.max(el.scrollWidth, 60) + 'px';
+    }, 0);
   };
 
   const handleTextKeyDown = (e, id) => {
@@ -234,6 +252,15 @@ export default function InteractiveWhiteboard({
 
   const updateTextBoxStyle = (id, key, value) => {
     setTextBoxes(prev => prev.map(tb => tb.id === id ? { ...tb, [key]: value } : tb));
+    // Re-measure after font/size change
+    setTimeout(() => {
+      const el = textareaRefs.current[id];
+      if (!el) return;
+      el.style.height = 'auto';
+      el.style.width = 'auto';
+      el.style.height = el.scrollHeight + 'px';
+      el.style.width = Math.max(el.scrollWidth, 60) + 'px';
+    }, 0);
   };
 
   // --- Drag to move textboxes ---
@@ -474,11 +501,10 @@ export default function InteractiveWhiteboard({
                 position: 'absolute',
                 left: tb.x,
                 top: tb.y,
-                width: tb.width,
-                height: tb.height,
+                minWidth: 40,
+                minHeight: 28,
                 boxSizing: 'border-box',
                 cursor: tool === 'select' && !editing ? 'move' : 'text',
-                // Only show outline while actively editing
                 outline: editing ? '2px solid #a78bfa' : 'none',
                 borderRadius: 4,
               }}
@@ -491,15 +517,19 @@ export default function InteractiveWhiteboard({
                 onKeyDown={e => handleTextKeyDown(e, tb.id)}
                 onClick={e => { e.stopPropagation(); setSelectedId(tb.id); if (tool === 'text') { setEditingId(tb.id); } }}
                 onFocus={() => { setSelectedId(tb.id); setEditingId(tb.id); }}
-                placeholder={editing ? 'Type here…' : ''}
+                placeholder={editing ? 'Type…' : ''}
                 readOnly={!editing && tool !== 'text'}
+                rows={1}
                 style={{
                   background: 'transparent',
                   border: 'none',
                   outline: 'none',
                   resize: 'none',
-                  width: '100%',
-                  height: '100%',
+                  overflow: 'hidden',
+                  display: 'block',
+                  minWidth: 40,
+                  width: tb.width || 'auto',
+                  height: tb.height || 'auto',
                   color: tb.color || '#ffffff',
                   fontSize: (tb.size || 18) + 'px',
                   fontFamily: tb.font || 'Arial',
@@ -509,6 +539,7 @@ export default function InteractiveWhiteboard({
                   pointerEvents: (tool === 'text' || tool === 'select') ? 'auto' : 'none',
                   userSelect: editing ? 'text' : 'none',
                   boxSizing: 'border-box',
+                  whiteSpace: 'pre',
                 }}
               />
 
