@@ -10,6 +10,7 @@ import GlassCard from '@/components/ui/GlassCard';
 import ClassMessaging from '@/components/class/ClassMessaging';
 import InteractiveWhiteboard from '@/components/whiteboard/InteractiveWhiteboard';
 import WhiteboardChat from '@/components/whiteboard/WhiteboardChat';
+import ClassLessons from '@/components/lessons/ClassLessons';
 import ClassPoll from '@/components/class/ClassPoll';
 import YesNoButton from '@/components/class/YesNoButton';
 import {
@@ -152,6 +153,9 @@ export default function StudentClassDetail() {
 
         <Tabs defaultValue="assignments" className="w-full">
           <TabsList className="bg-white/5 border border-white/10 mb-6">
+            <TabsTrigger value="lessons" className="data-[state=active]:bg-white/10">
+              📖 Lessons
+            </TabsTrigger>
             <TabsTrigger value="assignments" className="data-[state=active]:bg-white/10">
               <ClipboardList className="w-4 h-4 mr-2" />
               Assignments
@@ -171,6 +175,12 @@ export default function StudentClassDetail() {
               🛠 Tools
             </TabsTrigger>
           </TabsList>
+
+          <TabsContent value="lessons">
+            {user && (
+              <ClassLessons classId={classId} user={user} isTeacher={false} />
+            )}
+          </TabsContent>
 
           <TabsContent value="assignments">
             {assignments.length > 0 ? (

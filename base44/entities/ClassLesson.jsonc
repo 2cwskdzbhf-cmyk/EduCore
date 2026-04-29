@@ -1,0 +1,44 @@
+{
+  "name": "ClassLesson",
+  "type": "object",
+  "properties": {
+    "class_id": {
+      "type": "string",
+      "description": "Reference to Class"
+    },
+    "title": {
+      "type": "string",
+      "description": "Lesson title"
+    },
+    "content_text": {
+      "type": "string",
+      "description": "Rich text lesson notes"
+    },
+    "audio_url": {
+      "type": "string",
+      "description": "URL of recorded audio file"
+    },
+    "transcript_text": {
+      "type": "string",
+      "description": "Auto-generated transcript from audio"
+    },
+    "created_by": {
+      "type": "string",
+      "description": "Email of teacher who created the lesson"
+    },
+    "teacher_name": {
+      "type": "string",
+      "description": "Display name of teacher"
+    },
+    "is_published": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether lesson is visible to students"
+    }
+  },
+  "required": [
+    "class_id",
+    "title",
+    "created_by"
+  ]
+}

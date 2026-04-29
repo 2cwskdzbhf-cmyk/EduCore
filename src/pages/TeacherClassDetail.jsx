@@ -20,6 +20,7 @@ import ClassMessaging from '@/components/class/ClassMessaging';
 import InteractiveWhiteboard from '@/components/whiteboard/InteractiveWhiteboard';
 import WhiteboardPermissions from '@/components/whiteboard/WhiteboardPermissions';
 import WhiteboardChat from '@/components/whiteboard/WhiteboardChat';
+import ClassLessons from '@/components/lessons/ClassLessons';
 import StudentStatsModal from '@/components/teacher/StudentStatsModal';
 import ClassToolsPanel from '@/components/class/ClassToolsPanel';
 import ClassPoll from '@/components/class/ClassPoll';
@@ -487,6 +488,9 @@ export default function TeacherClassDetail() {
 
           <Tabs defaultValue="setAssignments" className="space-y-6">
             <TabsList className="bg-white/5 border border-white/10 h-auto p-1 flex flex-wrap gap-1 justify-start w-full">
+              <TabsTrigger value="lessons" className="text-slate-200 data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-500 data-[state=active]:to-blue-500 data-[state=active]:text-white">
+                📖 Lessons
+              </TabsTrigger>
               <TabsTrigger value="setAssignments" className="text-slate-200 data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-500 data-[state=active]:to-blue-500 data-[state=active]:text-white">
                 📋 Active Assignments
               </TabsTrigger>
@@ -517,6 +521,13 @@ export default function TeacherClassDetail() {
                 <Wrench className="w-4 h-4 mr-2" /> Useful Tools
               </Button>
             </div>
+
+            {/* Lessons Tab */}
+            <TabsContent value="lessons" className="space-y-4">
+              {user && (
+                <ClassLessons classId={classId} user={user} isTeacher={true} />
+              )}
+            </TabsContent>
 
             {/* Create Tab */}
             <TabsContent value="practice" className="space-y-6">
