@@ -40,28 +40,23 @@ export default function ClassLessons({ classId, user, isTeacher }) {
     setDeletingId(null);
   };
 
-  const handleRetranscribe = async (lesson) => {
-    if (!lesson.audio_url) return;
-    setRetranscribingId(lesson.id);
+  const handleRetranscribe = async (mediaItem) => {
+    if (!mediaItem?.url) return;
+    setRetranscribingId(mediaItem.id);
     try {
-      const res = await base44.functions.invoke('transcribeAudio', {
-        audio_url: lesson.audio_url,
-        lesson_id: lesson.id,
+      await base44.functions.invoke('transcribeAudio', {
+        audio_url: mediaItem.url,
+        lesson_id: mediaItem.lesson_id || null,
       });
       queryClient.invalidateQueries({ queryKey: ['classLessons', classId] });
-    } catch {
-      // ignore
-    }
+    } catch {}
     setRetranscribingId(null);
   };
 
-  const visibleLessons = isTeacher
-    ? lessons
-    : lessons.filter(l => l.is_published !== false);
+  const visibleLessons = isTeacher ? lessons : lessons.filter(l => l.is_published !== false);
 
   return (
     <div className="space-y-4">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <BookOpen className="w-5 h-5 text-purple-400" />
@@ -69,16 +64,13 @@ export default function ClassLessons({ classId, user, isTeacher }) {
           <span className="text-slate-500 text-sm">({visibleLessons.length})</span>
         </div>
         {isTeacher && !showForm && (
-          <Button
-            onClick={() => { setEditingLesson(null); setShowForm(true); }}
-            className="bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 font-semibold text-sm"
-          >
+          <Button onClick={() => { setEditingLesson(null); setShowForm(true); }}
+            className="bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 font-semibold text-sm">
             <Plus className="w-4 h-4 mr-1.5" /> Create Lesson
           </Button>
         )}
       </div>
 
-      {/* Form */}
       <AnimatePresence>
         {showForm && (
           <LessonForm
@@ -91,21 +83,16 @@ export default function ClassLessons({ classId, user, isTeacher }) {
         )}
       </AnimatePresence>
 
-      {/* Lesson list */}
       {isLoading ? (
         <div className="flex items-center justify-center py-12">
           <Loader2 className="w-6 h-6 text-purple-400 animate-spin" />
         </div>
       ) : visibleLessons.length === 0 ? (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="text-center py-16"
-        >
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-16">
           <BookOpen className="w-14 h-14 text-slate-600 mx-auto mb-4" />
           <p className="text-slate-300 font-semibold text-lg">No lessons yet</p>
           <p className="text-slate-500 text-sm mt-1">
-            {isTeacher ? 'Create your first lesson above.' : 'Your teacher hasn\'t posted any lessons yet.'}
+            {isTeacher ? 'Create your first lesson above.' : "Your teacher hasn't posted any lessons yet."}
           </p>
         </motion.div>
       ) : (
@@ -118,7 +105,7 @@ export default function ClassLessons({ classId, user, isTeacher }) {
               onEdit={handleEdit}
               onDelete={handleDelete}
               onRetranscribe={handleRetranscribe}
-              retranscribing={retranscribingId === lesson.id}
+              retranscribing={retranscribingId}
             />
           ))}
         </div>

@@ -14,6 +14,8 @@ import { AuthProvider, useAuth } from "@/lib/AuthContext";
 import UserNotRegisteredError from "@/components/UserNotRegisteredError";
 
 import mathsContent from "@/components/data/mathsContent";
+import TeacherClassDetail from "./pages/TeacherClassDetail.jsx";
+import StudentClassDetail from "./pages/StudentClassDetail.jsx";
 import TeacherResults from "./pages/TeacherResults";
 import StudentLiveQuizPlay from "./pages/StudentLiveQuizPlay.jsx";
 import TeacherLiveQuizPlay from "./pages/TeacherLiveQuizPlay.jsx";
@@ -100,6 +102,8 @@ const AuthenticatedApp = () => {
         />
       ))}
       <Route path="/TeacherResults" element={<LayoutWrapper currentPageName="TeacherResults"><TeacherResults /></LayoutWrapper>} />
+      <Route path="/TeacherClassDetail" element={<LayoutWrapper currentPageName="TeacherClassDetail"><TeacherClassDetail /></LayoutWrapper>} />
+      <Route path="/StudentClassDetail" element={<LayoutWrapper currentPageName="StudentClassDetail"><StudentClassDetail /></LayoutWrapper>} />
       <Route path="/LiveClassroomView" element={<LayoutWrapper currentPageName="LiveClassroomView"><LiveClassroomView /></LayoutWrapper>} />
       <Route path="/QuizScheduler" element={<LayoutWrapper currentPageName="QuizScheduler"><QuizScheduler /></LayoutWrapper>} />
       <Route path="/KnowledgeGapReport" element={<LayoutWrapper currentPageName="KnowledgeGapReport"><KnowledgeGapReport /></LayoutWrapper>} />

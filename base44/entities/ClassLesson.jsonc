@@ -12,15 +12,43 @@
     },
     "content_text": {
       "type": "string",
-      "description": "Rich text lesson notes"
+      "description": "Lesson notes / description"
+    },
+    "media_items": {
+      "type": "array",
+      "description": "Array of audio/video media items, each with url, type, label, transcript",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "audio",
+              "video"
+            ]
+          },
+          "label": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          },
+          "transcript": {
+            "type": "string"
+          }
+        }
+      }
     },
     "audio_url": {
       "type": "string",
-      "description": "URL of recorded audio file"
+      "description": "Legacy single audio URL (kept for backwards compat)"
     },
     "transcript_text": {
       "type": "string",
-      "description": "Auto-generated transcript from audio"
+      "description": "Legacy single transcript (kept for backwards compat)"
     },
     "created_by": {
       "type": "string",
