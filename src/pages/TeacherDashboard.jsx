@@ -208,9 +208,16 @@ export default function TeacherDashboard() {
           <h1 className="text-4xl font-bold text-white mb-2">
             Teacher Dashboard
           </h1>
-          <p className="text-slate-400">
+          <p className="text-slate-400 mb-6">
             Welcome back{user?.full_name ? `, ${user.full_name}` : ''}
           </p>
+
+          {/* Stats directly under welcome */}
+          <div className="grid grid-cols-2 lg:grid-cols-3 gap-6 mb-4">
+            <StatCard icon={Users} label="Total Students" value={getTotalStudents()} delay={0} />
+            <StatCard icon={BookOpen} label="Classes" value={classes.length} delay={0.1} />
+            <StatCard icon={ClipboardList} label="Assignments" value={assignments.length} delay={0.2} />
+          </div>
         </motion.div>
 
         <div className="flex justify-end gap-3 mb-8">
@@ -346,27 +353,7 @@ export default function TeacherDashboard() {
           )}
         </div>
 
-        {/* Stats */}
-        <div className="grid grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
-          <StatCard
-            icon={Users}
-            label="Total Students"
-            value={getTotalStudents()}
-            delay={0}
-          />
-          <StatCard
-            icon={BookOpen}
-            label="Classes"
-            value={classes.length}
-            delay={0.1}
-          />
-          <StatCard
-            icon={ClipboardList}
-            label="Assignments"
-            value={assignments.length}
-            delay={0.2}
-          />
-        </div>
+
 
         {/* Knowledge Gap Dashboard shortcut */}
         <div className="mb-8">
