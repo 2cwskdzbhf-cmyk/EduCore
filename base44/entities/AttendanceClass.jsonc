@@ -1,0 +1,34 @@
+{
+  "name": "AttendanceClass",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Class name (e.g. 10A Maths)"
+    },
+    "subject": {
+      "type": "string",
+      "description": "Subject name"
+    },
+    "teacher_name": {
+      "type": "string",
+      "description": "Teacher's full name"
+    },
+    "room": {
+      "type": "string",
+      "description": "Room number/name"
+    },
+    "student_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Array of AttendanceStudent IDs"
+    }
+  },
+  "required": [
+    "name",
+    "subject",
+    "teacher_name"
+  ]
+}

@@ -1,0 +1,57 @@
+{
+  "name": "AttendanceRecord",
+  "type": "object",
+  "properties": {
+    "session_id": {
+      "type": "string",
+      "description": "Reference to AttendanceSession"
+    },
+    "class_id": {
+      "type": "string",
+      "description": "Reference to AttendanceClass"
+    },
+    "student_id": {
+      "type": "string",
+      "description": "Reference to AttendanceStudent"
+    },
+    "student_name": {
+      "type": "string",
+      "description": "Cached student name"
+    },
+    "date": {
+      "type": "string",
+      "format": "date",
+      "description": "Date of record"
+    },
+    "period": {
+      "type": "string",
+      "description": "Period of the day"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "present",
+        "late",
+        "absent"
+      ],
+      "description": "Attendance status"
+    },
+    "marked_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when marked"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Optional notes for this record"
+    }
+  },
+  "required": [
+    "session_id",
+    "class_id",
+    "student_id",
+    "status",
+    "date",
+    "period"
+  ]
+}

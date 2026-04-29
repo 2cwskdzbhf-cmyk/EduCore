@@ -1,0 +1,31 @@
+{
+  "name": "AttendanceStudent",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Full name of the student"
+    },
+    "student_id": {
+      "type": "string",
+      "description": "Unique student ID"
+    },
+    "tutor_group": {
+      "type": "string",
+      "description": "Tutor group (e.g. 10A)"
+    },
+    "year_group": {
+      "type": "number",
+      "description": "Year group (7-13)"
+    },
+    "email": {
+      "type": "string",
+      "description": "Student email (optional)"
+    }
+  },
+  "required": [
+    "name",
+    "student_id",
+    "year_group"
+  ]
+}

@@ -1,0 +1,47 @@
+{
+  "name": "AttendanceSession",
+  "type": "object",
+  "properties": {
+    "class_id": {
+      "type": "string",
+      "description": "Reference to AttendanceClass"
+    },
+    "class_name": {
+      "type": "string",
+      "description": "Cached class name"
+    },
+    "date": {
+      "type": "string",
+      "format": "date",
+      "description": "Lesson date"
+    },
+    "period": {
+      "type": "string",
+      "enum": [
+        "P1",
+        "P2",
+        "P3",
+        "P4",
+        "P5",
+        "P6",
+        "AM",
+        "PM"
+      ],
+      "description": "Period of the day"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Optional session notes"
+    },
+    "is_complete": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether register has been taken"
+    }
+  },
+  "required": [
+    "class_id",
+    "date",
+    "period"
+  ]
+}

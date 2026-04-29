@@ -15,7 +15,8 @@ import {
   ArrowRight,
   MessageSquare,
   Trophy,
-  Loader2
+  Loader2,
+  Clock
 } from 'lucide-react';
 
 export default function LessonPage() {

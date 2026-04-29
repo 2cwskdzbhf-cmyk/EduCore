@@ -6,6 +6,7 @@ import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import GlassCard, { StatCard } from '@/components/ui/GlassCard';
 import { 
   ChevronLeft, 
   Trophy, 
