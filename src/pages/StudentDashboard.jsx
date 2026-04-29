@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { AnimatePresence } from 'framer-motion';
 import { motion } from 'framer-motion';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -9,6 +10,7 @@ import GlassCard, { StatCard } from '@/components/ui/GlassCard';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import PersonalizedLearningPath from '@/components/learning/PersonalizedLearningPath';
 import LiveQuizPopup from '@/components/quiz/LiveQuizPopup';
 import LiveQuizBanner from '@/components/quiz/LiveQuizBanner';
@@ -42,14 +44,6 @@ export default function StudentDashboard() {
     localStorage.getItem('dismissedLobbySessionId') || null
   );
   const [showLobbyBanner, setShowLobbyBanner] = useState(false);
-
-  // Join-by-code state
-  const [quizCodeOpen, setQuizCodeOpen] = useState(false);
-  const [quizCode, setQuizCode] = useState('');
-  const [quizCodeError, setQuizCodeError] = useState('');
-  const [joiningByCode, setJoiningByCode] = useState(false);
-
-
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -158,34 +152,6 @@ export default function StudentDashboard() {
     }
   };
 
-  const handleJoinByCode = async () => {
-    if (!quizCode.trim() || !user?.email) return;
-    setJoiningByCode(true);
-    setQuizCodeError('');
-    const sessions = await base44.entities.QuizLobbySession.filter({ join_code: quizCode.trim().toUpperCase() });
-    const sess = sessions.find(s => s.status === 'lobby' || s.status === 'active');
-    if (!sess) {
-      setQuizCodeError('Invalid or expired code. Please try again.');
-      setJoiningByCode(false);
-      return;
-    }
-    // Add student to participants
-    const emails = sess.participant_emails || [];
-    const names = sess.participant_names || [];
-    if (!emails.includes(user.email)) {
-      await base44.entities.QuizLobbySession.update(sess.id, {
-        participant_emails: [...emails, user.email],
-        participant_names: [...names, user.full_name || user.email.split('@')[0]]
-      });
-    }
-    setJoiningByCode(false);
-    setQuizCodeOpen(false);
-    setQuizCode('');
-    navigate(`/live-quiz-lobby-new?sessionId=${sess.id}`);
-  };
-
-
-
   const { data: assignments = [] } = useQuery({
     queryKey: ['studentAssignments', user?.email, enrolledClasses.map((c) => c.id).join(',')],
     queryFn: async () => {
@@ -213,6 +179,34 @@ export default function StudentDashboard() {
     queryFn: async () => {
       if (!user?.email) return [];
       return base44.entities.TimetableLesson.filter({ student_email: user.email }, '-created_date');
+    },
+    enabled: !!user?.email
+  });
+
+  const { data: assignmentStatuses = [] } = useQuery({
+    queryKey: ['studentAssignmentStatuses', user?.email],
+    queryFn: async () => {
+      if (!user?.email) return [];
+      return base44.entities.StudentAssignmentStatus.filter({ student_email: user.email });
+    },
+    enabled: !!user?.email
+  });
+
+  const { data: announcements = [] } = useQuery({
+    queryKey: ['classAnnouncements', enrolledClasses.map(c => c.id).join(',')],
+    queryFn: async () => {
+      if (enrolledClasses.length === 0) return [];
+      const classIds = enrolledClasses.map(c => c.id);
+      return base44.entities.Announcement.filter({ class_id: { $in: classIds }, is_active: true }, '-created_date');
+    },
+    enabled: enrolledClasses.length > 0
+  });
+
+  const { data: announcementReads = [] } = useQuery({
+    queryKey: ['announcementReads', user?.email],
+    queryFn: async () => {
+      if (!user?.email) return [];
+      return base44.entities.AnnouncementRead.filter({ student_email: user.email });
     },
     enabled: !!user?.email
   });
@@ -286,8 +280,10 @@ export default function StudentDashboard() {
     const pending = assignments.filter((a) => {
       if (!a.due_date) return false;
       const dueDate = new Date(a.due_date);
+      const isMarkedDone = assignmentStatuses.some(s => s.assignment_id === a.id && s.marked_done_by_student);
       const submission = submissions.find((s) => s.assignment_id === a.id);
       return (
+        !isMarkedDone &&
         dueDate > now && (
         !submission || submission.status === 'not_started' || submission.status === 'in_progress'));
 
@@ -322,6 +318,31 @@ export default function StudentDashboard() {
     });
   };
 
+  const handleMarkAnnouncementDone = async (announcementId) => {
+    if (!user?.email) return;
+    try {
+      const existing = await base44.entities.AnnouncementRead.filter({
+        announcement_id: announcementId,
+        student_email: user.email
+      });
+      if (existing.length === 0) {
+        const announcement = announcements.find(a => a.id === announcementId);
+        await base44.entities.AnnouncementRead.create({
+          announcement_id: announcementId,
+          student_email: user.email,
+          class_id: announcement?.class_id
+        });
+      }
+      queryClient.invalidateQueries({ queryKey: ['announcementReads'] });
+    } catch (error) {
+      console.error('Error marking announcement as read:', error);
+    }
+  };
+
+  const visibleAnnouncements = announcements.filter(
+    a => !announcementReads.some(r => r.announcement_id === a.id)
+  );
+
   const trend = getAccuracyTrend();
   const dueAssignments = getDueAssignments();
 
@@ -341,6 +362,30 @@ export default function StudentDashboard() {
   };
 
   const nextLesson = getNextLesson();
+
+  const handleMarkAssignmentDone = async (assignmentId) => {
+    if (!user?.email) return;
+    try {
+      const existing = await base44.entities.StudentAssignmentStatus.filter({ 
+        assignment_id: assignmentId, 
+        student_email: user.email 
+      });
+      if (existing.length > 0) {
+        await base44.entities.StudentAssignmentStatus.update(existing[0].id, { marked_done_by_student: true });
+      } else {
+        const assignmentRecord = assignments.find(a => a.id === assignmentId);
+        await base44.entities.StudentAssignmentStatus.create({
+          assignment_id: assignmentId,
+          student_email: user.email,
+          class_id: assignmentRecord?.class_id || enrolledClasses[0]?.id,
+          marked_done_by_student: true
+        });
+      }
+      queryClient.invalidateQueries({ queryKey: ['studentAssignments'] });
+    } catch (error) {
+      console.error('Error marking assignment done:', error);
+    }
+  };
 
   const handleJoinClass = async () => {
     if (!classJoinCode || !user?.email) return;
@@ -519,39 +564,44 @@ export default function StudentDashboard() {
                 };
 
                 return (
-                  <Link key={assignment.id} to={createPageUrl(`AssignmentDue?id=${assignment.id}`)}>
-                      <motion.div
-                      initial={{ opacity: 0, x: -20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: idx * 0.05 }}
-                      className={`p-4 rounded-xl border ${urgencyColors[assignment.urgency]} hover:bg-white/10 transition-all cursor-pointer group`}>
-                      
-                        <div className="flex items-center justify-between">
-                          <div className="flex-1">
-                            <h3 className="font-semibold text-white drop-shadow-md group-hover:text-purple-300 transition-colors">
-                              {assignment.title}
-                            </h3>
-                            <p className="text-sm text-slate-300 drop-shadow-sm">{assignment.className}</p>
-                          </div>
-                          <div className="flex items-center gap-3">
-                            <div className="text-right">
-                              <p
-                              className={`text-sm font-medium ${
-                              assignment.urgency === 'high' ?
-                              'text-red-400' :
-                              assignment.urgency === 'medium' ?
-                              'text-amber-400' :
-                              'text-slate-300'} drop-shadow-md`
-                              }>
-                              
-                                {assignment.dueDateText}
-                              </p>
-                            </div>
-                            <ChevronRight className="w-5 h-5 text-slate-400 group-hover:text-white transition-colors" />
-                          </div>
+                  <motion.div
+                    key={assignment.id}
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: idx * 0.05 }}
+                    exit={{ opacity: 0, x: 20 }}
+                    className={`p-4 rounded-xl border ${urgencyColors[assignment.urgency]} hover:bg-white/10 transition-all group`}>
+                    
+                    <div className="flex items-center justify-between gap-3">
+                      <Link to={createPageUrl(`AssignmentDue?id=${assignment.id}`)} className="flex-1">
+                        <div className="cursor-pointer">
+                          <h3 className="font-semibold text-white drop-shadow-md group-hover:text-purple-300 transition-colors">
+                            {assignment.title}
+                          </h3>
+                          {assignment.description && <p className="text-xs text-slate-400 mt-1 line-clamp-1">{assignment.description}</p>}
+                          <p className="text-sm text-slate-300 drop-shadow-sm">{assignment.className}</p>
                         </div>
-                      </motion.div>
-                    </Link>);
+                      </Link>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <div className="text-right">
+                          <p
+                          className={`text-sm font-medium whitespace-nowrap ${
+                          assignment.urgency === 'high' ?
+                          'text-red-400' :
+                          assignment.urgency === 'medium' ?
+                          'text-amber-400' :
+                          'text-slate-300'} drop-shadow-md`
+                          }>
+                          
+                            {assignment.dueDateText}
+                          </p>
+                        </div>
+                        <Button size="sm" variant="outline" onClick={(e) => { e.preventDefault(); handleMarkAssignmentDone(assignment.id); }} className="border-slate-400/30 text-slate-300 hover:bg-white/10 text-xs whitespace-nowrap">
+                          Mark Done
+                        </Button>
+                      </div>
+                    </div>
+                  </motion.div>);
 
               })}
               </div> :
@@ -583,26 +633,54 @@ export default function StudentDashboard() {
               </div>
             </div>
           </GlassCard>
-
-          <GlassCard
-            className="p-6 cursor-pointer hover:scale-[1.02] bg-slate-950/50 backdrop-blur-xl border border-amber-500/20"
-            onClick={() => { setQuizCodeOpen(true); setQuizCodeError(''); setQuizCode(''); }}>
-            <div className="flex items-center gap-4">
-              <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center shadow-lg shadow-amber-500/30">
-                <Zap className="w-7 h-7 text-white" />
-              </div>
-              <div>
-                <h3 className="text-lg font-bold text-white drop-shadow-md">Join Quiz</h3>
-                <p className="text-sm text-slate-300 drop-shadow-sm">Enter a quiz code from your teacher</p>
-              </div>
-            </div>
-          </GlassCard>
         </motion.div>
 
-        <div>
+          <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: nextLesson ? 0.7 : 0.6 }}
+          className="mb-8">
+
           <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2 drop-shadow-lg">
-            <Users className="w-5 h-5 text-blue-400" />
-            My Classes
+          📢 Announcements
+          </h2>
+          <GlassCard className="p-6 bg-slate-950/50 backdrop-blur-xl">
+          {visibleAnnouncements.length > 0 ?
+          <div className="space-y-3">
+              {visibleAnnouncements.map((announcement, idx) => (
+                <motion.div
+                  key={announcement.id}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: idx * 0.05 }}
+                  exit={{ opacity: 0, x: 20 }}
+                  className="p-4 rounded-xl border border-white/10 bg-white/[0.03] hover:bg-white/[0.08] transition-all group">
+
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1">
+                      <h3 className="font-semibold text-white drop-shadow-md">{announcement.title}</h3>
+                      <p className="text-sm text-slate-300 drop-shadow-sm mt-1">{announcement.message}</p>
+                      <p className="text-xs text-slate-500 mt-2">{new Date(announcement.created_date).toLocaleDateString()} at {new Date(announcement.created_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                    </div>
+                    <Button size="sm" variant="outline" onClick={() => handleMarkAnnouncementDone(announcement.id)} className="border-slate-400/30 text-slate-300 hover:bg-white/10 text-xs flex-shrink-0 whitespace-nowrap">
+                      Mark Done
+                    </Button>
+                  </div>
+                </motion.div>
+              ))}
+            </div> :
+
+          <div className="text-center py-8">
+              <p className="text-slate-400 drop-shadow-md">No announcements</p>
+            </div>
+          }
+          </GlassCard>
+          </motion.div>
+
+          <div>
+          <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2 drop-shadow-lg">
+          <Users className="w-5 h-5 text-blue-400" />
+          My Classes
           </h2>
 
           <div className="space-y-3">
@@ -683,43 +761,7 @@ export default function StudentDashboard() {
           </DialogContent>
         </Dialog>
 
-        {/* Join Quiz by Code Dialog */}
-        <Dialog open={quizCodeOpen} onOpenChange={setQuizCodeOpen}>
-          <DialogContent className="bg-slate-950/95 backdrop-blur-xl border-white/10">
-            <DialogHeader>
-              <DialogTitle className="text-white flex items-center gap-2">
-                <Zap className="w-5 h-5 text-amber-400" /> Join Live Quiz
-              </DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div>
-                <Label className="text-slate-300">Quiz Code</Label>
-                <Input
-                  value={quizCode}
-                  onChange={(e) => { setQuizCode(e.target.value.toUpperCase()); setQuizCodeError(''); }}
-                  placeholder="e.g. A7K9X"
-                  maxLength={6}
-                  className="bg-white/5 border-white/10 text-white text-xl tracking-widest font-bold text-center"
-                  onKeyDown={(e) => e.key === 'Enter' && handleJoinByCode()}
-                />
-                {quizCodeError && (
-                  <p className="text-red-400 text-sm mt-1">{quizCodeError}</p>
-                )}
-              </div>
-              <Button
-                onClick={handleJoinByCode}
-                className="w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600"
-                disabled={!quizCode.trim() || joiningByCode}>
-                {joiningByCode ? (
-                  <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Joining...</>
-                ) : (
-                  <><Zap className="w-4 h-4 mr-2" /> Join Quiz</>
-                )}
-              </Button>
-              <p className="text-xs text-slate-500 text-center">Ask your teacher for the 5-letter quiz code</p>
-            </div>
-          </DialogContent>
-        </Dialog>
+
       </div>
     </div>);
 
