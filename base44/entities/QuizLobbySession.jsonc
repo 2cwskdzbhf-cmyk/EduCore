@@ -1,0 +1,64 @@
+{
+  "name": "QuizLobbySession",
+  "type": "object",
+  "properties": {
+    "class_id": {
+      "type": "string",
+      "description": "Reference to Class"
+    },
+    "class_name": {
+      "type": "string",
+      "description": "Cached class name"
+    },
+    "teacher_email": {
+      "type": "string",
+      "description": "Teacher who created the session"
+    },
+    "teacher_name": {
+      "type": "string",
+      "description": "Teacher display name"
+    },
+    "quiz_title": {
+      "type": "string",
+      "description": "Optional quiz title/topic"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "lobby",
+        "active",
+        "ended"
+      ],
+      "default": "lobby",
+      "description": "Current session status"
+    },
+    "participant_emails": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Emails of students who joined the lobby"
+    },
+    "participant_names": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Display names of students in lobby"
+    },
+    "started_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When quiz was activated"
+    },
+    "ended_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When session ended"
+    }
+  },
+  "required": [
+    "class_id",
+    "teacher_email"
+  ]
+}

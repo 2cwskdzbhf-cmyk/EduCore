@@ -10,6 +10,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import PersonalizedLearningPath from '@/components/learning/PersonalizedLearningPath';
+import LiveQuizPopup from '@/components/quiz/LiveQuizPopup';
+import LiveQuizBanner from '@/components/quiz/LiveQuizBanner';
 import {
   Target,
   UserPlus,
@@ -35,7 +37,13 @@ export default function StudentDashboard() {
   const [joinClassOpen, setJoinClassOpen] = useState(false);
   const [classJoinCode, setClassJoinCode] = useState('');
 
-  // Live-quiz banner state (rebuilt)
+  // Live quiz lobby popup state
+  const [dismissedLobbySessionId, setDismissedLobbySessionId] = useState(() =>
+    localStorage.getItem('dismissedLobbySessionId') || null
+  );
+  const [showingPopup, setShowingPopup] = useState(true);
+
+  // Legacy live-quiz banner state
   const [joiningSessionId, setJoiningSessionId] = useState(null);
   const [nickname, setNickname] = useState('');
   const [dismissedLiveQuizSessionId, setDismissedLiveQuizSessionId] = useState(() => {
@@ -88,6 +96,56 @@ export default function StudentDashboard() {
     },
     enabled: !!user?.email
   });
+
+  // New: QuizLobbySession polling
+  const { data: lobbySession = null } = useQuery({
+    queryKey: ['quizLobbySession', enrolledClasses.map(c => c.id).join(',')],
+    queryFn: async () => {
+      if (enrolledClasses.length === 0) return null;
+      const classIds = enrolledClasses.map(c => c.id);
+      const teacherEmails = [...new Set(enrolledClasses.map(c => c.teacher_email).filter(Boolean))];
+      const now = Date.now();
+      const ONE_HOUR_MS = 60 * 60 * 1000;
+
+      const [byClass, byTeacher] = await Promise.all([
+        base44.entities.QuizLobbySession.filter({ class_id: { $in: classIds } }, '-created_date').catch(() => []),
+        teacherEmails.length > 0
+          ? base44.entities.QuizLobbySession.filter({ teacher_email: { $in: teacherEmails } }, '-created_date').catch(() => [])
+          : Promise.resolve([])
+      ]);
+
+      const all = [...byClass, ...byTeacher];
+      const byId = new Map();
+      for (const s of all) {
+        if (s && !byId.has(s.id)) byId.set(s.id, s);
+      }
+
+      const active = Array.from(byId.values()).filter(s => {
+        if (s.status === 'ended') return false;
+        const age = now - new Date(s.created_date).getTime();
+        return age < ONE_HOUR_MS;
+      }).sort((a, b) => new Date(b.created_date) - new Date(a.created_date));
+
+      return active[0] || null;
+    },
+    enabled: enrolledClasses.length > 0,
+    refetchInterval: 3000
+  });
+
+  const showLobbyPopup = !!lobbySession && lobbySession.id !== dismissedLobbySessionId && showingPopup;
+  const showLobbyBanner = !!lobbySession && lobbySession.id !== dismissedLobbySessionId && !showingPopup;
+
+  const handleDismissPopup = () => {
+    setShowingPopup(false);
+    if (lobbySession) {
+      setDismissedLobbySessionId(lobbySession.id);
+      localStorage.setItem('dismissedLobbySessionId', lobbySession.id);
+    }
+  };
+
+  const handleShowBannerPopup = () => {
+    setShowingPopup(true);
+  };
 
   /**
    * ✅ Rebuilt live quiz banner query:
@@ -399,6 +457,23 @@ export default function StudentDashboard() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900/20 to-slate-900 p-6">
+      {/* New lobby popup */}
+      {showLobbyPopup && user && lobbySession && (
+        <LiveQuizPopup
+          session={lobbySession}
+          user={user}
+          onDismiss={handleDismissPopup}
+        />
+      )}
+
+      {/* Dismissed → sticky banner */}
+      {showLobbyBanner && user && lobbySession && (
+        <LiveQuizBanner
+          session={lobbySession}
+          user={user}
+        />
+      )}
+
       <div className="max-w-7xl mx-auto">
         <motion.div
           initial={{ opacity: 0, y: -20 }}
