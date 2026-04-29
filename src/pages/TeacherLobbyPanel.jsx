@@ -34,8 +34,7 @@ export default function TeacherLobbyPanel() {
       started_at: new Date().toISOString()
     });
     setLoading(false);
-    // Teacher can navigate to a live quiz view
-    navigate(createPageUrl(`StartLiveQuiz`));
+    navigate(`/TeacherLobbyQuizPlay?sessionId=${sessionId}`);
   };
 
   const endSession = async () => {

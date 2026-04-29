@@ -51,6 +51,7 @@ export default function TeacherClassDetail() {
   const [deleteConfirmAssignment, setDeleteConfirmAssignment] = useState(null);
   const [deleteConfirmStudent, setDeleteConfirmStudent] = useState(null);
   const [createMode, setCreateMode] = useState(''); // 'manual' or 'ai'
+  const [liveCreateMode, setLiveCreateMode] = useState(''); // 'manual' or 'ai' — separate from assignment createMode
   const [whiteboardPerms, setWhiteboardPerms] = useState({});
   const [showClassTools, setShowClassTools] = useState(false);
 
@@ -310,81 +311,37 @@ export default function TeacherClassDetail() {
     }
   });
 
+  const generateJoinCode = () => {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    return Array.from({ length: 5 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+  };
+
   const startLiveQuizMutation = useMutation({
     mutationFn: async () => {
-      console.log('[DEBUG] Starting live quiz with', generatedLiveQuestions.length, 'questions');
-      
-      // Validate questions
       if (generatedLiveQuestions.length === 0) {
-        throw new Error('No questions to start quiz with');
+        throw new Error('Please generate questions first');
       }
 
-      // Generate unique join code
-      const generateCode = () => Math.random().toString(36).substr(2, 6).toUpperCase();
-      let joinCode = generateCode();
-      let attempts = 0;
-      while (attempts < 10) {
-        const existing = await base44.entities.LiveQuizSession.filter({ join_code: joinCode });
-        if (existing.length === 0) break;
-        joinCode = generateCode();
-        attempts++;
-      }
-
-      // Create session — quiz_set_id will be patched to the session's own ID after creation
-      const session = await base44.entities.LiveQuizSession.create({
+      // Create a QuizLobbySession with questions embedded
+      const session = await base44.entities.QuizLobbySession.create({
         class_id: classId,
-        host_email: user.email,
+        class_name: classData?.name || '',
+        teacher_email: user.email,
+        teacher_name: user.full_name || user.email.split('@')[0],
+        quiz_title: liveQuizTitle || '',
+        join_code: generateJoinCode(),
         status: 'lobby',
-        current_question_index: -1,
-        player_count: 0,
-        join_code: joinCode,
-        settings: {
-          time_per_question: 15000,
-          base_points: 500,
-          round_multiplier_increment: 0.25
-        }
-      });
-
-      // Patch quiz_set_id to the session's own ID so the backend can discover questions
-      await base44.entities.LiveQuizSession.update(session.id, {
-        quiz_set_id: session.id,
-        live_quiz_set_id: session.id
-      });
-
-      // Create questions linked by BOTH session_id AND live_quiz_set_id for maximum discoverability
-      const createdQuestions = [];
-      for (let i = 0; i < generatedLiveQuestions.length; i++) {
-        const q = generatedLiveQuestions[i];
-        const created = await base44.entities.LiveQuizQuestion.create({
-          session_id: session.id,
-          live_quiz_set_id: session.id,
-          order: i,
-          prompt: q.prompt,
-          correct_answer: q.correct_answer,
-          allowed_forms: q.allowed_forms || ['fraction', 'decimal'],
-          difficulty: q.difficulty || difficulty,
-          explanation: q.explanation || '',
-          type: q.type || 'fraction',
-          hint: q.hint || ''
-        });
-        createdQuestions.push(created);
-      }
-
-      // Cache questions directly on the session so updateLiveQuizSession finds them instantly
-      const firstQuestion = createdQuestions[0];
-      await base44.entities.LiveQuizSession.update(session.id, {
-        questions: createdQuestions,
-        current_question_id: firstQuestion?.id || null
+        participant_emails: [],
+        participant_names: [],
+        questions: generatedLiveQuestions
       });
 
       return session;
     },
     onSuccess: (session) => {
-      console.log('[DEBUG] Navigating to lobby for session:', session.id);
-      navigate(createPageUrl(`TeacherLiveQuizLobby?sessionId=${session.id}`));
+      navigate(`/TeacherLobbyPanel?sessionId=${session.id}`);
     },
     onError: (error) => {
-      console.error('[ERROR] Failed to start live quiz:', error);
       alert('Failed to start live quiz: ' + (error.message || 'Unknown error'));
     }
   });
@@ -801,42 +758,18 @@ export default function TeacherClassDetail() {
 
             {/* Live Quizzes Tab */}
             <TabsContent value="live" className="space-y-6">
-              {!createMode && (
+              {!liveCreateMode && (
                 <div className="space-y-4">
                   <div className="flex items-center gap-3 mb-2">
                     <Zap className="w-5 h-5 text-amber-400" />
                     <h3 className="text-lg font-semibold text-white">Launch a Live Quiz</h3>
                   </div>
                   <div className="grid md:grid-cols-2 gap-4">
-                    {/* Manual Live Quiz */}
+                    {/* AI Live Quiz */}
                     <motion.div
                       whileHover={{ scale: 1.02 }}
                       className="cursor-pointer"
-                      onClick={() => setCreateMode('manual')}
-                    >
-                      <div className="relative overflow-hidden rounded-2xl border-2 border-teal-500/40 bg-gradient-to-br from-teal-900/40 to-emerald-900/30 p-7 hover:border-teal-400/70 hover:from-teal-900/60 transition-all duration-200 group">
-                        <div className="absolute top-0 right-0 w-32 h-32 bg-teal-500/10 rounded-full -translate-y-1/2 translate-x-1/2" />
-                        <div className="w-14 h-14 mb-5 rounded-2xl bg-gradient-to-br from-teal-500 to-emerald-500 flex items-center justify-center shadow-lg shadow-teal-500/40">
-                          <Edit2 className="w-7 h-7 text-white" />
-                        </div>
-                        <h4 className="text-xl font-bold text-white mb-1">Manual Quiz</h4>
-                        <p className="text-sm text-teal-200/70 mb-5 leading-relaxed">Design a live quiz from scratch or launch a saved quiz set from your library.</p>
-                        <div className="flex flex-col gap-2 text-xs text-teal-200/60">
-                          <span className="flex items-center gap-2"><CheckCircle2 className="w-3.5 h-3.5 text-teal-400" /> Write custom questions</span>
-                          <span className="flex items-center gap-2"><CheckCircle2 className="w-3.5 h-3.5 text-teal-400" /> Launch from saved quiz library</span>
-                          <span className="flex items-center gap-2"><CheckCircle2 className="w-3.5 h-3.5 text-teal-400" /> Full control over pacing</span>
-                        </div>
-                        <div className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-teal-300 group-hover:text-teal-200 transition-colors">
-                          Get started <ChevronLeft className="w-4 h-4 rotate-180" />
-                        </div>
-                      </div>
-                    </motion.div>
-
-                    {/* AI Live Quiz - amber/orange for energy */}
-                    <motion.div
-                      whileHover={{ scale: 1.02 }}
-                      className="cursor-pointer"
-                      onClick={() => setCreateMode('ai')}
+                      onClick={() => setLiveCreateMode('ai')}
                     >
                       <div className="relative overflow-hidden rounded-2xl border-2 border-amber-500/50 bg-gradient-to-br from-amber-900/40 to-orange-900/30 p-7 hover:border-amber-400/80 hover:from-amber-900/60 transition-all duration-200 group">
                         <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/10 rounded-full -translate-y-1/2 translate-x-1/2" />
@@ -859,14 +792,38 @@ export default function TeacherClassDetail() {
                         </div>
                       </div>
                     </motion.div>
+
+                    {/* Manual Live Quiz */}
+                    <motion.div
+                      whileHover={{ scale: 1.02 }}
+                      className="cursor-pointer"
+                      onClick={() => setLiveCreateMode('manual')}
+                    >
+                      <div className="relative overflow-hidden rounded-2xl border-2 border-teal-500/40 bg-gradient-to-br from-teal-900/40 to-emerald-900/30 p-7 hover:border-teal-400/70 hover:from-teal-900/60 transition-all duration-200 group">
+                        <div className="absolute top-0 right-0 w-32 h-32 bg-teal-500/10 rounded-full -translate-y-1/2 translate-x-1/2" />
+                        <div className="w-14 h-14 mb-5 rounded-2xl bg-gradient-to-br from-teal-500 to-emerald-500 flex items-center justify-center shadow-lg shadow-teal-500/40">
+                          <Edit2 className="w-7 h-7 text-white" />
+                        </div>
+                        <h4 className="text-xl font-bold text-white mb-1">Manual Quiz</h4>
+                        <p className="text-sm text-teal-200/70 mb-5 leading-relaxed">Design a live quiz from scratch or launch a saved quiz set from your library.</p>
+                        <div className="flex flex-col gap-2 text-xs text-teal-200/60">
+                          <span className="flex items-center gap-2"><CheckCircle2 className="w-3.5 h-3.5 text-teal-400" /> Write custom questions</span>
+                          <span className="flex items-center gap-2"><CheckCircle2 className="w-3.5 h-3.5 text-teal-400" /> Launch from saved quiz library</span>
+                          <span className="flex items-center gap-2"><CheckCircle2 className="w-3.5 h-3.5 text-teal-400" /> Full control over pacing</span>
+                        </div>
+                        <div className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-teal-300 group-hover:text-teal-200 transition-colors">
+                          Get started <ChevronLeft className="w-4 h-4 rotate-180" />
+                        </div>
+                      </div>
+                    </motion.div>
                   </div>
                 </div>
               )}
 
-              {createMode === 'manual' && (
+              {liveCreateMode === 'manual' && (
                 <div className="space-y-4">
                   <div className="flex items-center gap-3">
-                    <button onClick={() => setCreateMode('')} className="text-slate-400 hover:text-white transition-colors">
+                    <button onClick={() => setLiveCreateMode('')} className="text-slate-400 hover:text-white transition-colors">
                       <ChevronLeft className="w-5 h-5" />
                     </button>
                     <h3 className="text-lg font-semibold text-white flex items-center gap-2">
@@ -899,17 +856,33 @@ export default function TeacherClassDetail() {
                 </div>
               )}
 
-              {createMode === 'ai' && (
+              {liveCreateMode === 'ai' && (
                 <>
                   <GlassCard className="p-6">
-                    <div className="flex items-center gap-3 mb-6">
-                      <button onClick={() => setCreateMode('')} className="text-slate-400 hover:text-white transition-colors">
-                        <ChevronLeft className="w-5 h-5" />
-                      </button>
-                      <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-                        <Zap className="w-5 h-5 text-amber-400" />
-                        AI Generate Live Quiz
-                      </h3>
+                    <div className="flex items-center justify-between mb-6">
+                      <div className="flex items-center gap-3">
+                        <button onClick={() => { setLiveCreateMode(''); setGeneratedLiveQuestions([]); }} className="text-slate-400 hover:text-white transition-colors">
+                          <ChevronLeft className="w-5 h-5" />
+                        </button>
+                        <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                          <Zap className="w-5 h-5 text-amber-400" />
+                          AI Generate Live Quiz
+                        </h3>
+                      </div>
+                      {/* Start Live Quiz button — top right, always visible when questions exist */}
+                      {generatedLiveQuestions.length > 0 && (
+                        <Button
+                          onClick={() => startLiveQuizMutation.mutate()}
+                          disabled={startLiveQuizMutation.isPending}
+                          className="bg-gradient-to-r from-amber-500 to-orange-500 shadow-lg shadow-amber-500/30"
+                        >
+                          {startLiveQuizMutation.isPending ? (
+                            <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Starting...</>
+                          ) : (
+                            <><Zap className="w-4 h-4 mr-2" />Start Live Quiz ({generatedLiveQuestions.length} Qs)</>
+                          )}
+                        </Button>
+                      )}
                     </div>
 
                     <div className="space-y-4">
@@ -979,27 +952,19 @@ export default function TeacherClassDetail() {
                     </div>
                   </div>
 
-                  <div className="space-y-3">
-                    <Button
-                      onClick={() => generateLiveMutation.mutate()}
-                      disabled={!selectedTopic || !liveQuizTitle || generateLiveMutation.isPending || cooldownRemaining > 0}
-                      className="w-full bg-gradient-to-r from-amber-500 to-orange-500"
-                    >
-                      {generateLiveMutation.isPending ? (
-                        <>
-                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                          Generating...
-                        </>
-                      ) : cooldownRemaining > 0 ? (
-                        <>Wait {cooldownRemaining}s...</>
-                      ) : (
-                        <>
-                          <Sparkles className="w-4 h-4 mr-2" />
-                          Generate Live Quiz Questions
-                        </>
-                      )}
-                    </Button>
-                  </div>
+                  <Button
+                    onClick={() => generateLiveMutation.mutate()}
+                    disabled={!selectedTopic || !liveQuizTitle || generateLiveMutation.isPending || cooldownRemaining > 0}
+                    className="w-full bg-gradient-to-r from-amber-500 to-orange-500"
+                  >
+                    {generateLiveMutation.isPending ? (
+                      <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Generating...</>
+                    ) : cooldownRemaining > 0 ? (
+                      <>Wait {cooldownRemaining}s...</>
+                    ) : (
+                      <><Sparkles className="w-4 h-4 mr-2" />Generate Live Quiz Questions</>
+                    )}
+                  </Button>
 
                   {generateLiveMutation.isError && (
                     <div className="p-3 rounded-lg bg-red-500/20 border border-red-500/30 text-red-400 text-sm">
@@ -1010,54 +975,45 @@ export default function TeacherClassDetail() {
                 </div>
 
                 {generatedLiveQuestions.length > 0 && (
-                  <div className="mt-6 space-y-4">
+                  <div className="mt-6 space-y-3">
                     <div className="flex items-center justify-between">
-                      <h4 className="font-semibold text-white">Preview ({generatedLiveQuestions.length})</h4>
-                      <div className="flex gap-2">
-                        <Button
-                          onClick={() => publishLiveQuizMutation.mutate()}
-                          disabled={publishLiveQuizMutation.isPending}
-                          className="bg-blue-500"
-                        >
-                          {publishLiveQuizMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Save className="w-4 h-4 mr-1" /> Save to Library</>}
-                        </Button>
-                        <Button
-                          onClick={() => startLiveQuizMutation.mutate()}
-                          disabled={startLiveQuizMutation.isPending}
-                          className="bg-gradient-to-r from-amber-500 to-orange-500 shadow-lg shadow-amber-500/30"
-                        >
-                          {startLiveQuizMutation.isPending ? (
-                            <>
-                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                              Starting...
-                            </>
-                          ) : (
-                            <>
-                              <Zap className="w-4 h-4 mr-2" />
-                              Start Quiz
-                            </>
-                          )}
-                        </Button>
-                      </div>
+                      <h4 className="font-semibold text-white">{generatedLiveQuestions.length} Questions Ready</h4>
+                      <Button
+                        onClick={() => publishLiveQuizMutation.mutate()}
+                        disabled={publishLiveQuizMutation.isPending}
+                        size="sm"
+                        className="bg-blue-500"
+                      >
+                        {publishLiveQuizMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Save className="w-4 h-4 mr-1" /> Save to Library</>}
+                      </Button>
                     </div>
 
                     {generatedLiveQuestions.map((q, idx) => (
                       <GlassCard key={idx} className="p-4">
-                        <div className="flex justify-between">
-                          <div>
-                            <p className="text-white font-medium">Q{idx + 1}: {q.prompt}</p>
-                            <p className="text-emerald-400 text-sm">Answer: {q.correct_answer}</p>
-                          </div>
-                        </div>
+                        <p className="text-white font-medium">Q{idx + 1}: {q.prompt}</p>
+                        <p className="text-emerald-400 text-sm mt-1">Answer: {q.correct_answer}</p>
                       </GlassCard>
                     ))}
+
+                    {/* Bottom Start button for convenience */}
+                    <Button
+                      onClick={() => startLiveQuizMutation.mutate()}
+                      disabled={startLiveQuizMutation.isPending}
+                      className="w-full py-4 text-lg bg-gradient-to-r from-amber-500 to-orange-500 shadow-lg shadow-amber-500/30"
+                    >
+                      {startLiveQuizMutation.isPending ? (
+                        <><Loader2 className="w-5 h-5 mr-2 animate-spin" />Opening Lobby...</>
+                      ) : (
+                        <><Zap className="w-5 h-5 mr-2" />Start Live Quiz Now</>
+                      )}
+                    </Button>
                   </div>
                 )}
 
                 {publishLiveQuizMutation.isSuccess && (
                   <div className="mt-4 p-3 rounded-lg bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 text-sm flex items-center gap-2">
                     <CheckCircle2 className="w-4 h-4" />
-                    Live quiz set published!
+                    Live quiz set saved to library!
                   </div>
                 )}
                   </GlassCard>

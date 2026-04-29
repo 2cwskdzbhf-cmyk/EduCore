@@ -66,7 +66,7 @@ export default function StudentLobbyRoom() {
       setSession(sess);
 
       if (sess.status === 'active') {
-        navigate(createPageUrl(`TeacherLiveQuizPlay?sessionId=${sess.live_session_id || sessionId}`));
+        navigate(`/StudentLobbyQuizPlay?sessionId=${sessionId}`);
       } else if (sess.status === 'ended') {
         navigate('/');
       }

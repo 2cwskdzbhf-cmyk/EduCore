@@ -38,6 +38,8 @@ import AttendanceClasses from "./pages/AttendanceClasses";
 import AttendanceAnalytics from "./pages/AttendanceAnalytics";
 import StudentLobbyRoom from "./pages/StudentLobbyRoom";
 import TeacherLobbyPanel from "./pages/TeacherLobbyPanel";
+import TeacherLobbyQuizPlay from "./pages/TeacherLobbyQuizPlay";
+import StudentLobbyQuizPlay from "./pages/StudentLobbyQuizPlay";
 
 const { Pages, Layout, mainPage } = pagesConfig;
 
@@ -121,6 +123,8 @@ const AuthenticatedApp = () => {
       <Route path="/att-analytics" element={<AttendanceAnalytics />} />
       <Route path="/student-lobby" element={<StudentLobbyRoom />} />
       <Route path="/TeacherLobbyPanel" element={<LayoutWrapper currentPageName="TeacherLobbyPanel"><TeacherLobbyPanel /></LayoutWrapper>} />
+      <Route path="/TeacherLobbyQuizPlay" element={<LayoutWrapper currentPageName="TeacherLobbyQuizPlay"><TeacherLobbyQuizPlay /></LayoutWrapper>} />
+      <Route path="/StudentLobbyQuizPlay" element={<StudentLobbyQuizPlay />} />
       <Route path="*" element={<PageNotFound />} />
     </Routes>
   );
