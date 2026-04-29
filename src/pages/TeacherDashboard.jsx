@@ -40,8 +40,7 @@ import {
   Sparkles,
   BrainCircuit,
   Trash2,
-  X,
-  Zap
+  X
 } from 'lucide-react';
 import GlassCard from '@/components/ui/GlassCard';
 import { StatCard } from '@/components/ui/GlassCard';
@@ -57,10 +56,7 @@ export default function TeacherDashboard() {
   const [selectedYearGroup, setSelectedYearGroup] = useState('');
   const [copiedCode, setCopiedCode] = useState(null);
   const [deleteConfirmClass, setDeleteConfirmClass] = useState(null);
-  const [lobbyModalOpen, setLobbyModalOpen] = useState(false);
-  const [lobbyClassId, setLobbyClassId] = useState('');
-  const [lobbyQuizTitle, setLobbyQuizTitle] = useState('');
-  const [creatingLobby, setCreatingLobby] = useState(false);
+
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -198,30 +194,7 @@ export default function TeacherDashboard() {
     setTimeout(() => setCopiedCode(null), 2000);
   };
 
-  const generateJoinCode = () => {
-    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-    return Array.from({ length: 5 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
-  };
 
-  const createLobby = async () => {
-    if (!lobbyClassId || !user?.email) return;
-    setCreatingLobby(true);
-    const selectedClass = classes.find(c => c.id === lobbyClassId);
-    const session = await base44.entities.QuizLobbySession.create({
-      class_id: lobbyClassId,
-      class_name: selectedClass?.name || '',
-      teacher_email: user.email,
-      teacher_name: user.full_name || user.email.split('@')[0],
-      quiz_title: lobbyQuizTitle.trim() || '',
-      join_code: generateJoinCode(),
-      status: 'lobby',
-      participant_emails: [],
-      participant_names: []
-    });
-    setCreatingLobby(false);
-    setLobbyModalOpen(false);
-    navigate(createPageUrl(`TeacherLobbyPanel?sessionId=${session.id}`));
-  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900/20 to-slate-900 p-6">
@@ -241,15 +214,6 @@ export default function TeacherDashboard() {
         </motion.div>
 
         <div className="flex justify-end gap-3 mb-8">
-          {/* Start Live Quiz Button */}
-          <Button
-            onClick={() => setLobbyModalOpen(true)}
-            className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 shadow-lg shadow-amber-500/30"
-          >
-            <Zap className="w-4 h-4 mr-2" />
-            Start Live Quiz
-          </Button>
-
           <Dialog open={newClassOpen} onOpenChange={setNewClassOpen}>
             <DialogTrigger asChild>
               <Button className="bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 shadow-lg shadow-purple-500/30">
@@ -425,82 +389,6 @@ export default function TeacherDashboard() {
           <div className="mb-8">
             <NotificationPanel teacherEmail={user.email} />
           </div>
-        )}
-
-        {/* Live Quiz Lobby Modal */}
-        {lobbyModalOpen && (
-          <motion.div
-            className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-6"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            onClick={() => !creatingLobby && setLobbyModalOpen(false)}
-          >
-            <motion.div
-              initial={{ scale: 0.9, y: 20 }}
-              animate={{ scale: 1, y: 0 }}
-              onClick={e => e.stopPropagation()}
-              className="max-w-sm w-full"
-            >
-              <GlassCard className="p-7">
-                <div className="flex items-center gap-3 mb-6">
-                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center">
-                    <Zap className="w-6 h-6 text-white" />
-                  </div>
-                  <div>
-                    <h3 className="text-white font-bold text-lg">Start Live Quiz</h3>
-                    <p className="text-slate-400 text-sm">Open a lobby for your class</p>
-                  </div>
-                </div>
-
-                <div className="space-y-4 mb-6">
-                  <div>
-                    <Label className="text-slate-300 mb-1.5 block">Select Class *</Label>
-                    <Select value={lobbyClassId} onValueChange={setLobbyClassId}>
-                      <SelectTrigger className="bg-white/5 border-white/10 text-white">
-                        <SelectValue placeholder="Choose a class..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {classes.map(c => (
-                          <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label className="text-slate-300 mb-1.5 block">Quiz Topic (optional)</Label>
-                    <Input
-                      value={lobbyQuizTitle}
-                      onChange={e => setLobbyQuizTitle(e.target.value)}
-                      placeholder="e.g. Fractions & Decimals"
-                      className="bg-white/5 border-white/10 text-white placeholder:text-slate-500"
-                    />
-                  </div>
-                </div>
-
-                <div className="flex gap-3">
-                  <Button
-                    variant="outline"
-                    onClick={() => setLobbyModalOpen(false)}
-                    disabled={creatingLobby}
-                    className="flex-1 border-white/20 text-white hover:bg-white/10"
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    onClick={createLobby}
-                    disabled={!lobbyClassId || creatingLobby}
-                    className="flex-1 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600"
-                  >
-                    {creatingLobby ? (
-                      <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />Opening...</>
-                    ) : (
-                      <><Zap className="w-4 h-4 mr-2" />Open Lobby</>
-                    )}
-                  </Button>
-                </div>
-              </GlassCard>
-            </motion.div>
-          </motion.div>
         )}
 
         {/* Delete Class Confirmation */}
