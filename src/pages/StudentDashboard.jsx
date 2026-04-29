@@ -181,7 +181,7 @@ export default function StudentDashboard() {
     setJoiningByCode(false);
     setQuizCodeOpen(false);
     setQuizCode('');
-    navigate(`/student-lobby?sessionId=${sess.id}`);
+    navigate(`/live-quiz-lobby-new?sessionId=${sess.id}`);
   };
 
 

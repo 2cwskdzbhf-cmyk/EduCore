@@ -38,6 +38,8 @@ import AttendanceClasses from "./pages/AttendanceClasses";
 import AttendanceAnalytics from "./pages/AttendanceAnalytics";
 import StudentLobbyRoom from "./pages/StudentLobbyRoom";
 import TeacherLobbyPanel from "./pages/TeacherLobbyPanel";
+import LiveQuizLobbyNew from "./pages/LiveQuizLobbyNew";
+import LiveQuizPlay from "./pages/LiveQuizPlay";
 
 const { Pages, Layout, mainPage } = pagesConfig;
 
@@ -121,6 +123,8 @@ const AuthenticatedApp = () => {
       <Route path="/att-analytics" element={<AttendanceAnalytics />} />
       <Route path="/student-lobby" element={<StudentLobbyRoom />} />
       <Route path="/TeacherLobbyPanel" element={<LayoutWrapper currentPageName="TeacherLobbyPanel"><TeacherLobbyPanel /></LayoutWrapper>} />
+      <Route path="/live-quiz-lobby-new" element={<LiveQuizLobbyNew />} />
+      <Route path="/live-quiz-play" element={<LiveQuizPlay />} />
       <Route path="*" element={<PageNotFound />} />
     </Routes>
   );

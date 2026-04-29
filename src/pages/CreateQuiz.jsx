@@ -355,7 +355,7 @@ export default function CreateQuiz() {
     onSuccess: (session) => {
       toast.success('Quiz lobby created! Share the join code with your students.');
       // Route to TeacherLobbyPanel — same lobby system students use
-      navigate(`/TeacherLobbyPanel?sessionId=${session.id}`);
+      navigate(`/live-quiz-lobby-new?sessionId=${session.id}`);
     },
     onError: (error) => {
       console.error('[START_QUIZ_ERROR]', error);

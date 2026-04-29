@@ -23,7 +23,7 @@ export default function LiveQuizPopup({ session, user, onDismiss }) {
           participant_names: [...names, user.full_name || user.email.split('@')[0]]
         });
       }
-      navigate(`/student-lobby?sessionId=${session.id}`);
+      navigate(`/live-quiz-lobby-new?sessionId=${session.id}`);
     }
     setJoining(false);
   };

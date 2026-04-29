@@ -385,8 +385,7 @@ export default function AssignmentBuilder() {
       return session;
     },
     onSuccess: (session) => {
-      // Navigate to TeacherLobbyPanel — same lobby system students join via popup/code
-      navigate(`/TeacherLobbyPanel?sessionId=${session.id}`);
+      navigate(`/live-quiz-lobby-new?sessionId=${session.id}`);
     },
     onError: (error) => {
       console.error('Failed to start live quiz:', error);
