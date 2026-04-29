@@ -50,18 +50,6 @@
       },
       "description": "Display names of students in lobby"
     },
-    "questions": {
-      "type": "array",
-      "items": {
-        "type": "object"
-      },
-      "description": "Array of question objects for this quiz session"
-    },
-    "current_question_index": {
-      "type": "number",
-      "default": -1,
-      "description": "Index of current question being shown (teacher controlled)"
-    },
     "started_at": {
       "type": "string",
       "format": "date-time",

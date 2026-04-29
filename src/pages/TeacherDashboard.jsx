@@ -241,6 +241,15 @@ export default function TeacherDashboard() {
         </motion.div>
 
         <div className="flex justify-end gap-3 mb-8">
+          {/* Start Live Quiz Button */}
+          <Button
+            onClick={() => setLobbyModalOpen(true)}
+            className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 shadow-lg shadow-amber-500/30"
+          >
+            <Zap className="w-4 h-4 mr-2" />
+            Start Live Quiz
+          </Button>
+
           <Dialog open={newClassOpen} onOpenChange={setNewClassOpen}>
             <DialogTrigger asChild>
               <Button className="bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 shadow-lg shadow-purple-500/30">
