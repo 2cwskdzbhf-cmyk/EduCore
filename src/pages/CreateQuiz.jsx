@@ -331,19 +331,14 @@ export default function CreateQuiz() {
 
       if (usable.length === 0) throw new Error('No valid questions to start the quiz');
 
-      // Generate a 5-char join code
-      const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-      const joinCode = Array.from({ length: 5 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
-
       const session = await base44.entities.LiveQuizSession.create({
         class_id: classId || '',
         host_email: user.email,
-        live_quiz_set_id: 'manual',
+        live_quiz_set_id: quizSet.title || 'manual-quiz',
         status: 'lobby',
         current_question_index: -1,
         player_count: 0,
-        join_code: joinCode,
-        // Embed questions directly in JSON so lobby & player screens find them instantly
+        // Embed questions directly so lobby & player screens can find them instantly
         questions_json: JSON.stringify(usable),
         settings: {
           time_per_question: quizSet.time_limit_per_question,
