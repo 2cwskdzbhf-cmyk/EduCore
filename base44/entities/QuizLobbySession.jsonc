@@ -50,6 +50,10 @@
       },
       "description": "Display names of students in lobby"
     },
+    "questions_json": {
+      "type": "string",
+      "description": "JSON string of quiz questions embedded from CreateQuiz"
+    },
     "started_at": {
       "type": "string",
       "format": "date-time",

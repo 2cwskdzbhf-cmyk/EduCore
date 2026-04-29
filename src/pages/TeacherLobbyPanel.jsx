@@ -134,6 +134,17 @@ export default function TeacherLobbyPanel() {
                 <p className="text-white font-semibold">{session.quiz_title}</p>
               </div>
             )}
+            {session.questions_json && (() => {
+              try {
+                const qs = JSON.parse(session.questions_json);
+                return (
+                  <div>
+                    <p className="text-slate-400 text-xs">Questions</p>
+                    <p className="text-white font-semibold">{qs.length} question{qs.length !== 1 ? 's' : ''} loaded</p>
+                  </div>
+                );
+              } catch { return null; }
+            })()}
           </div>
 
           {/* Controls */}

@@ -306,9 +306,9 @@ export default function CreateQuiz() {
       if (!validateAllQuestions()) throw new Error('Quiz validation failed');
 
       const urlParams = new URLSearchParams(window.location.search);
-      const classId = urlParams.get('classId');
+      const classId = urlParams.get('classId') || '';
 
-      // Prepare the valid questions with full data embedded in the session
+      // Build valid questions to embed in the session
       const usable = questions.filter(q => !isTrulyEmptyQuestion(q)).map((q, i) => {
         const type = q.question_type || 'multiple_choice';
         const isTextType = type === 'short_answer' || type === 'written';
@@ -331,27 +331,31 @@ export default function CreateQuiz() {
 
       if (usable.length === 0) throw new Error('No valid questions to start the quiz');
 
-      const session = await base44.entities.LiveQuizSession.create({
-        class_id: classId || '',
-        host_email: user.email,
-        live_quiz_set_id: quizSet.title || 'manual-quiz',
+      // Generate a 5-char join code
+      const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+      const joinCode = Array.from({ length: 5 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+
+      // Create a QuizLobbySession — the same entity students join via popup/code
+      const session = await base44.entities.QuizLobbySession.create({
+        class_id: classId,
+        class_name: quizSet.title || 'Live Quiz',
+        teacher_email: user.email,
+        teacher_name: user.full_name || user.email.split('@')[0],
+        quiz_title: quizSet.title || '',
+        join_code: joinCode,
         status: 'lobby',
-        current_question_index: -1,
-        player_count: 0,
-        // Embed questions directly so lobby & player screens can find them instantly
+        participant_emails: [],
+        participant_names: [],
+        // Embed questions so TeacherLobbyPanel can pass them when starting
         questions_json: JSON.stringify(usable),
-        settings: {
-          time_per_question: quizSet.time_limit_per_question,
-          base_points: 500,
-          round_multiplier_increment: 0.25
-        }
       });
 
       return session;
     },
     onSuccess: (session) => {
       toast.success('Quiz lobby created! Share the join code with your students.');
-      navigate(createPageUrl(`TeacherLiveQuizLobby?sessionId=${session.id}`));
+      // Route to TeacherLobbyPanel — same lobby system students use
+      navigate(`/TeacherLobbyPanel?sessionId=${session.id}`);
     },
     onError: (error) => {
       console.error('[START_QUIZ_ERROR]', error);
