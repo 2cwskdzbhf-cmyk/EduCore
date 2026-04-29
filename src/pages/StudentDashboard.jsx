@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { base44 } from '@/api/base44Client';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import { Button } from '@/components/ui/button';
@@ -24,30 +24,32 @@ import {
   ChevronRight,
   X,
   Loader2,
-  Zap,
-  Brain,
-  ExternalLink } from
+  Zap } from
 'lucide-react';
 
 export default function StudentDashboard() {
   const [user, setUser] = useState(null);
+  const [nickname, setNickname] = useState('');
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
   const [joinClassOpen, setJoinClassOpen] = useState(false);
   const [classJoinCode, setClassJoinCode] = useState('');
 
-  // Live quiz lobby popup state
+  // Live quiz lobby state
+  const [lobbySession, setLobbySession] = useState(null);
   const [dismissedLobbySessionId, setDismissedLobbySessionId] = useState(() =>
     localStorage.getItem('dismissedLobbySessionId') || null
   );
-  const [showingPopup, setShowingPopup] = useState(true);
+  const [showLobbyBanner, setShowLobbyBanner] = useState(false);
 
-  // Legacy live-quiz banner state
-  const [joiningSessionId, setJoiningSessionId] = useState(null);
-  const [nickname, setNickname] = useState('');
-  const [dismissedLiveQuizSessionId, setDismissedLiveQuizSessionId] = useState(() => {
-    return localStorage.getItem('dismissedLiveQuizSessionId') || null;});
+  // Join-by-code state
+  const [quizCodeOpen, setQuizCodeOpen] = useState(false);
+  const [quizCode, setQuizCode] = useState('');
+  const [quizCodeError, setQuizCodeError] = useState('');
+  const [joiningByCode, setJoiningByCode] = useState(false);
+
+
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -97,123 +99,92 @@ export default function StudentDashboard() {
     enabled: !!user?.email
   });
 
-  // New: QuizLobbySession polling
-  const { data: lobbySession = null } = useQuery({
-    queryKey: ['quizLobbySession', enrolledClasses.map(c => c.id).join(',')],
-    queryFn: async () => {
-      if (enrolledClasses.length === 0) return null;
-      const classIds = enrolledClasses.map(c => c.id);
-      const teacherEmails = [...new Set(enrolledClasses.map(c => c.teacher_email).filter(Boolean))];
+  // Real-time QuizLobbySession subscription + initial fetch
+  useEffect(() => {
+    if (enrolledClasses.length === 0) return;
+
+    const classIds = enrolledClasses.map(c => c.id);
+    const ONE_HOUR_MS = 60 * 60 * 1000;
+
+    const findActive = (sessions) => {
       const now = Date.now();
-      const ONE_HOUR_MS = 60 * 60 * 1000;
+      return sessions
+        .filter(s => s && s.status !== 'ended' && (now - new Date(s.created_date).getTime()) < ONE_HOUR_MS && classIds.includes(s.class_id))
+        .sort((a, b) => new Date(b.created_date) - new Date(a.created_date))[0] || null;
+    };
 
-      const [byClass, byTeacher] = await Promise.all([
-        base44.entities.QuizLobbySession.filter({ class_id: { $in: classIds } }, '-created_date').catch(() => []),
-        teacherEmails.length > 0
-          ? base44.entities.QuizLobbySession.filter({ teacher_email: { $in: teacherEmails } }, '-created_date').catch(() => [])
-          : Promise.resolve([])
-      ]);
+    // Initial fetch
+    base44.entities.QuizLobbySession.filter({ class_id: { $in: classIds } }, '-created_date')
+      .then(sessions => {
+        const active = findActive(sessions);
+        setLobbySession(active);
+      })
+      .catch(() => {});
 
-      const all = [...byClass, ...byTeacher];
-      const byId = new Map();
-      for (const s of all) {
-        if (s && !byId.has(s.id)) byId.set(s.id, s);
+    // Real-time subscription
+    const unsub = base44.entities.QuizLobbySession.subscribe((event) => {
+      if (event.type === 'create' || event.type === 'update') {
+        const s = event.data;
+        if (!s || !classIds.includes(s.class_id)) return;
+        if (s.status === 'ended') {
+          setLobbySession(prev => prev?.id === s.id ? null : prev);
+        } else {
+          const age = Date.now() - new Date(s.created_date || Date.now()).getTime();
+          if (age < ONE_HOUR_MS) {
+            setLobbySession(s);
+            // Re-show popup if this is a brand new session
+            if (event.type === 'create') {
+              setShowLobbyBanner(false);
+              setDismissedLobbySessionId(null);
+              localStorage.removeItem('dismissedLobbySessionId');
+            }
+          }
+        }
+      } else if (event.type === 'delete') {
+        setLobbySession(prev => prev?.id === event.id ? null : prev);
       }
+    });
 
-      const active = Array.from(byId.values()).filter(s => {
-        if (s.status === 'ended') return false;
-        const age = now - new Date(s.created_date).getTime();
-        return age < ONE_HOUR_MS;
-      }).sort((a, b) => new Date(b.created_date) - new Date(a.created_date));
+    return () => unsub();
+  }, [enrolledClasses.map(c => c.id).join(',')]);
 
-      return active[0] || null;
-    },
-    enabled: enrolledClasses.length > 0,
-    refetchInterval: 3000
-  });
-
-  const showLobbyPopup = !!lobbySession && lobbySession.id !== dismissedLobbySessionId && showingPopup;
-  const showLobbyBanner = !!lobbySession && lobbySession.id !== dismissedLobbySessionId && !showingPopup;
+  const showLobbyPopup = !!lobbySession && lobbySession.id !== dismissedLobbySessionId && !showLobbyBanner;
 
   const handleDismissPopup = () => {
-    setShowingPopup(false);
+    setShowLobbyBanner(true);
     if (lobbySession) {
       setDismissedLobbySessionId(lobbySession.id);
       localStorage.setItem('dismissedLobbySessionId', lobbySession.id);
     }
   };
 
-  const handleShowBannerPopup = () => {
-    setShowingPopup(true);
+  const handleJoinByCode = async () => {
+    if (!quizCode.trim() || !user?.email) return;
+    setJoiningByCode(true);
+    setQuizCodeError('');
+    const sessions = await base44.entities.QuizLobbySession.filter({ join_code: quizCode.trim().toUpperCase() });
+    const sess = sessions.find(s => s.status === 'lobby' || s.status === 'active');
+    if (!sess) {
+      setQuizCodeError('Invalid or expired code. Please try again.');
+      setJoiningByCode(false);
+      return;
+    }
+    // Add student to participants
+    const emails = sess.participant_emails || [];
+    const names = sess.participant_names || [];
+    if (!emails.includes(user.email)) {
+      await base44.entities.QuizLobbySession.update(sess.id, {
+        participant_emails: [...emails, user.email],
+        participant_names: [...names, user.full_name || user.email.split('@')[0]]
+      });
+    }
+    setJoiningByCode(false);
+    setQuizCodeOpen(false);
+    setQuizCode('');
+    navigate(`/student-lobby?sessionId=${sess.id}`);
   };
 
-  /**
-   * ✅ Rebuilt live quiz banner query:
-   * - fetch lobby/live sessions for your enrolled classes
-   * - remove ended + stale
-   * - dedupe by id
-   * - keep only newest session per class
-   * - display at most ONE session (newest overall)
-   */
-  const { data: liveQuizBannerSession = null } = useQuery({
-    queryKey: ['liveQuizBannerSession', enrolledClasses.map((c) => c.id).join(',')],
-    queryFn: async () => {
-      if (enrolledClasses.length === 0) return null;
 
-      const classIds = enrolledClasses.map((c) => c.id);
-      const teacherEmails = [...new Set(enrolledClasses.map((c) => c.teacher_email).filter(Boolean))];
-      const now = Date.now();
-      const ONE_HOUR_MS = 60 * 60 * 1000;
-
-      // Fetch by class_id AND by teacher host_email (covers sessions created without a class_id)
-      const [byClass, byTeacher] = await Promise.all([
-      base44.entities.LiveQuizSession.filter({ class_id: { $in: classIds } }, '-created_date').catch(() => []),
-      teacherEmails.length > 0 ?
-      base44.entities.LiveQuizSession.filter({ host_email: { $in: teacherEmails } }, '-created_date').catch(() => []) :
-      Promise.resolve([])]
-      );
-
-      const allSessions = [...byClass, ...byTeacher];
-
-      // Filter: only lobby/live, not ended, not stale
-      const filtered = allSessions.filter((s) => {
-        if (!s) return false;
-        if (s.ended_at) return false;
-        if (s.status !== 'lobby' && s.status !== 'live') return false;
-        const createdAt = s.created_date ? new Date(s.created_date).getTime() : 0;
-        if (!createdAt || now - createdAt > ONE_HOUR_MS) return false;
-        return true;
-      });
-
-      // Dedup by session id
-      const byId = new Map();
-      for (const s of filtered) {
-        if (!byId.has(s.id)) byId.set(s.id, s);
-      }
-
-      const candidates = Array.from(byId.values()).sort(
-        (a, b) => new Date(b.created_date).getTime() - new Date(a.created_date).getTime()
-      );
-
-      return candidates[0] || null;
-    },
-    enabled: enrolledClasses.length > 0,
-    refetchInterval: 4000
-  });
-
-  const sessionClass = useMemo(() => {
-    if (!liveQuizBannerSession) return null;
-    // Match by class_id, or fall back to matching by teacher email
-    return (
-      enrolledClasses.find((c) => c.id === liveQuizBannerSession.class_id) ||
-      enrolledClasses.find((c) => c.teacher_email === liveQuizBannerSession.host_email) ||
-      null);
-
-  }, [liveQuizBannerSession, enrolledClasses]);
-
-  const showLiveQuizBanner =
-  !!liveQuizBannerSession &&
-  liveQuizBannerSession.id !== dismissedLiveQuizSessionId;
 
   const { data: assignments = [] } = useQuery({
     queryKey: ['studentAssignments', user?.email, enrolledClasses.map((c) => c.id).join(',')],
@@ -399,61 +370,7 @@ export default function StudentDashboard() {
     }
   };
 
-  const joinLiveQuizMutation = useMutation({
-    mutationFn: async ({ sessionId, nickname }) => {
-      const trimmedNickname = (nickname || '').trim();
-      if (trimmedNickname.length < 2 || trimmedNickname.length > 16) {
-        throw new Error('Nickname must be between 2-16 characters');
-      }
 
-      // Hard validate session is still joinable
-      const sessions = await base44.entities.LiveQuizSession.filter({ id: sessionId });
-      const session = sessions[0];
-      if (!session || session.ended_at || session.status !== 'lobby' && session.status !== 'live') {
-        throw new Error('No live quiz is currently running');
-      }
-
-      const existingPlayers = await base44.entities.LiveQuizPlayer.filter({ session_id: sessionId });
-
-      let finalNickname = trimmedNickname;
-      let counter = 2;
-      while (existingPlayers.some((p) => p.nickname === finalNickname)) {
-        finalNickname = `${trimmedNickname} ${counter}`;
-        counter++;
-      }
-
-      await base44.entities.LiveQuizPlayer.create({
-        session_id: sessionId,
-        nickname: finalNickname,
-        student_email: user.email,
-        total_points: 0,
-        correct_count: 0,
-        questions_answered: 0,
-        average_response_time_ms: 0,
-        current_streak: 0,
-        longest_streak: 0,
-        connected: true
-      });
-
-      return { sessionId };
-    },
-    onSuccess: ({ sessionId }) => {
-      navigate(createPageUrl(`StudentLiveQuizPlay?sessionId=${sessionId}`));
-    },
-    onError: (error) => {
-      alert('Failed to join: ' + (error.message || 'Please try again'));
-    }
-  });
-
-  const handleJoinLiveQuiz = (sessionId) => {
-    setJoiningSessionId(sessionId);
-    joinLiveQuizMutation.mutate({ sessionId, nickname });
-  };
-
-  const dismissBanner = () => {
-    if (!liveQuizBannerSession) return;
-    setDismissedLiveQuizSessionId(liveQuizBannerSession.id);
-    localStorage.setItem('dismissedLiveQuizSessionId', liveQuizBannerSession.id);};
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900/20 to-slate-900 p-6">
@@ -486,92 +403,7 @@ export default function StudentDashboard() {
           </p>
         </motion.div>
 
-        {/* ✅ Rebuilt: single live quiz banner (max 1) */}
-        {showLiveQuizBanner &&
-        <motion.div
-          initial={{ opacity: 0, y: 14 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mb-8">
-          
-            <GlassCard className="p-6 border-2 border-amber-500/30 bg-slate-950/60 backdrop-blur-xl">
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex items-center gap-3">
-                  <div
-                  className={`w-12 h-12 rounded-xl bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center ${
-                  liveQuizBannerSession.status === 'lobby' ? 'animate-pulse' : ''}`
-                  }>
-                  
-                    <Zap className="w-6 h-6 text-white" />
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-white drop-shadow-md">
-                      {liveQuizBannerSession.status === 'lobby' ?
-                    'Live Quiz Starting!' :
-                    'Live Quiz In Progress'}
-                    </h3>
-                    <p className="text-sm text-slate-300 drop-shadow-sm">{sessionClass?.name}</p>
-                  </div>
-                </div>
 
-                <Button
-                variant="ghost"
-                size="icon"
-                onClick={dismissBanner}
-                className="text-slate-400 hover:text-white">
-                
-                  <X className="w-4 h-4" />
-                </Button>
-              </div>
-
-              <div className="space-y-3">
-                {liveQuizBannerSession.status === 'live' &&
-              <div className="p-3 rounded-lg bg-blue-500/20 border border-blue-500/30 text-blue-300 text-sm">
-                    Quiz has started! You can still join as a late entry.
-                  </div>
-              }
-
-                <div>
-                  <Label className="text-white text-sm mb-2">Your Nickname</Label>
-                  <Input
-                  value={nickname}
-                  onChange={(e) => setNickname(e.target.value)}
-                  placeholder="Enter nickname"
-                  minLength={2}
-                  maxLength={16}
-                  className="bg-white/5 border-white/10 text-white" />
-                
-                  <p className="text-xs text-slate-400 mt-1">2-16 characters</p>
-                </div>
-
-                <Button
-                onClick={() => handleJoinLiveQuiz(liveQuizBannerSession.id)}
-                disabled={
-                nickname.trim().length < 2 ||
-                nickname.trim().length > 16 ||
-                joinLiveQuizMutation.isPending
-                }
-                className={`w-full ${
-                liveQuizBannerSession.status === 'lobby' ?
-                'bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600' :
-                'bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600'}`
-                }>
-                
-                  {joinLiveQuizMutation.isPending && joiningSessionId === liveQuizBannerSession.id ?
-                <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Joining...
-                    </> :
-
-                <>
-                      <Zap className="w-4 h-4 mr-2" />
-                      {liveQuizBannerSession.status === 'lobby' ? 'Join Quiz' : 'Join Now (Late Entry)'}
-                    </>
-                }
-                </Button>
-              </div>
-            </GlassCard>
-          </motion.div>
-        }
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <StatCard
@@ -733,7 +565,7 @@ export default function StudentDashboard() {
         </motion.div>
 
         <motion.div
-          className="grid md:grid-cols-1 gap-4 mb-8"
+          className="grid md:grid-cols-2 gap-4 mb-8"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: nextLesson ? 0.6 : 0.5 }}>
@@ -741,7 +573,6 @@ export default function StudentDashboard() {
           <GlassCard
             className="p-6 cursor-pointer hover:scale-[1.02] bg-slate-950/50 backdrop-blur-xl"
             onClick={() => setJoinClassOpen(true)}>
-            
             <div className="flex items-center gap-4">
               <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center shadow-lg shadow-blue-500/30">
                 <UserPlus className="w-7 h-7 text-white" />
@@ -749,6 +580,20 @@ export default function StudentDashboard() {
               <div>
                 <h3 className="text-lg font-bold text-white drop-shadow-md">Join a Class</h3>
                 <p className="text-sm text-slate-300 drop-shadow-sm">Enter a class code from your teacher</p>
+              </div>
+            </div>
+          </GlassCard>
+
+          <GlassCard
+            className="p-6 cursor-pointer hover:scale-[1.02] bg-slate-950/50 backdrop-blur-xl border border-amber-500/20"
+            onClick={() => { setQuizCodeOpen(true); setQuizCodeError(''); setQuizCode(''); }}>
+            <div className="flex items-center gap-4">
+              <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center shadow-lg shadow-amber-500/30">
+                <Zap className="w-7 h-7 text-white" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-white drop-shadow-md">Join Quiz</h3>
+                <p className="text-sm text-slate-300 drop-shadow-sm">Enter a quiz code from your teacher</p>
               </div>
             </div>
           </GlassCard>
@@ -827,15 +672,51 @@ export default function StudentDashboard() {
                   onChange={(e) => setClassJoinCode(e.target.value.toUpperCase())}
                   placeholder="Enter class code"
                   className="bg-white/5 border-white/10 text-white" />
-                
               </div>
               <Button
                 onClick={handleJoinClass}
                 className="w-full bg-gradient-to-r from-blue-500 to-cyan-500"
                 disabled={!classJoinCode}>
-                
                 Join Class
               </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Join Quiz by Code Dialog */}
+        <Dialog open={quizCodeOpen} onOpenChange={setQuizCodeOpen}>
+          <DialogContent className="bg-slate-950/95 backdrop-blur-xl border-white/10">
+            <DialogHeader>
+              <DialogTitle className="text-white flex items-center gap-2">
+                <Zap className="w-5 h-5 text-amber-400" /> Join Live Quiz
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <Label className="text-slate-300">Quiz Code</Label>
+                <Input
+                  value={quizCode}
+                  onChange={(e) => { setQuizCode(e.target.value.toUpperCase()); setQuizCodeError(''); }}
+                  placeholder="e.g. A7K9X"
+                  maxLength={6}
+                  className="bg-white/5 border-white/10 text-white text-xl tracking-widest font-bold text-center"
+                  onKeyDown={(e) => e.key === 'Enter' && handleJoinByCode()}
+                />
+                {quizCodeError && (
+                  <p className="text-red-400 text-sm mt-1">{quizCodeError}</p>
+                )}
+              </div>
+              <Button
+                onClick={handleJoinByCode}
+                className="w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600"
+                disabled={!quizCode.trim() || joiningByCode}>
+                {joiningByCode ? (
+                  <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Joining...</>
+                ) : (
+                  <><Zap className="w-4 h-4 mr-2" /> Join Quiz</>
+                )}
+              </Button>
+              <p className="text-xs text-slate-500 text-center">Ask your teacher for the 5-letter quiz code</p>
             </div>
           </DialogContent>
         </Dialog>

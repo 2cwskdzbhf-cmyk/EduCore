@@ -198,6 +198,11 @@ export default function TeacherDashboard() {
     setTimeout(() => setCopiedCode(null), 2000);
   };
 
+  const generateJoinCode = () => {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    return Array.from({ length: 5 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+  };
+
   const createLobby = async () => {
     if (!lobbyClassId || !user?.email) return;
     setCreatingLobby(true);
@@ -208,6 +213,7 @@ export default function TeacherDashboard() {
       teacher_email: user.email,
       teacher_name: user.full_name || user.email.split('@')[0],
       quiz_title: lobbyQuizTitle.trim() || '',
+      join_code: generateJoinCode(),
       status: 'lobby',
       participant_emails: [],
       participant_names: []

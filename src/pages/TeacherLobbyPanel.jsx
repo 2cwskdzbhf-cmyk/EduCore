@@ -119,13 +119,22 @@ export default function TeacherLobbyPanel() {
             )}
           </div>
 
-          {/* Quiz info */}
-          {session.quiz_title && (
-            <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl p-4 mb-6">
-              <p className="text-slate-400 text-xs">Quiz Topic</p>
-              <p className="text-white font-semibold">{session.quiz_title}</p>
-            </div>
-          )}
+          {/* Join code + quiz info */}
+          <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl p-4 mb-6 space-y-3">
+            {session.join_code && (
+              <div>
+                <p className="text-slate-400 text-xs mb-1">Student Join Code</p>
+                <p className="text-3xl font-bold tracking-widest text-amber-400">{session.join_code}</p>
+                <p className="text-slate-500 text-xs mt-1">Students can enter this code on their dashboard</p>
+              </div>
+            )}
+            {session.quiz_title && (
+              <div>
+                <p className="text-slate-400 text-xs">Quiz Topic</p>
+                <p className="text-white font-semibold">{session.quiz_title}</p>
+              </div>
+            )}
+          </div>
 
           {/* Controls */}
           <div className="flex gap-3">

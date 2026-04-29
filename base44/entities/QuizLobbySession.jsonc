@@ -22,6 +22,10 @@
       "type": "string",
       "description": "Optional quiz title/topic"
     },
+    "join_code": {
+      "type": "string",
+      "description": "Short unique code students can use to join manually (e.g. A7K9X)"
+    },
     "status": {
       "type": "string",
       "enum": [
