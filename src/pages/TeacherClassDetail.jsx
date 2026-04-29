@@ -21,9 +21,12 @@ import InteractiveWhiteboard from '@/components/whiteboard/InteractiveWhiteboard
 import WhiteboardPermissions from '@/components/whiteboard/WhiteboardPermissions';
 import WhiteboardChat from '@/components/whiteboard/WhiteboardChat';
 import ClassLessons from '@/components/lessons/ClassLessons';
-import ClassPollsTab from '@/components/class/ClassPollsTab';
+import ModernPollsTab from '@/components/class/ModernPollsTab';
 import StudentStatsModal from '@/components/teacher/StudentStatsModal';
 import ClassToolsPanel from '@/components/class/ClassToolsPanel';
+import AnnouncementsFeed from '@/components/class/AnnouncementsFeed';
+import AssignmentsList from '@/components/class/AssignmentsList';
+import ModernClassNav from '@/components/class/ModernClassNav';
 
 const NAV_ITEMS = [
   { id: 'lessons', icon: '📖', label: 'Lessons' },
@@ -62,8 +65,6 @@ export default function TeacherClassDetail() {
   const [generatedLiveQuestions, setGeneratedLiveQuestions] = useState([]);
   const [lastGenerateTime, setLastGenerateTime] = useState(0);
   const [cooldownRemaining, setCooldownRemaining] = useState(0);
-  const [announcementTitle, setAnnouncementTitle] = useState('');
-  const [announcementMessage, setAnnouncementMessage] = useState('');
 
   // Modal state
   const [selectedStudent, setSelectedStudent] = useState(null);
@@ -134,11 +135,7 @@ export default function TeacherClassDetail() {
     enabled: !!classId
   });
 
-  const { data: announcements = [] } = useQuery({
-    queryKey: ['classAnnouncements', classId],
-    queryFn: () => base44.entities.Announcement.filter({ class_id: classId, is_active: true }, '-created_date'),
-    enabled: !!classId
-  });
+
 
   const { data: whiteboard } = useQuery({
     queryKey: ['classWhiteboard', classId],
@@ -255,29 +252,7 @@ export default function TeacherClassDetail() {
     onSuccess: () => { queryClient.invalidateQueries(['class',classId]); queryClient.invalidateQueries(['classStudents']); setDeleteConfirmStudent(null); }
   });
 
-  const createAnnouncementMutation = useMutation({
-    mutationFn: async () => {
-      if (!announcementTitle.trim() || !announcementMessage.trim()) throw new Error('Title and message required');
-      await base44.entities.Announcement.create({
-        class_id: classId,
-        teacher_email: user.email,
-        title: announcementTitle.trim(),
-        message: announcementMessage.trim()
-      });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries(['classAnnouncements', classId]);
-      setAnnouncementTitle('');
-      setAnnouncementMessage('');
-    }
-  });
 
-  const deleteAnnouncementMutation = useMutation({
-    mutationFn: async (id) => {
-      await base44.entities.Announcement.update(id, { is_active: false });
-    },
-    onSuccess: () => queryClient.invalidateQueries(['classAnnouncements', classId])
-  });
 
   const copyJoinCode = (code) => {
     navigator.clipboard.writeText(code);
@@ -680,7 +655,7 @@ export default function TeacherClassDetail() {
 
                 {/* POLLS */}
                 {activeTab === 'polls' && user && (
-                  <ClassPollsTab classId={classId} user={user} isTeacher={true} />
+                  <ModernPollsTab classId={classId} user={user} isTeacher={true} />
                 )}
 
                 {/* WHITEBOARD */}
@@ -709,49 +684,8 @@ export default function TeacherClassDetail() {
                 )}
 
                 {/* ANNOUNCEMENTS */}
-                {activeTab === 'announcements' && (
-                  <div className="space-y-4">
-                    <h2 className="text-2xl font-bold text-white">Announcements</h2>
-                    <GlassCard className="p-6">
-                      <h3 className="text-lg font-bold text-white mb-4">Create Announcement</h3>
-                      <div className="space-y-3 mb-4">
-                        <div>
-                          <Label className="text-white mb-1 block">Title</Label>
-                          <Input placeholder="Announcement title..." value={announcementTitle} onChange={e => setAnnouncementTitle(e.target.value)} className="bg-white/5 border-white/10 text-white"/>
-                        </div>
-                        <div>
-                          <Label className="text-white mb-1 block">Message</Label>
-                          <Textarea placeholder="Announcement message..." value={announcementMessage} onChange={e => setAnnouncementMessage(e.target.value)} className="bg-white/5 border-white/10 text-white h-24"/>
-                        </div>
-                        <Button onClick={() => createAnnouncementMutation.mutate()} disabled={createAnnouncementMutation.isPending} className="bg-gradient-to-r from-purple-500 to-blue-500 w-full">
-                          {createAnnouncementMutation.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin"/> : <Plus className="w-4 h-4 mr-2"/>}
-                          Post Announcement
-                        </Button>
-                      </div>
-                    </GlassCard>
-
-                    <GlassCard className="p-6">
-                      <h3 className="text-lg font-bold text-white mb-4">Recent Announcements ({announcements.length})</h3>
-                      {announcements.length > 0 ? (
-                        <div className="space-y-2">
-                          {announcements.map(announcement => (
-                            <div key={announcement.id} className="p-4 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 transition-all flex items-start justify-between gap-3">
-                              <div className="flex-1">
-                                <h4 className="font-semibold text-white">{announcement.title}</h4>
-                                <p className="text-sm text-slate-300 mt-1">{announcement.message}</p>
-                                <p className="text-xs text-slate-500 mt-2">{new Date(announcement.created_date).toLocaleDateString()}</p>
-                              </div>
-                              <Button size="sm" variant="outline" onClick={() => deleteAnnouncementMutation.mutate(announcement.id)} className="border-red-500/30 text-red-400 hover:bg-red-500/10 flex-shrink-0">
-                                <Trash2 className="w-3.5 h-3.5"/>
-                              </Button>
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <p className="text-slate-400 text-center py-8">No announcements posted yet.</p>
-                      )}
-                    </GlassCard>
-                  </div>
+                {activeTab === 'announcements' && user && (
+                  <AnnouncementsFeed classId={classId} user={user} isTeacher={true} />
                 )}
 
                 {/* TOOLS */}
