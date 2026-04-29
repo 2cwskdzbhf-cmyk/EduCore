@@ -6,8 +6,9 @@ import { Clock, Trophy, Loader2, Users, BarChart2, Crown, Medal, Flame, ChevronR
 import { Button } from '@/components/ui/button';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-const QUESTION_TIME_S = 20;
-const INTRO_DELAY_S = 5;
+const INTRO_DELAY_S = 5;   // Phase 1: thinking time (no answers)
+const ANSWER_TIME_S = 5;   // Phase 2: answer window
+const TOTAL_TIME_S = INTRO_DELAY_S + ANSWER_TIME_S; // 10s total
 const BASE_POINTS = 1000;
 
 // ─── Sound System (Web Audio API) ─────────────────────────────────────────────
@@ -85,7 +86,7 @@ function PodiumScreen({ scores, onDone }) {
   const order = [1, 0, 2];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900/30 to-slate-900 flex flex-col items-center justify-center p-6">
+    <div className="fixed inset-0 bg-gradient-to-br from-slate-900 via-purple-900/30 to-slate-900 flex flex-col items-center justify-center p-6 overflow-y-auto">
       <motion.div initial={{ opacity: 0, y: -30 }} animate={{ opacity: 1, y: 0 }}>
         <h1 className="text-5xl font-black text-white text-center mb-2">🎉 Quiz Over!</h1>
         <p className="text-slate-400 text-center mb-10 text-lg">Final Standings</p>
@@ -149,11 +150,11 @@ function LeaderboardScreen({ scores, isTeacher, onNext, isLastQuestion, prevScor
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900/20 to-slate-900 p-4 flex flex-col items-center">
-      <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-md pt-8">
+    <div className="fixed inset-0 bg-gradient-to-br from-slate-900 via-purple-900/20 to-slate-900 flex flex-col items-center overflow-y-auto">
+      <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-2xl pt-8 px-4 pb-8">
         <div className="flex items-center gap-3 mb-6 justify-center">
-          <BarChart2 className="w-7 h-7 text-amber-400" />
-          <h2 className="text-2xl font-bold text-white">Leaderboard</h2>
+          <BarChart2 className="w-8 h-8 text-amber-400" />
+          <h2 className="text-3xl font-black text-white">Leaderboard</h2>
         </div>
 
         <div className="space-y-3 mb-8">
@@ -170,20 +171,20 @@ function LeaderboardScreen({ scores, isTeacher, onNext, isLastQuestion, prevScor
                   className={`flex items-center gap-3 p-4 rounded-2xl border ${
                     idx === 0 ? 'bg-amber-500/10 border-amber-500/30' : 'bg-white/5 border-white/10'
                   }`}>
-                  <span className="text-xl font-black w-8 text-center">{rankEmoji}</span>
+                  <span className="text-2xl w-10 text-center flex-shrink-0">{rankEmoji}</span>
                   <div className="flex-1 min-w-0">
-                    <p className="text-white font-semibold truncate">{player.name}</p>
-                    <p className="text-slate-400 text-xs">{player.correct || 0} correct</p>
+                    <p className="text-white font-bold text-lg truncate">{player.name}</p>
+                    <p className="text-slate-400 text-sm">{player.correct || 0} correct</p>
                   </div>
                   {(player.streak || 0) >= 2 && (
-                    <span className="text-orange-400 text-sm font-bold">🔥{player.streak}</span>
+                    <span className="text-orange-400 font-bold">🔥{player.streak}</span>
                   )}
                   {moved && (
-                    <span className={`text-sm font-bold ${movedUp ? 'text-emerald-400' : 'text-red-400'}`}>
+                    <span className={`font-bold text-lg ${movedUp ? 'text-emerald-400' : 'text-red-400'}`}>
                       {movedUp ? '▲' : '▼'}
                     </span>
                   )}
-                  <span className="text-amber-400 font-bold text-lg ml-1">{player.total_score}</span>
+                  <span className="text-amber-400 font-bold text-2xl ml-2">{player.total_score}</span>
                 </motion.div>
               );
             })}
@@ -206,14 +207,14 @@ function LeaderboardScreen({ scores, isTeacher, onNext, isLastQuestion, prevScor
 // ─── Teacher Question View ────────────────────────────────────────────────────
 function TeacherQuestion({ session, question, qIndex, totalQ, answeredCount, totalStudents, onShowLeaderboard }) {
   const startTime = new Date(session.question_start_time).getTime();
-  const [displayTime, setDisplayTime] = useState(QUESTION_TIME_S);
+  const [answerTime, setAnswerTime] = useState(ANSWER_TIME_S);
   const [introCountdown, setIntroCountdown] = useState(INTRO_DELAY_S);
 
   useEffect(() => {
     const update = () => {
       const elapsed = (Date.now() - startTime) / 1000;
       setIntroCountdown(Math.max(0, Math.ceil(INTRO_DELAY_S - elapsed)));
-      setDisplayTime(Math.max(0, Math.ceil(QUESTION_TIME_S - Math.max(0, elapsed - INTRO_DELAY_S))));
+      setAnswerTime(Math.max(0, Math.ceil(ANSWER_TIME_S - Math.max(0, elapsed - INTRO_DELAY_S))));
     };
     update();
     const interval = setInterval(update, 250);
@@ -225,66 +226,71 @@ function TeacherQuestion({ session, question, qIndex, totalQ, answeredCount, tot
   const canSkip = !inIntro;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900/20 to-slate-900 p-4 flex flex-col">
-      {/* Header */}
-      <div className="max-w-3xl mx-auto w-full mb-6 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <span className="text-slate-400 text-sm font-medium">Q {qIndex + 1} / {totalQ}</span>
-          <div className="w-32 h-2 bg-white/10 rounded-full overflow-hidden">
+    <div className="fixed inset-0 bg-gradient-to-br from-slate-900 via-purple-900/30 to-slate-900 flex flex-col overflow-hidden">
+      {/* Top bar */}
+      <div className="flex items-center justify-between px-8 py-5 border-b border-white/10">
+        <div className="flex items-center gap-4">
+          <span className="text-slate-300 text-xl font-bold">Q {qIndex + 1} / {totalQ}</span>
+          <div className="w-40 h-3 bg-white/10 rounded-full overflow-hidden">
             <div className="h-full bg-gradient-to-r from-purple-500 to-blue-500 rounded-full transition-all"
               style={{ width: `${((qIndex + 1) / totalQ) * 100}%` }} />
           </div>
         </div>
-        <div className={`flex items-center gap-2 px-4 py-2 rounded-xl font-mono font-bold text-lg ${
-          !inIntro && displayTime <= 5 ? 'bg-red-500/20 text-red-400' : 'bg-white/10 text-white'
-        }`}>
-          <Clock className="w-5 h-5" />
-          {inIntro ? `${introCountdown}s` : `${displayTime}s`}
-        </div>
+        {/* Timer */}
+        <motion.div key={inIntro ? `i${introCountdown}` : `a${answerTime}`}
+          initial={{ scale: 1.2 }} animate={{ scale: 1 }}
+          className={`w-20 h-20 rounded-full flex items-center justify-center font-black text-4xl shadow-lg ${
+            inIntro
+              ? 'bg-gradient-to-br from-purple-500 to-blue-600 text-white'
+              : answerTime <= 2
+              ? 'bg-red-500/30 border-2 border-red-500 text-red-300'
+              : 'bg-white/10 border-2 border-white/20 text-white'
+          }`}>
+          {inIntro ? introCountdown : answerTime}
+        </motion.div>
       </div>
 
-      <div className="max-w-3xl mx-auto w-full flex-1 flex flex-col justify-center">
-        {/* Intro countdown overlay */}
+      {/* Main — question + status */}
+      <div className="flex-1 flex flex-col items-center justify-center px-10 gap-8">
         {inIntro && (
-          <div className="text-center mb-6">
-            <motion.div key={introCountdown} initial={{ scale: 2, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
-              transition={{ type: 'spring', stiffness: 300 }}
-              className="inline-flex items-center justify-center w-24 h-24 rounded-full bg-gradient-to-br from-purple-500 to-blue-600 text-5xl font-black text-white shadow-2xl shadow-purple-500/50 mb-4">
-              {introCountdown}
-            </motion.div>
-            <p className="text-slate-400 text-sm">Students are reading the question...</p>
-          </div>
+          <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+            className="text-purple-300 text-lg font-medium tracking-wide uppercase">
+            ⏳ Students are reading the question…
+          </motion.p>
+        )}
+        {!inIntro && (
+          <motion.p initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
+            className="text-emerald-300 text-lg font-bold tracking-wide uppercase">
+            ✅ Answer window open
+          </motion.p>
         )}
 
-        {/* Question */}
-        <motion.div key={qIndex} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
-          className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-3xl p-10 mb-8 text-center">
-          <p className="text-3xl font-bold text-white leading-relaxed">{question.prompt}</p>
+        <motion.div key={qIndex} initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
+          className="w-full max-w-4xl bg-white/5 border border-white/10 rounded-3xl p-14 text-center shadow-2xl">
+          <p className="text-5xl font-black text-white leading-tight">{question.prompt}</p>
           {question.image_url && (
-            <img src={question.image_url} alt="" className="max-h-48 mx-auto mt-6 rounded-xl object-contain" />
+            <img src={question.image_url} alt="" className="max-h-56 mx-auto mt-8 rounded-2xl object-contain" />
           )}
         </motion.div>
 
-        {/* Progress + controls — NO answer options shown to teacher */}
-        <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl p-5 flex items-center gap-4">
-          <div className="flex items-center gap-3 flex-1">
-            <Users className="w-5 h-5 text-purple-400 flex-shrink-0" />
-            <div>
-              <p className="text-white font-bold text-2xl">{answeredCount} / {totalStudents}</p>
-              <p className="text-slate-400 text-sm">students answered</p>
-            </div>
+        {/* Answer progress */}
+        <div className="w-full max-w-4xl bg-white/5 border border-white/10 rounded-2xl px-8 py-5 flex items-center gap-6">
+          <Users className="w-7 h-7 text-purple-400 flex-shrink-0" />
+          <div>
+            <p className="text-white font-black text-4xl leading-none">{answeredCount} / {totalStudents}</p>
+            <p className="text-slate-400 text-sm mt-1">students answered</p>
           </div>
-          <div className="flex-1 h-3 bg-white/10 rounded-full overflow-hidden">
+          <div className="flex-1 h-4 bg-white/10 rounded-full overflow-hidden mx-4">
             <motion.div className="h-full bg-gradient-to-r from-emerald-500 to-teal-400 rounded-full"
               animate={{ width: totalStudents > 0 ? `${(answeredCount / totalStudents) * 100}%` : '0%' }} />
           </div>
           {canSkip && (
-            <Button onClick={onShowLeaderboard}
-              className={`ml-2 ${allAnswered
+            <Button onClick={onShowLeaderboard} size="lg"
+              className={`text-lg px-8 py-6 font-bold ${allAnswered
                 ? 'bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600'
                 : 'bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600'
-              } font-bold`}>
-              {allAnswered ? 'All answered! →' : 'Skip →'}
+              }`}>
+              {allAnswered ? 'All answered! →' : 'Go to Leaderboard →'}
             </Button>
           )}
         </div>
@@ -309,7 +315,7 @@ function IntroCountdown({ count }) {
 // ─── Student Question View ────────────────────────────────────────────────────
 function StudentQuestion({ session, question, qIndex, user, myAnswer, onAnswer }) {
   const startTime = new Date(session.question_start_time).getTime();
-  const [timeLeft, setTimeLeft] = useState(QUESTION_TIME_S);
+  const [answerTime, setAnswerTime] = useState(ANSWER_TIME_S);
   const [introCount, setIntroCount] = useState(INTRO_DELAY_S);
   const [flash, setFlash] = useState(null);
   const tickedRef = useRef(new Set());
@@ -319,16 +325,15 @@ function StudentQuestion({ session, question, qIndex, user, myAnswer, onAnswer }
   const canAnswer = !inIntro && !answeredThisQ;
 
   useEffect(() => {
+    tickedRef.current = new Set();
     const update = () => {
       const elapsed = (Date.now() - startTime) / 1000;
       const intro = Math.max(0, Math.ceil(INTRO_DELAY_S - elapsed));
       const answerElapsed = Math.max(0, elapsed - INTRO_DELAY_S);
-      const tl = Math.max(0, Math.ceil(QUESTION_TIME_S - answerElapsed));
-
+      const tl = Math.max(0, Math.ceil(ANSWER_TIME_S - answerElapsed));
       setIntroCount(intro);
-      setTimeLeft(tl);
-
-      // Tick sound in last 3 seconds of answer time
+      setAnswerTime(tl);
+      // Tick on last 3s of answer phase
       if (intro === 0 && tl <= 3 && tl > 0 && !tickedRef.current.has(tl)) {
         tickedRef.current.add(tl);
         sound.tick();
@@ -343,9 +348,9 @@ function StudentQuestion({ session, question, qIndex, user, myAnswer, onAnswer }
     if (!canAnswer) return;
     const timeTakenMs = Math.max(0, Date.now() - startTime - INTRO_DELAY_S * 1000);
     const isCorrect = idx === question.correct_index;
-    const speedFraction = Math.max(0.1, (QUESTION_TIME_S - timeTakenMs / 1000) / QUESTION_TIME_S);
-    const streak = myAnswer?.streak || 0; // passed from parent via myAnswer context
-    const currentStreak = isCorrect ? streak + 1 : 0;
+    const speedFraction = Math.max(0.1, (ANSWER_TIME_S - timeTakenMs / 1000) / ANSWER_TIME_S);
+    const prevStreak = myAnswer?.streak || 0;
+    const currentStreak = isCorrect ? prevStreak + 1 : 0;
     const bonus = streakBonus(currentStreak);
     const baseEarned = isCorrect ? Math.round(BASE_POINTS * speedFraction) : 0;
     const bonusPoints = Math.round(baseEarned * bonus);
@@ -360,107 +365,111 @@ function StudentQuestion({ session, question, qIndex, user, myAnswer, onAnswer }
     await onAnswer({ answerIndex: idx, isCorrect, timeTakenMs, points, streak: currentStreak, bonusPoints });
   };
 
-  const colors = [
-    { active: 'bg-blue-600 hover:bg-blue-500 border-blue-400', passive: 'bg-blue-900/30 border-blue-800' },
-    { active: 'bg-purple-600 hover:bg-purple-500 border-purple-400', passive: 'bg-purple-900/30 border-purple-800' },
-    { active: 'bg-amber-600 hover:bg-amber-500 border-amber-400', passive: 'bg-amber-900/30 border-amber-800' },
-    { active: 'bg-rose-600 hover:bg-rose-500 border-rose-400', passive: 'bg-rose-900/30 border-rose-800' },
+  const colorSchemes = [
+    { active: 'bg-blue-600 hover:bg-blue-500 border-blue-400', passive: 'bg-blue-900/20 border-blue-900/40' },
+    { active: 'bg-purple-600 hover:bg-purple-500 border-purple-400', passive: 'bg-purple-900/20 border-purple-900/40' },
+    { active: 'bg-amber-600 hover:bg-amber-500 border-amber-400', passive: 'bg-amber-900/20 border-amber-900/40' },
+    { active: 'bg-rose-600 hover:bg-rose-500 border-rose-400', passive: 'bg-rose-900/20 border-rose-900/40' },
   ];
   const labels = ['A', 'B', 'C', 'D'];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900/20 to-slate-900 p-4 flex flex-col relative">
-      {/* Flash overlay */}
+    <div className="fixed inset-0 bg-gradient-to-br from-slate-900 via-purple-900/20 to-slate-900 flex flex-col overflow-hidden">
+      {/* Full-screen flash overlay */}
       <AnimatePresence>
         {flash && (
-          <motion.div key={flash} initial={{ opacity: 0.7 }} animate={{ opacity: 0 }}
-            transition={{ duration: 0.9 }}
-            className={`fixed inset-0 z-50 pointer-events-none ${flash === 'correct' ? 'bg-emerald-500/50' : 'bg-red-500/50'}`} />
+          <motion.div key={flash} initial={{ opacity: 0.85 }} animate={{ opacity: 0 }}
+            transition={{ duration: 1 }}
+            className={`fixed inset-0 z-50 pointer-events-none ${flash === 'correct' ? 'bg-emerald-500/60' : 'bg-red-600/60'}`} />
         )}
       </AnimatePresence>
 
-      {/* Intro countdown overlay */}
+      {/* Intro countdown — full screen overlay */}
       <AnimatePresence>
         {inIntro && <IntroCountdown count={introCount} />}
       </AnimatePresence>
 
-      {/* Header */}
-      <div className="max-w-xl mx-auto w-full mb-4 flex items-center justify-between">
-        <span className="text-slate-400 text-sm">Q {qIndex + 1}</span>
-        <div className={`flex items-center gap-2 px-4 py-2 rounded-xl font-mono font-bold ${
-          !inIntro && timeLeft <= 5 ? 'text-red-400 bg-red-500/20' : 'text-white bg-white/10'
-        }`}>
-          <Clock className="w-4 h-4" />
-          {inIntro ? '—' : `${timeLeft}s`}
-        </div>
+      {/* Header strip */}
+      <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 flex-shrink-0">
+        <span className="text-slate-300 font-bold text-xl">Q {qIndex + 1}</span>
+        {/* Answer timer — only show after intro */}
+        <motion.div key={answerTime}
+          initial={{ scale: 1.3 }} animate={{ scale: 1 }}
+          className={`w-16 h-16 rounded-full flex items-center justify-center font-black text-3xl ${
+            inIntro ? 'bg-white/5 text-slate-600' :
+            answerTime <= 2 ? 'bg-red-500/30 border-2 border-red-500 text-red-300' :
+            'bg-white/10 border-2 border-white/20 text-white'
+          }`}>
+          {inIntro ? '—' : answerTime}
+        </motion.div>
       </div>
 
-      <div className="max-w-xl mx-auto w-full">
-        {/* Question */}
-        <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-3xl p-8 mb-6 text-center">
-          {question.image_url && <img src={question.image_url} alt="" className="max-h-40 mx-auto mb-4 rounded-xl object-contain" />}
-          <p className="text-2xl font-bold text-white leading-relaxed">{question.prompt}</p>
+      {/* Question — vertically centered, takes most of the space */}
+      <div className="flex-1 flex flex-col justify-center px-6 py-4 gap-5 overflow-hidden">
+        <div className="bg-white/5 border border-white/10 rounded-3xl p-8 text-center shadow-xl">
+          {question.image_url && <img src={question.image_url} alt="" className="max-h-44 mx-auto mb-5 rounded-2xl object-contain" />}
+          <p className="text-3xl md:text-4xl font-black text-white leading-tight">{question.prompt}</p>
         </div>
 
-        {/* Answer buttons */}
+        {/* Answer buttons — LARGE, full-width-ish grid */}
         {question.options?.length > 0 ? (
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-4 flex-shrink-0">
             {question.options.filter(Boolean).map((opt, idx) => {
               const isSelected = myAnswer?.answerIndex === idx;
               const isCorrect = idx === question.correct_index;
-              let cls = 'p-5 rounded-2xl border-2 text-left font-semibold transition-all flex items-center gap-3 ';
+              const scheme = colorSchemes[idx % 4];
 
+              let cls = 'w-full py-6 px-5 rounded-2xl border-2 font-bold text-lg transition-all flex items-center gap-4 ';
               if (!answeredThisQ && inIntro) {
-                cls += `${colors[idx % 4].passive} text-slate-500 cursor-not-allowed opacity-50`;
+                cls += `${scheme.passive} text-slate-600 cursor-not-allowed`;
               } else if (!answeredThisQ) {
-                cls += `${colors[idx % 4].active} text-white cursor-pointer active:scale-95 transform`;
+                cls += `${scheme.active} text-white cursor-pointer active:scale-95`;
               } else if (isCorrect) {
                 cls += 'bg-emerald-500/30 border-emerald-400 text-emerald-200';
               } else if (isSelected) {
                 cls += 'bg-red-500/30 border-red-400 text-red-200';
               } else {
-                cls += 'bg-white/5 border-white/10 text-slate-500';
+                cls += 'bg-white/5 border-white/10 text-slate-600';
               }
 
               return (
                 <button key={idx} onClick={() => handleSelect(idx)} disabled={!canAnswer} className={cls}>
-                  <span className="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center font-bold flex-shrink-0 text-white">
+                  <span className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center font-black text-xl flex-shrink-0">
                     {labels[idx]}
                   </span>
-                  <span className="flex-1 text-sm">{opt}</span>
+                  <span className="flex-1 text-left leading-snug">{opt}</span>
                 </button>
               );
             })}
           </div>
         ) : (
-          <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl p-6 text-center">
+          <div className="bg-white/5 border border-white/10 rounded-2xl p-8 text-center">
             {answeredThisQ
-              ? <p className="text-emerald-300 font-semibold text-lg">✓ Submitted</p>
-              : <Button onClick={() => handleSelect(0)} disabled={inIntro} className="bg-purple-500 hover:bg-purple-600 text-lg px-8">Submit Answer</Button>
+              ? <p className="text-emerald-300 font-bold text-2xl">✓ Submitted</p>
+              : <Button onClick={() => handleSelect(0)} disabled={inIntro} className="bg-purple-500 hover:bg-purple-600 text-xl px-12 py-6">Submit Answer</Button>
             }
           </div>
         )}
 
         {/* Post-answer feedback */}
         {answeredThisQ && (
-          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-            className={`mt-4 p-5 rounded-2xl border text-center ${
-              myAnswer.isCorrect ? 'bg-emerald-500/20 border-emerald-500/40' : 'bg-red-500/20 border-red-500/40'
+          <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }}
+            className={`rounded-2xl border p-5 text-center flex-shrink-0 ${
+              myAnswer.isCorrect ? 'bg-emerald-500/20 border-emerald-500/50' : 'bg-red-500/20 border-red-500/50'
             }`}>
-            <p className={`text-xl font-bold ${myAnswer.isCorrect ? 'text-emerald-300' : 'text-red-300'}`}>
-              {myAnswer.isCorrect ? `✅ Correct! +${myAnswer.points} pts` : '❌ Incorrect — 0 pts'}
+            <p className={`text-2xl font-black ${myAnswer.isCorrect ? 'text-emerald-300' : 'text-red-300'}`}>
+              {myAnswer.isCorrect ? `✅ Correct!  +${myAnswer.points} pts` : '❌ Incorrect — 0 pts'}
             </p>
-            {/* Streak badge */}
             {(myAnswer.streak || 0) >= 2 && (
               <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', delay: 0.2 }}
-                className="inline-flex items-center gap-1 mt-2 px-4 py-1.5 bg-orange-500/20 border border-orange-500/40 rounded-full">
-                <Flame className="w-4 h-4 text-orange-400" />
-                <span className="text-orange-300 font-bold">{myAnswer.streak} Streak!</span>
-                {myAnswer.bonusPoints > 0 && <span className="text-orange-400 text-xs ml-1">+{myAnswer.bonusPoints} bonus</span>}
+                className="inline-flex items-center gap-2 mt-3 px-5 py-2 bg-orange-500/20 border border-orange-500/40 rounded-full">
+                <Flame className="w-5 h-5 text-orange-400" />
+                <span className="text-orange-300 font-bold text-lg">{myAnswer.streak} Streak!</span>
+                {myAnswer.bonusPoints > 0 && <span className="text-orange-400 text-sm">+{myAnswer.bonusPoints} bonus</span>}
               </motion.div>
             )}
             {question.explanation && <p className="text-slate-400 text-sm mt-2">{question.explanation}</p>}
-            <p className="text-slate-500 text-sm mt-3 animate-pulse">Waiting for others...</p>
+            <p className="text-slate-500 text-sm mt-2 animate-pulse">Waiting for others…</p>
           </motion.div>
         )}
       </div>
