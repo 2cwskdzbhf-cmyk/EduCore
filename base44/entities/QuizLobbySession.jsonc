@@ -24,17 +24,36 @@
     },
     "join_code": {
       "type": "string",
-      "description": "Short unique code students can use to join manually (e.g. A7K9X)"
+      "description": "Short unique code students can use to join"
     },
     "status": {
       "type": "string",
       "enum": [
         "lobby",
-        "active",
+        "question",
+        "leaderboard",
         "ended"
       ],
       "default": "lobby",
-      "description": "Current session status"
+      "description": "Current session status \u2014 drives all client screens"
+    },
+    "current_question_index": {
+      "type": "number",
+      "default": 0,
+      "description": "Index of the question currently being shown"
+    },
+    "question_start_time": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO timestamp when the current question was pushed"
+    },
+    "answers_json": {
+      "type": "string",
+      "description": "JSON array of all student answers: [{email, name, q_index, answer_index, is_correct, time_ms, points}]"
+    },
+    "scores_json": {
+      "type": "string",
+      "description": "JSON object mapping email -> {name, total_score, correct}"
     },
     "participant_emails": {
       "type": "array",
@@ -52,17 +71,15 @@
     },
     "questions_json": {
       "type": "string",
-      "description": "JSON string of quiz questions embedded from CreateQuiz"
+      "description": "JSON string of quiz questions"
     },
     "started_at": {
       "type": "string",
-      "format": "date-time",
-      "description": "When quiz was activated"
+      "format": "date-time"
     },
     "ended_at": {
       "type": "string",
-      "format": "date-time",
-      "description": "When session ended"
+      "format": "date-time"
     }
   },
   "required": [
