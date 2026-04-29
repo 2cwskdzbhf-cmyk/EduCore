@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import AttendanceNav from '@/components/attendance/AttendanceNav';
 import { motion } from 'framer-motion';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
@@ -97,13 +98,11 @@ export default function AttendanceAnalytics() {
     : 0;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-4 md:p-6">
-      <div className="max-w-5xl mx-auto">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+      <AttendanceNav />
+      <div className="max-w-5xl mx-auto p-4 md:p-6">
         {/* Header */}
         <div className="flex items-center gap-3 mb-6">
-          <Link to="/att-dashboard" className="text-slate-400 hover:text-white transition-colors">
-            <ChevronLeft className="w-6 h-6" />
-          </Link>
           <div className="flex-1">
             <h1 className="text-2xl font-bold text-white">Analytics & Reports</h1>
             <p className="text-slate-400 text-sm">View and export attendance data</p>
@@ -240,7 +239,7 @@ export default function AttendanceAnalytics() {
             <BarChart3 className="w-12 h-12 mx-auto mb-4 opacity-30" />
             <p className="font-medium">No attendance data yet</p>
             <p className="text-sm mt-1">Start taking registers to see analytics here</p>
-            <Link to="/att-take-register" className="mt-4 inline-block px-4 py-2 bg-purple-500 text-white text-sm rounded-xl hover:bg-purple-600 transition-colors">Take Register</Link>
+            <Link to="/att-register" className="mt-4 inline-block px-4 py-2 bg-purple-500 text-white text-sm rounded-xl hover:bg-purple-600 transition-colors">Take Register</Link>
           </div>
         )}
       </div>

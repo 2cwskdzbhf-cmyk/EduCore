@@ -32,6 +32,7 @@ import CollaborationHub from "./pages/CollaborationHub";
 import UsefulTools from "./pages/UsefulTools";
 import AttendanceDashboard from "./pages/AttendanceDashboard";
 import AttendanceTakeRegister from "./pages/AttendanceTakeRegister";
+import AttendanceRegister from "./pages/AttendanceRegister";
 import AttendanceStudents from "./pages/AttendanceStudents";
 import AttendanceClasses from "./pages/AttendanceClasses";
 import AttendanceAnalytics from "./pages/AttendanceAnalytics";
@@ -110,6 +111,7 @@ const AuthenticatedApp = () => {
       <Route path="/StudentLiveQuizPlay" element={<LayoutWrapper currentPageName="StudentLiveQuizPlay"><StudentLiveQuizPlay /></LayoutWrapper>} />
       <Route path="/TeacherLiveQuizPlay" element={<LayoutWrapper currentPageName="TeacherLiveQuizPlay"><TeacherLiveQuizPlay /></LayoutWrapper>} />
       <Route path="/UsefulTools" element={<LayoutWrapper currentPageName="UsefulTools"><UsefulTools /></LayoutWrapper>} />
+      <Route path="/att-register" element={<AttendanceRegister />} />
       <Route path="/att-dashboard" element={<AttendanceDashboard />} />
       <Route path="/att-take-register" element={<AttendanceTakeRegister />} />
       <Route path="/att-students" element={<AttendanceStudents />} />

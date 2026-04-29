@@ -1,14 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
 import {
   Users, BookOpen, ClipboardCheck, AlertTriangle,
-  TrendingDown, Calendar, ChevronRight, CheckCircle2,
-  Clock, XCircle, BarChart3
+  TrendingDown, BarChart3
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import AttendanceNav from '@/components/attendance/AttendanceNav';
 
 export default function AttendanceDashboard() {
   const { data: students = [] } = useQuery({
@@ -78,11 +78,12 @@ export default function AttendanceDashboard() {
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-4 md:p-6">
-      <div className="max-w-6xl mx-auto">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+      <AttendanceNav />
+      <div className="max-w-6xl mx-auto p-4 md:p-6">
         {/* Header */}
         <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
-          <h1 className="text-3xl font-bold text-white mb-1">Smart Attendance Tracker</h1>
+          <h1 className="text-3xl font-bold text-white mb-1">Dashboard</h1>
           <p className="text-slate-400 text-sm">{new Date().toLocaleDateString('en-GB', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
         </motion.div>
 
@@ -104,7 +105,7 @@ export default function AttendanceDashboard() {
         {/* Quick Actions */}
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="mb-8">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <Link to="/att-take-register">
+            <Link to="/att-register">
               <div className="bg-gradient-to-br from-emerald-500 to-teal-600 rounded-2xl p-5 text-white cursor-pointer hover:scale-[1.02] transition-transform shadow-lg shadow-emerald-500/30">
                 <ClipboardCheck className="w-6 h-6 mb-2" />
                 <p className="font-bold text-sm">Take Register</p>
