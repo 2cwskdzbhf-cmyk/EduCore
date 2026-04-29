@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useMemo } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -18,8 +18,6 @@ export default function TeacherLiveQuizLobby() {
 
   // Prevent ending session when we intentionally navigate Lobby -> Play
   const leavingForPlayRef = useRef(false);
-
-  // Track latest session status safely (so unmount cleanup doesn't depend on effect deps)
   const statusRef = useRef(null);
 
   /* ---------------- SESSION ---------------- */
@@ -40,12 +38,10 @@ export default function TeacherLiveQuizLobby() {
   /* ✅ AUTO-REDIRECT WHEN SESSION STARTS/ENDS */
   useEffect(() => {
     if (!sessionId || !session?.status) return;
-
     if (session.status === 'live') {
       leavingForPlayRef.current = true;
       navigate(createPageUrl(`TeacherLiveQuizPlay?sessionId=${sessionId}`), { replace: true });
     }
-
     if (session.status === 'ended') {
       navigate(createPageUrl('TeacherDashboard'), { replace: true });
     }
@@ -55,52 +51,22 @@ export default function TeacherLiveQuizLobby() {
   const quizSetId =
     session?.quiz_set_id ||
     session?.live_quiz_set_id ||
-    session?.quizSetId ||
-    session?.liveQuizSetId ||
     session?.quiz_id ||
-    session?.set_id ||
     null;
 
-  /* ---------------- LOAD QUIZ META ---------------- */
+  /* ---------------- LOAD QUIZ META (only for library quizzes) ---------------- */
   const { data: quizSet } = useQuery({
     queryKey: ['quizSetMeta', quizSetId],
     queryFn: async () => {
-      if (!quizSetId) return null;
-
-      // Most likely: QuizSet (your QuizLibrary uses QuizSet)
+      if (!quizSetId || quizSetId === 'manual') return null;
       try {
         const qs = await base44.entities.QuizSet.filter({ id: quizSetId });
         if (qs?.[0]) return qs[0];
       } catch {}
-
-      // Fallback: LiveQuizSet
-      try {
-        const lqs = await base44.entities.LiveQuizSet.filter({ id: quizSetId });
-        if (lqs?.[0]) return lqs[0];
-      } catch {}
-
       return null;
     },
-    enabled: !!quizSetId
+    enabled: !!quizSetId && quizSetId !== 'manual'
   });
-
-  /* ---------------- CANDIDATE IDS TO SEARCH WITH ---------------- */
-  const candidateIds = useMemo(() => {
-    const ids = [
-      quizSetId,
-      quizSet?.id,
-      session?.quiz_set_id,
-      session?.live_quiz_set_id,
-      session?.quizSetId,
-      session?.liveQuizSetId,
-      session?.quiz_id,
-      session?.set_id,
-      sessionId // sometimes questions are attached to session
-    ].filter(Boolean);
-
-    // unique
-    return Array.from(new Set(ids));
-  }, [quizSetId, quizSet?.id, sessionId, session]);
 
   /* ---------------- SAFE FILTER HELPER ---------------- */
   const safeFilter = async (entityName, filter, order = 'order') => {
@@ -114,68 +80,28 @@ export default function TeacherLiveQuizLobby() {
     }
   };
 
-  /* ---------------- LOAD QUESTIONS (TRULY SCHEMA-PROOF) ---------------- */
-  const { data: questionResult } = useQuery({
-    queryKey: ['lobbyQuestions', sessionId, quizSetId],
+  /* ---------------- LOAD QUESTIONS ---------------- */
+  const { data: questions = [] } = useQuery({
+    queryKey: ['lobbyQuestions', sessionId, quizSetId, session?.questions_json],
     queryFn: async () => {
-      // 0) Questions stored INSIDE the QuizSet row (common)
-      const inlineCandidates = [
-        quizSet?.questions,
-        quizSet?.items,
-        quizSet?.question_list,
-        quizSet?.quiz_questions,
-        quizSet?.content
-      ];
-
-      for (const inline of inlineCandidates) {
-        if (Array.isArray(inline) && inline.length) {
-          return { questions: inline, source: 'QuizSet.inline', tried: [] };
-        }
+      // 1) questions_json embedded directly on the session (manual quizzes from CreateQuiz)
+      if (session?.questions_json) {
+        try {
+          const parsed = JSON.parse(session.questions_json);
+          if (Array.isArray(parsed) && parsed.length) return parsed;
+        } catch {}
       }
 
-      // 1) Try multiple entities + field names against multiple candidate IDs
-      const tried = [];
-
-      const attempts = [];
-      for (const id of candidateIds) {
-        // Most common combinations
-        attempts.push(['QuizQuestion', { quiz_id: id }]);
-        attempts.push(['QuizQuestion', { quiz_set_id: id }]);
-        attempts.push(['QuizQuestion', { quizSetId: id }]);
-        attempts.push(['QuizQuestion', { set_id: id }]);
-
-        attempts.push(['LiveQuizQuestion', { live_quiz_set_id: id }]);
-        attempts.push(['LiveQuizQuestion', { quiz_set_id: id }]);
-        attempts.push(['LiveQuizQuestion', { session_id: id }]);
-
-        // Other common naming used in builders
-        attempts.push(['Question', { quiz_id: id }]);
-        attempts.push(['Question', { quiz_set_id: id }]);
-        attempts.push(['Question', { set_id: id }]);
-
-        attempts.push(['QuizItem', { quiz_id: id }]);
-        attempts.push(['QuizItem', { quiz_set_id: id }]);
+      // 2) QuizQuestion rows linked by quiz_set_id (library quizzes)
+      if (quizSetId && quizSetId !== 'manual') {
+        const q = await safeFilter('QuizQuestion', { quiz_set_id: quizSetId }, 'order');
+        if (q?.length) return q;
       }
 
-      // Run attempts in order and return first match
-      for (const [entityName, filter] of attempts) {
-        const key = `${entityName} ${JSON.stringify(filter)}`;
-        tried.push(key);
-
-        const q = await safeFilter(entityName, filter, 'order');
-        if (q?.length) {
-          return { questions: q, source: key, tried };
-        }
-      }
-
-      return { questions: [], source: 'none', tried };
+      return [];
     },
-    enabled: !!sessionId && (!!quizSetId || !!session || !!quizSet)
+    enabled: !!sessionId && !!session
   });
-
-  const questions = questionResult?.questions || [];
-  const questionSource = questionResult?.source || 'unknown';
-  const tried = questionResult?.tried || [];
 
   /* ---------------- PLAYERS ---------------- */
   const { data: players = [] } = useQuery({
@@ -249,15 +175,15 @@ export default function TeacherLiveQuizLobby() {
   }
 
   const joinCode = session.join_code || session.id.substring(0, 6).toUpperCase();
+  const quizTitle = quizSet?.title || (session.questions_json ? 'Manual Quiz' : 'Live Quiz');
 
   return (
     <div className="min-h-screen p-6 bg-gradient-to-br from-slate-900 via-purple-900/20 to-slate-900">
       <div className="max-w-4xl mx-auto">
         <GlassCard className="p-8 text-center mb-6">
-          <h1 className="text-3xl font-bold text-white mb-1">
-            {quizSet?.title || 'Live Quiz'}
-          </h1>
-          <p className="text-slate-400 mb-6">Waiting for students to join</p>
+          <h1 className="text-3xl font-bold text-white mb-1">{quizTitle}</h1>
+          <p className="text-slate-400 mb-2">Waiting for students to join</p>
+          <p className="text-slate-500 text-sm mb-6">{questions.length} question{questions.length !== 1 ? 's' : ''} loaded</p>
 
           <div className="inline-flex items-center gap-4 bg-white/10 px-8 py-6 rounded-2xl mb-6">
             <div>
@@ -281,21 +207,9 @@ export default function TeacherLiveQuizLobby() {
           </p>
 
           {questions.length === 0 && (
-            <div className="mb-4 p-4 rounded-lg bg-red-500/15 border border-red-500/30 text-red-300 text-sm">
-              <div className="flex items-center gap-2 justify-center mb-2">
-                <AlertTriangle className="w-4 h-4" />
-                <span className="font-semibold">No questions found for this quiz set</span>
-              </div>
-
-              <div className="text-left text-xs text-red-200/90 space-y-1">
-                <div><span className="font-semibold">quizSetId:</span> {String(quizSetId)}</div>
-                <div><span className="font-semibold">candidateIds tried:</span> {candidateIds.map(String).join(', ')}</div>
-                <div><span className="font-semibold">last source attempt:</span> {String(questionSource)}</div>
-                <div className="mt-2 text-red-200/70">
-                  If this still shows empty, your questions are stored under a different entity/field.
-                  Paste the “Question” table/entity name + the field that links it to the quiz.
-                </div>
-              </div>
+            <div className="mb-4 p-4 rounded-lg bg-red-500/15 border border-red-500/30 text-red-300 text-sm flex items-center gap-2 justify-center">
+              <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+              <span className="font-semibold">No questions found — go back and add questions before starting</span>
             </div>
           )}
 
