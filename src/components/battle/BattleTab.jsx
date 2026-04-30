@@ -2,10 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Swords, Trophy, Lock, Loader2, Zap } from 'lucide-react';
+import { Swords, Trophy, Lock, Loader2, Clock } from 'lucide-react';
 import BattleArena from './BattleArena';
 import BattleInvitePopup from './BattleInvitePopup';
 import BattleLeaderboard from './BattleLeaderboard';
+import BattleHistory from './BattleHistory';
 
 const BATTLE_QUESTIONS_COUNT = 5;
 
@@ -25,7 +26,7 @@ export default function BattleTab({ classId, classData, user, isTeacher }) {
   const [activeBattle, setActiveBattle] = useState(null);
   const [incomingInvite, setIncomingInvite] = useState(null);
   const [pendingInvite, setPendingInvite] = useState(null);
-  const [tab, setTab] = useState('lobby'); // 'lobby' | 'leaderboard'
+  const [tab, setTab] = useState('lobby'); // 'lobby' | 'leaderboard' | 'history'
 
   const battleEnabled = classData?.battle_mode_enabled !== false; // default true unless explicitly disabled
 
@@ -225,6 +226,14 @@ export default function BattleTab({ classId, classData, user, isTeacher }) {
             >
               🏆 Leaderboard
             </button>
+            {!isTeacher && (
+              <button
+                onClick={() => setTab('history')}
+                className={`px-4 py-2 rounded-xl font-bold text-sm transition-all ${tab === 'history' ? 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white shadow-lg shadow-blue-500/30' : 'bg-white/5 text-slate-400 hover:text-white hover:bg-white/10'}`}
+              >
+                📜 My History
+              </button>
+            )}
           </div>
 
           <AnimatePresence mode="wait">
@@ -287,6 +296,12 @@ export default function BattleTab({ classId, classData, user, isTeacher }) {
             {tab === 'leaderboard' && (
               <motion.div key="leaderboard" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }}>
                 <BattleLeaderboard classId={classId} studentEmails={classData?.student_emails || []} />
+              </motion.div>
+            )}
+
+            {tab === 'history' && (
+              <motion.div key="history" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }}>
+                <BattleHistory classId={classId} userEmail={user?.email} />
               </motion.div>
             )}
           </AnimatePresence>

@@ -37,7 +37,7 @@ const NAV_ITEMS = [
   { id: 'announcements', icon: '📢', label: 'Announcements' },
   { id: 'battle', icon: '⚔️', label: '1v1 Battle' },
   { id: 'students', icon: '👥', label: 'Students' },
-  { id: 'analytics', icon: '📊', label: 'Analytics' },
+  { id: 'analytics', icon: '📊', label: 'Analytics', external: true },
   { id: 'messaging', icon: '💬', label: 'Messaging' },
   { id: 'polls', icon: '📊', label: 'Polls' },
   { id: 'whiteboard', icon: '✏️', label: 'Whiteboard' },
@@ -300,18 +300,29 @@ export default function TeacherClassDetail() {
           {/* Nav */}
           <nav className="flex-1 overflow-y-auto p-3 space-y-1">
             {NAV_ITEMS.map(item => (
-              <button
-                key={item.id}
-                onClick={() => { setActiveTab(item.id); setSidebarOpen(false); setCreateMode(''); }}
-                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all text-left ${
-                  activeTab === item.id
-                    ? 'bg-gradient-to-r from-purple-500 to-blue-500 text-white shadow-lg shadow-purple-500/20'
-                    : 'text-slate-400 hover:text-white hover:bg-white/5'
-                }`}
-              >
-                <span>{item.icon}</span>
-                <span>{item.label}</span>
-              </button>
+              item.external ? (
+                <button
+                  key={item.id}
+                  onClick={() => { navigate(createPageUrl(`ClassAnalytics?classId=${classId}`)); setSidebarOpen(false); }}
+                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all text-left text-slate-400 hover:text-white hover:bg-white/5"
+                >
+                  <span>{item.icon}</span>
+                  <span>{item.label}</span>
+                </button>
+              ) : (
+                <button
+                  key={item.id}
+                  onClick={() => { setActiveTab(item.id); setSidebarOpen(false); setCreateMode(''); }}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all text-left ${
+                    activeTab === item.id
+                      ? 'bg-gradient-to-r from-purple-500 to-blue-500 text-white shadow-lg shadow-purple-500/20'
+                      : 'text-slate-400 hover:text-white hover:bg-white/5'
+                  }`}
+                >
+                  <span>{item.icon}</span>
+                  <span>{item.label}</span>
+                </button>
+              )
             ))}
           </nav>
         </aside>

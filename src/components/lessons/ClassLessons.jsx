@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { base44 } from '@/api/base44Client';
 import LessonCard from './LessonCard';
 import LessonForm from './LessonForm';
+import { useCallback } from 'react';
 
 export default function ClassLessons({ classId, user, isTeacher }) {
   const queryClient = useQueryClient();
@@ -13,6 +14,24 @@ export default function ClassLessons({ classId, user, isTeacher }) {
   const [editingLesson, setEditingLesson] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
   const [retranscribingId, setRetranscribingId] = useState(null);
+  const [completedLessonIds, setCompletedLessonIds] = useState([]);
+
+  // Load completed lessons for student
+  useQuery({
+    queryKey: ['lessonProgress', user?.email, classId],
+    queryFn: async () => {
+      if (!user?.email || isTeacher) return [];
+      const records = await base44.entities.LessonReadProgress.filter({ student_email: user.email });
+      const ids = records.map(r => r.lesson_id);
+      setCompletedLessonIds(ids);
+      return ids;
+    },
+    enabled: !!user?.email && !isTeacher,
+  });
+
+  const handleMarkComplete = useCallback((lessonId) => {
+    setCompletedLessonIds(prev => prev.includes(lessonId) ? prev : [...prev, lessonId]);
+  }, []);
 
   const { data: lessons = [], isLoading } = useQuery({
     queryKey: ['classLessons', classId],
@@ -106,6 +125,9 @@ export default function ClassLessons({ classId, user, isTeacher }) {
               onDelete={handleDelete}
               onRetranscribe={handleRetranscribe}
               retranscribing={retranscribingId}
+              userEmail={user?.email}
+              completedLessonIds={completedLessonIds}
+              onMarkComplete={handleMarkComplete}
             />
           ))}
         </div>

@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import PersonalizedLearningPath from '@/components/learning/PersonalizedLearningPath';
+import GamificationWidget from '@/components/student/GamificationWidget';
 import LiveQuizPopup from '@/components/quiz/LiveQuizPopup';
 import LiveQuizBanner from '@/components/quiz/LiveQuizBanner';
 import {
@@ -536,6 +537,9 @@ export default function StudentDashboard() {
             </GlassCard>
           </motion.div>
         )}
+
+        {/* Gamification */}
+        <GamificationWidget studentEmail={user?.email} />
 
         {/* Personalized Learning Path */}
         <motion.div

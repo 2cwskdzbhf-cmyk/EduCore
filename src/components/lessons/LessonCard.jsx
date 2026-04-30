@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { format } from 'date-fns';
-import { ChevronDown, ChevronUp, Mic, FileText, Trash2, Edit2, RefreshCw, Loader2, Video } from 'lucide-react';
+import { ChevronDown, ChevronUp, Mic, FileText, Trash2, Edit2, RefreshCw, Loader2, Video, CheckCircle2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { base44 } from '@/api/base44Client';
 
 function MediaItem({ item, isTeacher, onRetranscribe, retranscribing }) {
   const [transcriptOpen, setTranscriptOpen] = useState(false);
@@ -68,8 +69,24 @@ function MediaItem({ item, isTeacher, onRetranscribe, retranscribing }) {
   );
 }
 
-export default function LessonCard({ lesson, isTeacher, onEdit, onDelete, onRetranscribe, retranscribing }) {
+export default function LessonCard({ lesson, isTeacher, onEdit, onDelete, onRetranscribe, retranscribing, userEmail, completedLessonIds = [], onMarkComplete }) {
   const [expanded, setExpanded] = useState(false);
+  const [marking, setMarking] = useState(false);
+  const isCompleted = completedLessonIds.includes(lesson.id);
+
+  const handleMarkComplete = async (e) => {
+    e.stopPropagation();
+    if (isCompleted || marking || isTeacher) return;
+    setMarking(true);
+    try {
+      const existing = await base44.entities.LessonReadProgress.filter({ lesson_id: lesson.id, student_email: userEmail });
+      if (existing.length === 0) {
+        await base44.entities.LessonReadProgress.create({ lesson_id: lesson.id, student_email: userEmail, class_id: lesson.class_id });
+      }
+      onMarkComplete?.(lesson.id);
+    } catch {}
+    setMarking(false);
+  };
 
   // Normalise media: prefer media_items array, fall back to legacy audio_url
   const mediaItems = lesson.media_items?.length
@@ -117,7 +134,7 @@ export default function LessonCard({ lesson, isTeacher, onEdit, onDelete, onRetr
             )}
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
-            {isTeacher && (
+            {isTeacher ? (
               <>
                 <button onClick={e => { e.stopPropagation(); onEdit(lesson); }}
                   className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors">
@@ -128,6 +145,19 @@ export default function LessonCard({ lesson, isTeacher, onEdit, onDelete, onRetr
                   <Trash2 className="w-4 h-4" />
                 </button>
               </>
+            ) : (
+              <button
+                onClick={handleMarkComplete}
+                disabled={isCompleted || marking}
+                className={`flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg font-semibold transition-all ${
+                  isCompleted
+                    ? 'bg-emerald-500/20 text-emerald-400 cursor-default'
+                    : 'bg-white/5 text-slate-400 hover:bg-emerald-500/20 hover:text-emerald-400'
+                }`}
+              >
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                {isCompleted ? 'Done' : marking ? '…' : 'Mark done'}
+              </button>
             )}
             {expanded ? <ChevronUp className="w-5 h-5 text-slate-400" /> : <ChevronDown className="w-5 h-5 text-slate-400" />}
           </div>

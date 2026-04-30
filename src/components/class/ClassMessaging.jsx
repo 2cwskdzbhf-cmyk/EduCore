@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Send, HelpCircle, Users, MessageCircle, ChevronLeft, Check } from 'lucide-react';
+import { Send, HelpCircle, Users, MessageCircle, ChevronLeft } from 'lucide-react';
 
 const TABS = [
   { id: 'class', label: 'Class Chat', icon: MessageCircle },
@@ -24,14 +24,19 @@ function Avatar({ name, email, size = 8 }) {
   );
 }
 
-function MessageBubble({ msg, isOwn, isTeacher }) {
+const REACTIONS = ['👍', '🔥', '😂', '❤️', '🎯'];
+
+function MessageBubble({ msg, isOwn, isTeacher, onReact }) {
+  const [showReactions, setShowReactions] = useState(false);
   const isQuestion = msg.message_type === 'question';
   const senderName = msg.sender_name || msg.sender_email?.split('@')[0] || 'Unknown';
+  const reactions = msg.reactions || {};
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      className={`flex gap-2.5 ${isOwn ? 'flex-row-reverse' : 'flex-row'}`}
+      className={`flex gap-2.5 group ${isOwn ? 'flex-row-reverse' : 'flex-row'}`}
     >
       {!isOwn && <Avatar name={senderName} email={msg.sender_email} size={8} />}
       <div className={`max-w-[72%] ${isOwn ? 'items-end' : 'items-start'} flex flex-col gap-1`}>
@@ -43,18 +48,50 @@ function MessageBubble({ msg, isOwn, isTeacher }) {
             )}
           </p>
         )}
-        <div className={`px-4 py-2.5 rounded-2xl text-sm leading-relaxed ${
-          isOwn
-            ? 'bg-gradient-to-br from-purple-600 to-blue-600 text-white rounded-tr-sm'
-            : isQuestion
-            ? 'bg-amber-500/15 border border-amber-500/30 text-amber-100 rounded-tl-sm'
-            : msg.sender_type === 'teacher'
-            ? 'bg-purple-500/15 border border-purple-500/30 text-white rounded-tl-sm'
-            : 'bg-white/8 border border-white/10 text-slate-100 rounded-tl-sm'
-        }`}>
-          {isQuestion && !isOwn && <p className="text-amber-400 text-xs font-bold mb-1">❓ Question</p>}
-          {msg.content}
+        <div className="relative">
+          <div className={`px-4 py-2.5 rounded-2xl text-sm leading-relaxed ${
+            isOwn
+              ? 'bg-gradient-to-br from-purple-600 to-blue-600 text-white rounded-tr-sm'
+              : isQuestion
+              ? 'bg-amber-500/15 border border-amber-500/30 text-amber-100 rounded-tl-sm'
+              : msg.sender_type === 'teacher'
+              ? 'bg-purple-500/15 border border-purple-500/30 text-white rounded-tl-sm'
+              : 'bg-white/8 border border-white/10 text-slate-100 rounded-tl-sm'
+          }`}>
+            {isQuestion && !isOwn && <p className="text-amber-400 text-xs font-bold mb-1">❓ Question</p>}
+            {msg.content}
+          </div>
+
+          {/* React button */}
+          <button
+            onClick={() => setShowReactions(r => !r)}
+            className={`absolute -bottom-1 ${isOwn ? '-left-6' : '-right-6'} opacity-0 group-hover:opacity-100 transition-opacity text-slate-500 hover:text-white text-xs p-1`}
+          >
+            😊
+          </button>
+
+          {/* Reaction picker */}
+          {showReactions && (
+            <div className={`absolute bottom-6 ${isOwn ? 'right-0' : 'left-0'} bg-slate-800 border border-white/10 rounded-2xl px-2 py-1.5 flex gap-1 z-10 shadow-xl`}>
+              {REACTIONS.map(r => (
+                <button key={r} onClick={() => { onReact(msg.id, r); setShowReactions(false); }}
+                  className="text-lg hover:scale-125 transition-transform p-0.5">{r}</button>
+              ))}
+            </div>
+          )}
         </div>
+
+        {/* Reaction counts */}
+        {Object.keys(reactions).length > 0 && (
+          <div className={`flex gap-1 flex-wrap px-1 ${isOwn ? 'justify-end' : 'justify-start'}`}>
+            {Object.entries(reactions).map(([emoji, count]) => count > 0 && (
+              <span key={emoji} className="text-xs bg-white/10 border border-white/10 rounded-full px-1.5 py-0.5">
+                {emoji} {count}
+              </span>
+            ))}
+          </div>
+        )}
+
         <p className="text-xs text-slate-600 px-1">
           {new Date(msg.created_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
         </p>
@@ -100,6 +137,15 @@ export default function ClassMessaging({ classId, user, classData }) {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages.length, tab, selectedStudent]);
+
+  const handleReact = async (msgId, emoji) => {
+    const msg = [...classMessages, ...qaMessages, ...dmMessages].find(m => m.id === msgId);
+    if (!msg) return;
+    const reactions = { ...(msg.reactions || {}) };
+    reactions[emoji] = (reactions[emoji] || 0) + 1;
+    await base44.entities.ClassMessage.update(msgId, { reactions });
+    queryClient.invalidateQueries(['classMessages', classId]);
+  };
 
   const handleSend = () => {
     if (!message.trim()) return;
@@ -240,6 +286,7 @@ export default function ClassMessaging({ classId, user, classData }) {
               msg={msg}
               isOwn={msg.sender_email === user.email}
               isTeacher={isTeacher}
+              onReact={handleReact}
             />
           ))}
 
