@@ -14,7 +14,6 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import {
   Select,
@@ -131,12 +130,13 @@ export default function TeacherDashboard() {
         is_active: true
       });
     },
-    onSuccess: () => {
+    onSuccess: (newClass) => {
       queryClient.invalidateQueries(['teacherClasses']);
       setNewClassOpen(false);
       setNewClassName('');
       setSelectedSubject('');
       setSelectedYearGroup('');
+      navigate(createPageUrl(`TeacherClassDetail?id=${newClass.id}`));
     },
     onError: (error) => {
       alert(error.message || 'Failed to create class');
@@ -205,12 +205,23 @@ export default function TeacherDashboard() {
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
         >
-          <h1 className="text-4xl font-bold text-white mb-2">
-            Teacher Dashboard
-          </h1>
-          <p className="text-slate-400 mb-6">
-            Welcome back{user?.full_name ? `, ${user.full_name}` : ''}
-          </p>
+          <div className="flex items-start justify-between mb-6">
+            <div>
+              <h1 className="text-4xl font-bold text-white mb-2">
+                Teacher Dashboard
+              </h1>
+              <p className="text-slate-400">
+                Welcome back{user?.full_name ? `, ${user.full_name}` : ''}
+              </p>
+            </div>
+            <button
+              onClick={() => setNewClassOpen(true)}
+              className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center text-white shadow-lg shadow-purple-500/30 hover:from-purple-400 hover:to-blue-400 transition-all hover:scale-110 flex-shrink-0 mt-1"
+              title="Create New Class"
+            >
+              <Plus className="w-5 h-5" />
+            </button>
+          </div>
 
           {/* Stats directly under welcome */}
           <div className="grid grid-cols-2 lg:grid-cols-3 gap-6 mb-4">
@@ -220,69 +231,67 @@ export default function TeacherDashboard() {
           </div>
         </motion.div>
 
-        <div className="flex justify-end gap-3 mb-8">
-          <Dialog open={newClassOpen} onOpenChange={setNewClassOpen}>
-            <DialogTrigger asChild>
-              <Button className="bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 shadow-lg shadow-purple-500/30">
-                <Plus className="w-4 h-4 mr-2" />
-                New Class
+        {/* Create Class Modal */}
+        <Dialog open={newClassOpen} onOpenChange={setNewClassOpen}>
+          <DialogContent className="bg-slate-950/95 backdrop-blur-xl border-white/10 sm:max-w-sm">
+            <DialogHeader>
+              <DialogTitle className="text-white text-xl flex items-center gap-2">
+                <Plus className="w-5 h-5 text-purple-400" /> Create New Class
+              </DialogTitle>
+            </DialogHeader>
+            <p className="text-slate-400 text-sm -mt-1">Set up a new class for your students.</p>
+            <div className="space-y-4 pt-2">
+              <div>
+                <Label className="text-slate-300 mb-1.5 block">Class Name *</Label>
+                <Input
+                  placeholder="e.g., Year 9 Maths Set 1"
+                  value={newClassName}
+                  onChange={(e) => setNewClassName(e.target.value)}
+                  className="bg-white/5 border-white/10 text-white placeholder:text-slate-500"
+                />
+              </div>
+              <div>
+                <Label className="text-slate-300 mb-1.5 block">Subject *</Label>
+                <Select value={selectedSubject} onValueChange={setSelectedSubject}>
+                  <SelectTrigger className="bg-white/5 border-white/10 text-white">
+                    <SelectValue placeholder="Select a subject" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {subjects.map(subject => (
+                      <SelectItem key={subject.id} value={subject.id}>
+                        {subject.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-slate-300 mb-1.5 block">Year Group <span className="text-slate-500">(optional)</span></Label>
+                <Select value={selectedYearGroup} onValueChange={setSelectedYearGroup}>
+                  <SelectTrigger className="bg-white/5 border-white/10 text-white">
+                    <SelectValue placeholder="Select year group" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="7">Year 7</SelectItem>
+                    <SelectItem value="8">Year 8</SelectItem>
+                    <SelectItem value="9">Year 9</SelectItem>
+                    <SelectItem value="10">Year 10</SelectItem>
+                    <SelectItem value="11">Year 11</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <Button
+                className="w-full bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-400 hover:to-blue-400 h-11 font-semibold"
+                onClick={() => createClassMutation.mutate()}
+                disabled={!newClassName || !selectedSubject || createClassMutation.isPending}
+              >
+                {createClassMutation.isPending ? (
+                  <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />Creating...</>
+                ) : 'Create Class'}
               </Button>
-            </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Create New Class</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-4 pt-4">
-                  <div>
-                    <Label>Class Name</Label>
-                    <Input
-                      placeholder="e.g., Year 9 Maths Set 1"
-                      value={newClassName}
-                      onChange={(e) => setNewClassName(e.target.value)}
-                      className="mt-1"
-                    />
-                  </div>
-                  <div>
-                    <Label>Subject</Label>
-                    <Select value={selectedSubject} onValueChange={setSelectedSubject}>
-                      <SelectTrigger className="mt-1">
-                        <SelectValue placeholder="Select a subject" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {subjects.map(subject => (
-                          <SelectItem key={subject.id} value={subject.id}>
-                            {subject.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label>Year Group</Label>
-                    <Select value={selectedYearGroup} onValueChange={setSelectedYearGroup}>
-                      <SelectTrigger className="mt-1">
-                        <SelectValue placeholder="Select year group" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="7">Year 7</SelectItem>
-                        <SelectItem value="8">Year 8</SelectItem>
-                        <SelectItem value="9">Year 9</SelectItem>
-                        <SelectItem value="10">Year 10</SelectItem>
-                        <SelectItem value="11">Year 11</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <Button
-                   className="w-full"
-                   onClick={() => createClassMutation.mutate()}
-                   disabled={!newClassName || !selectedSubject || createClassMutation.isPending}
-                  >
-                   {createClassMutation.isPending ? 'Creating...' : 'Create Class'}
-                  </Button>
-                </div>
-              </DialogContent>
-          </Dialog>
-        </div>
+            </div>
+          </DialogContent>
+        </Dialog>
 
         {/* Classes */}
         <div className="mb-8">

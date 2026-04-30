@@ -442,10 +442,21 @@ export default function StudentDashboard() {
           animate={{ opacity: 1, y: 0 }}
           className="mb-8">
           
-          <h1 className="text-3xl font-bold text-white mb-2 drop-shadow-lg">My Dashboard</h1>
-          <p className="text-slate-300 drop-shadow-md">
-            Track your assignments, classes, and quiz performance
-          </p>
+          <div className="flex items-start justify-between">
+            <div>
+              <h1 className="text-3xl font-bold text-white mb-2 drop-shadow-lg">My Dashboard</h1>
+              <p className="text-slate-300 drop-shadow-md">
+                Track your assignments, classes, and quiz performance
+              </p>
+            </div>
+            <button
+              onClick={() => setJoinClassOpen(true)}
+              className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center text-white shadow-lg shadow-blue-500/30 hover:from-blue-400 hover:to-cyan-400 transition-all hover:scale-110 flex-shrink-0 mt-1"
+              title="Join a Class"
+            >
+              <UserPlus className="w-5 h-5" />
+            </button>
+          </div>
         </motion.div>
 
 
@@ -614,26 +625,7 @@ export default function StudentDashboard() {
           </GlassCard>
         </motion.div>
 
-        <motion.div
-          className="grid md:grid-cols-2 gap-4 mb-8"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: nextLesson ? 0.6 : 0.5 }}>
-          
-          <GlassCard
-            className="p-6 cursor-pointer hover:scale-[1.02] bg-slate-950/50 backdrop-blur-xl"
-            onClick={() => setJoinClassOpen(true)}>
-            <div className="flex items-center gap-4">
-              <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center shadow-lg shadow-blue-500/30">
-                <UserPlus className="w-7 h-7 text-white" />
-              </div>
-              <div>
-                <h3 className="text-lg font-bold text-white drop-shadow-md">Join a Class</h3>
-                <p className="text-sm text-slate-300 drop-shadow-sm">Enter a class code from your teacher</p>
-              </div>
-            </div>
-          </GlassCard>
-        </motion.div>
+
 
           <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -738,22 +730,26 @@ export default function StudentDashboard() {
         </div>
 
         <Dialog open={joinClassOpen} onOpenChange={setJoinClassOpen}>
-          <DialogContent className="bg-slate-950/95 backdrop-blur-xl border-white/10">
+          <DialogContent className="bg-slate-950/95 backdrop-blur-xl border-white/10 sm:max-w-sm">
             <DialogHeader>
-              <DialogTitle className="text-white">Join Class</DialogTitle>
+              <DialogTitle className="text-white text-xl flex items-center gap-2">
+                <UserPlus className="w-5 h-5 text-blue-400" /> Join a Class
+              </DialogTitle>
             </DialogHeader>
-            <div className="space-y-4">
+            <p className="text-slate-400 text-sm -mt-1">Enter the class code from your teacher.</p>
+            <div className="space-y-4 pt-2">
               <div>
-                <Label className="text-slate-300">Class Code</Label>
+                <Label className="text-slate-300 mb-1.5 block">Class Code</Label>
                 <Input
                   value={classJoinCode}
                   onChange={(e) => setClassJoinCode(e.target.value.toUpperCase())}
-                  placeholder="Enter class code"
-                  className="bg-white/5 border-white/10 text-white" />
+                  onKeyDown={(e) => e.key === 'Enter' && handleJoinClass()}
+                  placeholder="e.g. AB12CD7"
+                  className="bg-white/5 border-white/10 text-white placeholder:text-slate-500 font-mono tracking-widest text-center text-lg h-12" />
               </div>
               <Button
                 onClick={handleJoinClass}
-                className="w-full bg-gradient-to-r from-blue-500 to-cyan-500"
+                className="w-full bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-400 hover:to-cyan-400 h-11 font-semibold"
                 disabled={!classJoinCode}>
                 Join Class
               </Button>
