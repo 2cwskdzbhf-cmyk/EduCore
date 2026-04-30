@@ -17,7 +17,6 @@ import AssignmentsList from '@/components/class/AssignmentsList';
 import ModernClassNav from '@/components/class/ModernClassNav';
 import ModernLeaderboard from '@/components/class/ModernLeaderboard';
 import BattleTab from '@/components/battle/BattleTab';
-import CollabDocsTab from '@/components/collab/CollabDocsTab';
 import {
   ChevronLeft, ClipboardList, Trophy, Clock, MessageCircle,
   BarChart3, Menu, Loader2, CheckCircle2, AlertCircle, BookOpen, Wrench
@@ -31,7 +30,6 @@ const NAV_ITEMS = [
   { id: 'messaging', icon: '💬', label: 'Messaging' },
   { id: 'polls', icon: '📊', label: 'Polls' },
   { id: 'whiteboard', icon: '✏️', label: 'Whiteboard' },
-  { id: 'docs', icon: '📄', label: 'Shared Docs' },
   { id: 'tools', icon: '🛠', label: 'Tools' },
 ];
 
@@ -182,11 +180,6 @@ export default function StudentClassDetail() {
                     })()}
                     {!whiteboard && <GlassCard className="p-12 text-center"><p className="text-slate-400">Whiteboard not available yet.</p></GlassCard>}
                   </>
-                )}
-
-                {/* SHARED DOCS */}
-                {activeTab==='docs' && user && (
-                  <CollabDocsTab user={user} classId={classId} />
                 )}
 
                 {/* TOOLS */}
