@@ -731,7 +731,7 @@ export default function TeacherClassDetail() {
 
                 {/* BATTLE */}
                 {activeTab === 'battle' && user && classData && (
-                  <BattleTab classId={classId} classData={classData} user={user} isTeacher={true} />
+                  <BattleTab classId={classId} classData={classData} user={user} isTeacher={true} classStudents={classStudents} />
                 )}
 
                 {/* INVITE LINKS */}

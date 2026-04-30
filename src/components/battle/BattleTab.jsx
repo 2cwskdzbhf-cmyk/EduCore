@@ -21,33 +21,35 @@ function generateQuestions(topic) {
   ];
 }
 
-export default function BattleTab({ classId, classData, user, isTeacher }) {
+export default function BattleTab({ classId, classData, user, isTeacher, classStudents: classStudentsProp }) {
   const queryClient = useQueryClient();
   const [activeBattle, setActiveBattle] = useState(null);
   const [incomingInvite, setIncomingInvite] = useState(null);
   const [pendingInvite, setPendingInvite] = useState(null);
   const [tab, setTab] = useState('lobby'); // 'lobby' | 'leaderboard' | 'history'
 
-  const battleEnabled = classData?.battle_mode_enabled !== false; // default true unless explicitly disabled
+  const battleEnabled = classData?.battle_mode_enabled !== false;
 
-  // Use student_emails from classData prop directly — same source as Students tab
   const studentEmails = classData?.student_emails || [];
 
-  const { data: classStudents = [], isLoading: studentsLoading, isError: studentsError, refetch: refetchStudents } = useQuery({
+  // If parent already has students loaded (TeacherClassDetail), use them directly.
+  // Otherwise fetch using the exact same $in filter as the Students tab.
+  const { data: fetchedStudents = [], isLoading: studentsLoading, isError: studentsError, refetch: refetchStudents } = useQuery({
     queryKey: ['classStudentsForBattle', classId, studentEmails.join(',')],
     queryFn: async () => {
       console.log('1v1 class_id:', classId);
       console.log('1v1 student_emails:', studentEmails);
       if (!studentEmails.length) return [];
-      // Use $in filter (same as Students tab) — avoids listing all users
       const users = await base44.entities.User.filter({ email: { $in: studentEmails } });
-      console.log('1v1 students loaded:', users.length);
+      console.log('Loaded students:', users);
       return users;
     },
-    enabled: !!classId && studentEmails.length > 0,
+    enabled: !!classId && studentEmails.length > 0 && !classStudentsProp,
     staleTime: 30000,
     retry: 2,
   });
+
+  const classStudents = classStudentsProp || fetchedStudents;
 
   // Subscribe to BattleSession for incoming invites and active battles
   useEffect(() => {
