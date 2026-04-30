@@ -70,6 +70,7 @@ export default function LessonForm({ classId, user, lesson, onSave, onCancel }) 
   const [transcribingId, setTranscribingId] = useState(null);
 
   const mediaRecorderRef = useRef(null);
+  const streamRef = useRef(null);
   const chunksRef = useRef([]);
   const timerRef = useRef(null);
   const videoPreviewRef = useRef(null);
@@ -80,6 +81,7 @@ export default function LessonForm({ classId, user, lesson, onSave, onCancel }) 
       if (mediaRecorderRef.current?.state !== 'inactive') {
         mediaRecorderRef.current?.stop();
       }
+      streamRef.current?.getTracks().forEach(t => t.stop());
     };
   }, []);
 
@@ -93,33 +95,43 @@ export default function LessonForm({ classId, user, lesson, onSave, onCancel }) 
 
   const startRecording = async (type) => {
     setMicError('');
-    setRecordingType(type);
     let stream;
     try {
       stream = await navigator.mediaDevices.getUserMedia(
-        type === 'video' ? { audio: true, video: true } : { audio: true }
+        type === 'video' ? { audio: true, video: { facingMode: 'user' } } : { audio: true }
       );
     } catch {
       setMicError('Microphone/camera access denied. Please grant permission.');
       return;
     }
-    if (type === 'video' && videoPreviewRef.current) {
-      videoPreviewRef.current.srcObject = stream;
-    }
+    streamRef.current = stream;
+
+    // Set the preview BEFORE setting recording state so the ref is available
+    setRecording(true);
+    setRecordingMs(0);
+    setRecordingType(type);
+
+    // Attach stream to video preview after state update
+    requestAnimationFrame(() => {
+      if (type === 'video' && videoPreviewRef.current) {
+        videoPreviewRef.current.srcObject = stream;
+        videoPreviewRef.current.play().catch(() => {});
+      }
+    });
+
     chunksRef.current = [];
     const mimeType = type === 'video' ? 'video/webm' : 'audio/webm';
     const mr = new MediaRecorder(stream, { mimeType });
     mr.ondataavailable = e => { if (e.data.size > 0) chunksRef.current.push(e.data); };
     mr.onstop = async () => {
       stream.getTracks().forEach(t => t.stop());
+      streamRef.current = null;
       if (videoPreviewRef.current) videoPreviewRef.current.srcObject = null;
       const blob = new Blob(chunksRef.current, { type: mimeType });
       await handleBlob(blob, type);
     };
     mediaRecorderRef.current = mr;
     mr.start(250);
-    setRecording(true);
-    setRecordingMs(0);
     timerRef.current = setInterval(() => setRecordingMs(ms => ms + 100), 100);
   };
 
@@ -128,6 +140,10 @@ export default function LessonForm({ classId, user, lesson, onSave, onCancel }) 
     setRecording(false);
     if (mediaRecorderRef.current?.state !== 'inactive') {
       mediaRecorderRef.current.stop();
+      // onstop will clean up the stream
+    } else {
+      streamRef.current?.getTracks().forEach(t => t.stop());
+      streamRef.current = null;
     }
   };
 
@@ -301,10 +317,14 @@ export default function LessonForm({ classId, user, lesson, onSave, onCancel }) 
             </div>
           )}
 
-          {/* Video preview during recording */}
-          {recording && recordingType === 'video' && (
-            <video ref={videoPreviewRef} autoPlay muted className="w-full max-h-40 rounded-xl bg-black" />
-          )}
+          {/* Video preview during recording - always rendered so ref is always available */}
+          <video
+            ref={videoPreviewRef}
+            autoPlay
+            playsInline
+            muted
+            className={`w-full max-h-40 rounded-xl bg-black ${recording && recordingType === 'video' ? 'block' : 'hidden'}`}
+          />
 
           {uploading && (
             <div className="flex items-center gap-2 text-slate-400 text-sm">

@@ -30,12 +30,17 @@ export default function BattleTab({ classId, classData, user, isTeacher }) {
   const battleEnabled = classData?.battle_mode_enabled !== false; // default true unless explicitly disabled
 
   const { data: classStudents = [] } = useQuery({
-    queryKey: ['classStudentsForBattle', classData?.student_emails],
+    queryKey: ['classStudentsForBattle', classId],
     queryFn: async () => {
-      if (!classData?.student_emails?.length) return [];
-      return base44.entities.User.filter({ email: { $in: classData.student_emails } });
+      // Fetch fresh class data to get current student_emails
+      const classes = await base44.entities.Class.filter({ id: classId });
+      const cls = classes[0];
+      if (!cls?.student_emails?.length) return [];
+      const users = await base44.entities.User.list();
+      return users.filter(u => cls.student_emails.includes(u.email));
     },
-    enabled: !!classData?.student_emails?.length
+    enabled: !!classId,
+    staleTime: 30000
   });
 
   // Subscribe to BattleSession for incoming invites and active battles
@@ -298,6 +303,13 @@ function StudentBattleCard({ student, classId, isTeacher, disabled, onChallenge 
     enabled: !!classId && !!student.email
   });
 
+  const { data: progressList = [] } = useQuery({
+    queryKey: ['studentProgressCoins', student.email],
+    queryFn: () => base44.entities.StudentProgress.filter({ student_email: student.email }),
+    enabled: !!student.email
+  });
+
+  const coins = progressList[0]?.battle_coins || 0;
   const displayName = student.full_name || student.email.split('@')[0];
 
   return (
@@ -323,9 +335,14 @@ function StudentBattleCard({ student, classId, isTeacher, disabled, onChallenge 
         )}
       </div>
       <p className="text-white font-bold text-sm truncate">{displayName}</p>
-      <p className="text-amber-400 text-xs mt-1 font-semibold">
-        {wins.length} {wins.length === 1 ? 'win' : 'wins'}
-      </p>
+      <div className="flex items-center justify-center gap-2 mt-1">
+        <p className="text-amber-400 text-xs font-semibold">
+          ⚔️ {wins.length} {wins.length === 1 ? 'win' : 'wins'}
+        </p>
+        {coins > 0 && (
+          <p className="text-yellow-400 text-xs font-semibold">🪙 {coins}</p>
+        )}
+      </div>
       {!isTeacher && !disabled && (
         <div className="absolute inset-0 rounded-2xl flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-red-500/10">
           <span className="text-red-400 font-black text-sm flex items-center gap-1">

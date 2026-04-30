@@ -9,9 +9,11 @@ import {
   Calendar,
   Clock,
   CheckCircle2,
+  XCircle,
   AlertCircle,
   ChevronRight,
-  Trash2
+  Trash2,
+  Loader2
 } from 'lucide-react';
 
 export default function AssignmentsList({ classId, user, isTeacher, onCreateClick }) {
@@ -96,6 +98,15 @@ export default function AssignmentsList({ classId, user, isTeacher, onCreateClic
     return { label: `Due in ${days}d`, color: 'text-slate-400', icon: Calendar };
   };
 
+  const getSubmissionStatus = (assignmentId) => {
+    const isMarkedDone = assignmentStatuses.some(s => s.assignment_id === assignmentId && s.marked_done_by_student);
+    if (isMarkedDone) return { label: 'Completed', color: 'text-emerald-400', bg: 'bg-emerald-500/10 border-emerald-500/30', icon: CheckCircle2 };
+    const sub = submissions.find(s => s.assignment_id === assignmentId && s.student_email === user?.email);
+    if (!sub || sub.status === 'not_started') return { label: 'Not Started', color: 'text-red-400', bg: 'bg-red-500/10 border-red-500/30', icon: XCircle };
+    if (['submitted', 'graded'].includes(sub.status)) return { label: 'Submitted', color: 'text-emerald-400', bg: 'bg-emerald-500/10 border-emerald-500/30', icon: CheckCircle2 };
+    return { label: 'In Progress', color: 'text-amber-400', bg: 'bg-amber-500/10 border-amber-500/30', icon: AlertCircle };
+  };
+
   const now = new Date();
   const dueAssignments = assignments.filter((a) => {
     if (!a.due_date) return false;
@@ -164,42 +175,56 @@ export default function AssignmentsList({ classId, user, isTeacher, onCreateClic
                         transition={{ delay: index * 0.05 }}
                         className="group">
                         <Link to={createPageUrl(`TakeAssignment?id=${assignment.id}`)}>
-                          <div className="backdrop-blur-xl bg-gradient-to-r from-amber-500/10 to-orange-500/10 border border-amber-500/30 rounded-2xl p-5 hover:shadow-lg hover:shadow-amber-500/20 transition-all duration-300 cursor-pointer">
-                            <div className="flex items-start justify-between">
-                              <div className="flex-1">
-                                <h3 className="text-lg font-semibold text-white group-hover:text-amber-300 transition-colors">
-                                  {assignment.title}
-                                </h3>
+                          <div className="backdrop-blur-xl bg-white/[0.04] border border-white/10 rounded-2xl p-5 hover:bg-white/[0.08] hover:border-white/20 hover:shadow-lg transition-all duration-300 cursor-pointer">
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 flex-wrap mb-1">
+                                  <h3 className="text-base font-semibold text-white group-hover:text-purple-300 transition-colors truncate">
+                                    {assignment.title}
+                                  </h3>
+                                  {!isTeacher && (() => {
+                                    const st = getSubmissionStatus(assignment.id);
+                                    const StIcon = st.icon;
+                                    return (
+                                      <span className={`flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full border ${st.color} ${st.bg} flex-shrink-0`}>
+                                        <StIcon className="w-3 h-3" />
+                                        {st.label}
+                                      </span>
+                                    );
+                                  })()}
+                                </div>
                                 {assignment.description && (
-                                  <p className="text-slate-400 text-sm mt-1 line-clamp-2">
+                                  <p className="text-slate-400 text-sm mt-1 line-clamp-1">
                                     {assignment.description}
                                   </p>
                                 )}
-                                <div className="flex items-center gap-4 mt-3 text-sm">
+                                <div className="flex items-center gap-4 mt-2.5 text-xs">
                                   <span className={`flex items-center gap-1 font-medium ${status.color}`}>
-                                    <StatusIcon className="w-4 h-4" />
+                                    <StatusIcon className="w-3.5 h-3.5" />
                                     {status.label}
                                   </span>
                                   {assignment.max_points && (
-                                    <span className="text-slate-400">
-                                      {assignment.max_points} points
+                                    <span className="text-slate-500">
+                                      {assignment.max_points} pts
                                     </span>
                                   )}
                                 </div>
                               </div>
                               {!isTeacher && (
-                                <div className="flex items-center gap-2 ml-4 flex-shrink-0">
+                                <div className="flex items-center gap-2 flex-shrink-0">
                                   <Button
                                     size="sm"
                                     onClick={(e) => {
                                       e.preventDefault();
                                       markDoneMutation.mutate(assignment.id);
                                     }}
+                                    disabled={markDoneMutation.isPending}
                                     variant="outline"
-                                    className="border-slate-400/30 text-slate-300 hover:bg-white/10">
-                                    Mark Done
+                                    className="border-slate-600/50 text-slate-400 hover:bg-emerald-500/10 hover:text-emerald-400 hover:border-emerald-500/40 text-xs h-7 px-2.5">
+                                    {markDoneMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckCircle2 className="w-3 h-3 mr-1" />}
+                                    Done
                                   </Button>
-                                  <ChevronRight className="w-5 h-5 text-slate-500 group-hover:text-white transition-colors" />
+                                  <ChevronRight className="w-4 h-4 text-slate-500 group-hover:text-white transition-colors" />
                                 </div>
                               )}
                               {isTeacher && (
@@ -208,8 +233,8 @@ export default function AssignmentsList({ classId, user, isTeacher, onCreateClic
                                     e.preventDefault();
                                     deleteMutation.mutate(assignment.id);
                                   }}
-                                  className="p-2 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors ml-4">
-                                  <Trash2 className="w-5 h-5" />
+                                  className="p-2 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors">
+                                  <Trash2 className="w-4 h-4" />
                                 </button>
                               )}
                             </div>
@@ -237,22 +262,17 @@ export default function AssignmentsList({ classId, user, isTeacher, onCreateClic
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: index * 0.05 }}
-                    className="group opacity-60 hover:opacity-100 transition-opacity">
+                    className="group">
                     <Link to={createPageUrl(`TakeAssignment?id=${assignment.id}`)}>
-                      <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl p-5">
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <h3 className="text-lg font-semibold text-white">
+                      <div className="backdrop-blur-xl bg-emerald-500/[0.04] border border-emerald-500/20 rounded-2xl p-4 hover:bg-emerald-500/[0.08] transition-all">
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="flex items-center gap-2 flex-1 min-w-0">
+                            <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                            <h3 className="text-sm font-medium text-slate-300 truncate">
                               {assignment.title}
                             </h3>
-                            {assignment.due_date && (
-                              <p className="text-slate-500 text-sm mt-1">
-                                Completed on{' '}
-                                {new Date(assignment.due_date).toLocaleDateString()}
-                              </p>
-                            )}
                           </div>
-                          <ChevronRight className="w-5 h-5 text-slate-600 flex-shrink-0" />
+                          <span className="text-xs text-emerald-400 font-semibold flex-shrink-0">Completed</span>
                         </div>
                       </div>
                     </Link>

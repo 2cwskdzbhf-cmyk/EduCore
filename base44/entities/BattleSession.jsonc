@@ -46,6 +46,10 @@
       "type": "string",
       "description": "JSON array of answers per question"
     },
+    "power_ups_json": {
+      "type": "string",
+      "description": "JSON object tracking power-up usage per player"
+    },
     "challenger_score": {
       "type": "number",
       "default": 0
