@@ -10,12 +10,21 @@ import GlassCard from '@/components/ui/GlassCard';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   ChevronLeft, Users, UserPlus, Check, X, MessageSquare,
-  BookOpen, Clock, CheckCircle2, Send, Save
+  BookOpen, Clock, CheckCircle2, Send, Save, FileText, HardDrive
 } from 'lucide-react';
+import CollabDocsTab from '@/components/collab/CollabDocsTab';
+import DrivePanel from '@/components/collab/DrivePanel';
+
+const TABS = [
+  { id: 'collab', label: 'Classmates', icon: Users },
+  { id: 'docs', label: 'Shared Docs', icon: FileText },
+  { id: 'drive', label: 'Google Drive', icon: HardDrive },
+];
 
 export default function CollaborationHub() {
   const queryClient = useQueryClient();
   const [user, setUser] = useState(null);
+  const [activeTab, setActiveTab] = useState('collab');
   const [requestingFor, setRequestingFor] = useState(null); // { classmate, classId }
   const [selectedAssignmentId, setSelectedAssignmentId] = useState('');
   const [requestMessage, setRequestMessage] = useState('');
@@ -114,7 +123,34 @@ export default function CollaborationHub() {
             <ChevronLeft className="w-5 h-5" /> Back to Dashboard
           </Link>
           <h1 className="text-3xl font-bold text-white mb-2">Collaboration Hub</h1>
-          <p className="text-slate-400 mb-8">Work together with your classmates on assignments</p>
+          <p className="text-slate-400 mb-6">Work together with your classmates on assignments</p>
+
+          {/* Tabs */}
+          <div className="flex gap-1 mb-6 bg-white/5 p-1 rounded-xl border border-white/10">
+            {TABS.map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-semibold transition-all ${
+                  activeTab === tab.id
+                    ? 'bg-gradient-to-r from-purple-500 to-blue-500 text-white shadow-lg'
+                    : 'text-slate-400 hover:text-white hover:bg-white/5'
+                }`}
+              >
+                <tab.icon className="w-4 h-4" />
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Drive Tab */}
+          {activeTab === 'drive' && <DrivePanel />}
+
+          {/* Docs Tab */}
+          {activeTab === 'docs' && user && <CollabDocsTab user={user} classId={null} />}
+
+          {/* Collab Tab */}
+          {activeTab === 'collab' && <>
 
           {/* Pending Requests Banner */}
           {pendingReceived.length > 0 && (
@@ -221,6 +257,7 @@ export default function CollaborationHub() {
               </GlassCard>
             )}
           </div>
+          </>}
         </motion.div>
       </div>
 

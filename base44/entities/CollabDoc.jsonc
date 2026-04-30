@@ -1,0 +1,53 @@
+{
+  "name": "CollabDoc",
+  "type": "object",
+  "properties": {
+    "title": {
+      "type": "string",
+      "description": "Document title"
+    },
+    "class_id": {
+      "type": "string",
+      "description": "Class this doc belongs to"
+    },
+    "collab_request_id": {
+      "type": "string",
+      "description": "Optional: linked collaboration request"
+    },
+    "owner_email": {
+      "type": "string",
+      "description": "Who created the doc"
+    },
+    "collaborator_emails": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Emails of people who can edit"
+    },
+    "content": {
+      "type": "string",
+      "description": "Document content (rich text / markdown)"
+    },
+    "last_edited_by": {
+      "type": "string",
+      "description": "Email of last editor"
+    },
+    "last_edited_name": {
+      "type": "string",
+      "description": "Display name of last editor"
+    },
+    "drive_file_id": {
+      "type": "string",
+      "description": "Linked Google Drive file ID"
+    },
+    "drive_file_url": {
+      "type": "string",
+      "description": "Google Drive view link"
+    }
+  },
+  "required": [
+    "title",
+    "owner_email"
+  ]
+}

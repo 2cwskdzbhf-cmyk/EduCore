@@ -28,6 +28,7 @@ import AnnouncementsFeed from '@/components/class/AnnouncementsFeed';
 import AssignmentsList from '@/components/class/AssignmentsList';
 import ModernClassNav from '@/components/class/ModernClassNav';
 import BattleTab from '@/components/battle/BattleTab';
+import CollabDocsTab from '@/components/collab/CollabDocsTab';
 
 const NAV_ITEMS = [
   { id: 'lessons', icon: '📖', label: 'Lessons' },
@@ -41,6 +42,7 @@ const NAV_ITEMS = [
   { id: 'messaging', icon: '💬', label: 'Messaging' },
   { id: 'polls', icon: '📊', label: 'Polls' },
   { id: 'whiteboard', icon: '✏️', label: 'Whiteboard' },
+  { id: 'docs', icon: '📄', label: 'Shared Docs' },
   { id: 'tools', icon: '🛠', label: 'Useful Tools' },
 ];
 
@@ -704,6 +706,11 @@ export default function TeacherClassDetail() {
                 {/* BATTLE */}
                 {activeTab === 'battle' && user && classData && (
                   <BattleTab classId={classId} classData={classData} user={user} isTeacher={true} />
+                )}
+
+                {/* SHARED DOCS */}
+                {activeTab === 'docs' && user && (
+                  <CollabDocsTab user={user} classId={classId} />
                 )}
 
                 {/* TOOLS */}
