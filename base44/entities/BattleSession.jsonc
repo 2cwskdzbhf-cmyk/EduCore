@@ -1,0 +1,90 @@
+{
+  "name": "BattleSession",
+  "type": "object",
+  "properties": {
+    "class_id": {
+      "type": "string"
+    },
+    "challenger_email": {
+      "type": "string"
+    },
+    "challenger_name": {
+      "type": "string"
+    },
+    "opponent_email": {
+      "type": "string"
+    },
+    "opponent_name": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "active",
+        "question",
+        "round_result",
+        "finished",
+        "declined",
+        "cancelled"
+      ],
+      "default": "pending"
+    },
+    "current_question_index": {
+      "type": "number",
+      "default": 0
+    },
+    "question_started_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "questions_json": {
+      "type": "string",
+      "description": "JSON array of questions"
+    },
+    "answers_json": {
+      "type": "string",
+      "description": "JSON array of answers per question"
+    },
+    "challenger_score": {
+      "type": "number",
+      "default": 0
+    },
+    "opponent_score": {
+      "type": "number",
+      "default": 0
+    },
+    "challenger_wins": {
+      "type": "number",
+      "default": 0
+    },
+    "opponent_wins": {
+      "type": "number",
+      "default": 0
+    },
+    "winner_email": {
+      "type": "string"
+    },
+    "topic_id": {
+      "type": "string"
+    },
+    "total_questions": {
+      "type": "number",
+      "default": 5
+    },
+    "phase": {
+      "type": "string",
+      "enum": [
+        "thinking",
+        "answering",
+        "result"
+      ],
+      "default": "thinking"
+    }
+  },
+  "required": [
+    "class_id",
+    "challenger_email",
+    "opponent_email"
+  ]
+}

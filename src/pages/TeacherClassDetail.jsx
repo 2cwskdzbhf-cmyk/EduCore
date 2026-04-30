@@ -27,6 +27,7 @@ import ClassToolsPanel from '@/components/class/ClassToolsPanel';
 import AnnouncementsFeed from '@/components/class/AnnouncementsFeed';
 import AssignmentsList from '@/components/class/AssignmentsList';
 import ModernClassNav from '@/components/class/ModernClassNav';
+import BattleTab from '@/components/battle/BattleTab';
 
 const NAV_ITEMS = [
   { id: 'lessons', icon: '📖', label: 'Lessons' },
@@ -34,6 +35,7 @@ const NAV_ITEMS = [
   { id: 'create', icon: '✏️', label: 'Create Assignment' },
   { id: 'live', icon: '⚡', label: 'Live Quizzes' },
   { id: 'announcements', icon: '📢', label: 'Announcements' },
+  { id: 'battle', icon: '⚔️', label: '1v1 Battle' },
   { id: 'students', icon: '👥', label: 'Students' },
   { id: 'analytics', icon: '📊', label: 'Analytics' },
   { id: 'messaging', icon: '💬', label: 'Messaging' },
@@ -686,6 +688,11 @@ export default function TeacherClassDetail() {
                 {/* ANNOUNCEMENTS */}
                 {activeTab === 'announcements' && user && (
                   <AnnouncementsFeed classId={classId} user={user} isTeacher={true} />
+                )}
+
+                {/* BATTLE */}
+                {activeTab === 'battle' && user && classData && (
+                  <BattleTab classId={classId} classData={classData} user={user} isTeacher={true} />
                 )}
 
                 {/* TOOLS */}

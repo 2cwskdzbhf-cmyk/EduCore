@@ -1,0 +1,87 @@
+{
+  "name": "Class",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Class name (e.g., Year 9 Maths Set 1)"
+    },
+    "teacher_email": {
+      "type": "string"
+    },
+    "co_teacher_emails": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Additional teachers"
+    },
+    "subject_id": {
+      "type": "string"
+    },
+    "year_group": {
+      "type": "number",
+      "description": "Year group (7-11)",
+      "minimum": 7,
+      "maximum": 11
+    },
+    "academic_year": {
+      "type": "string",
+      "description": "e.g., 2024-2025"
+    },
+    "student_emails": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "join_code": {
+      "type": "string",
+      "description": "Code for students to join"
+    },
+    "description": {
+      "type": "string"
+    },
+    "color": {
+      "type": "string"
+    },
+    "schedule": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "day": {
+            "type": "string"
+          },
+          "start_time": {
+            "type": "string"
+          },
+          "end_time": {
+            "type": "string"
+          },
+          "room": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true
+    },
+    "is_archived": {
+      "type": "boolean",
+      "default": false
+    },
+    "battle_mode_enabled": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether 1v1 battle mode is enabled for this class"
+    }
+  },
+  "required": [
+    "name",
+    "teacher_email",
+    "year_group"
+  ]
+}

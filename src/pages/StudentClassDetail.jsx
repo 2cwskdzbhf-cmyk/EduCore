@@ -16,6 +16,7 @@ import AnnouncementsFeed from '@/components/class/AnnouncementsFeed';
 import AssignmentsList from '@/components/class/AssignmentsList';
 import ModernClassNav from '@/components/class/ModernClassNav';
 import ModernLeaderboard from '@/components/class/ModernLeaderboard';
+import BattleTab from '@/components/battle/BattleTab';
 import {
   ChevronLeft, ClipboardList, Trophy, Clock, MessageCircle,
   BarChart3, Menu, Loader2, CheckCircle2, AlertCircle, BookOpen, Wrench
@@ -24,6 +25,7 @@ import {
 const NAV_ITEMS = [
   { id: 'lessons', icon: '📖', label: 'Lessons' },
   { id: 'assignments', icon: '📋', label: 'Assignments' },
+  { id: 'battle', icon: '⚔️', label: '1v1 Battle' },
   { id: 'leaderboard', icon: '🏆', label: 'Leaderboard' },
   { id: 'messaging', icon: '💬', label: 'Messaging' },
   { id: 'polls', icon: '📊', label: 'Polls' },
@@ -135,6 +137,11 @@ export default function StudentClassDetail() {
                 {/* LEADERBOARD */}
                 {activeTab==='leaderboard' && (
                   <ModernLeaderboard classId={classId} classData={classData} user={user} isTeacher={false} />
+                )}
+
+                {/* BATTLE */}
+                {activeTab==='battle' && user && classData && (
+                  <BattleTab classId={classId} classData={classData} user={user} isTeacher={false} />
                 )}
 
                 {/* MESSAGING */}

@@ -1,0 +1,35 @@
+{
+  "name": "BattleWin",
+  "type": "object",
+  "properties": {
+    "class_id": {
+      "type": "string"
+    },
+    "winner_email": {
+      "type": "string"
+    },
+    "winner_name": {
+      "type": "string"
+    },
+    "loser_email": {
+      "type": "string"
+    },
+    "loser_name": {
+      "type": "string"
+    },
+    "winner_score": {
+      "type": "number"
+    },
+    "loser_score": {
+      "type": "number"
+    },
+    "battle_session_id": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "class_id",
+    "winner_email",
+    "loser_email"
+  ]
+}
