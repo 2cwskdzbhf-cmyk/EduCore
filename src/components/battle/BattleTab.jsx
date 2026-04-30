@@ -32,24 +32,15 @@ export default function BattleTab({ classId, classData, user, isTeacher, classSt
 
   const studentEmails = classData?.student_emails || [];
 
-  // If parent already has students loaded (TeacherClassDetail), use them directly.
-  // Otherwise fetch using the exact same $in filter as the Students tab.
-  const { data: fetchedStudents = [], isLoading: studentsLoading, isError: studentsError, refetch: refetchStudents } = useQuery({
-    queryKey: ['classStudentsForBattle', classId, studentEmails.join(',')],
-    queryFn: async () => {
-      console.log('1v1 class_id:', classId);
-      console.log('1v1 student_emails:', studentEmails);
-      if (!studentEmails.length) return [];
-      const users = await base44.entities.User.filter({ email: { $in: studentEmails } });
-      console.log('Loaded students:', users);
-      return users;
-    },
-    enabled: !!classId && studentEmails.length > 0 && !classStudentsProp,
-    staleTime: 30000,
-    retry: 2,
+  // Build student list from emails directly (no User fetch needed — same approach as BattleLeaderboard)
+  // If teacher passed classStudents prop, enrich with real names; otherwise use email-derived display objects
+  const classStudents = studentEmails.map(email => {
+    const match = classStudentsProp?.find(u => u.email === email);
+    return match || { email, full_name: email.split('@')[0], id: email };
   });
 
-  const classStudents = classStudentsProp || fetchedStudents;
+  const studentsLoading = false;
+  const studentsError = false;
 
   // Subscribe to BattleSession for incoming invites and active battles
   useEffect(() => {
@@ -283,11 +274,6 @@ export default function BattleTab({ classId, classData, user, isTeacher, classSt
                 ) : studentsLoading ? (
                   <div className="flex items-center justify-center py-12 gap-2 text-slate-400">
                     <Loader2 className="w-5 h-5 animate-spin" /> Loading students…
-                  </div>
-                ) : studentsError ? (
-                  <div className="text-center py-12">
-                    <p className="text-red-400 mb-3">Unable to load students. Please try again.</p>
-                    <button onClick={() => refetchStudents()} className="px-4 py-2 rounded-xl bg-white/10 text-white text-sm hover:bg-white/20 transition-colors">Retry</button>
                   </div>
                 ) : studentEmails.length === 0 ? (
                   <div className="text-center py-12 text-slate-500">No students enrolled in this class yet.</div>
