@@ -69,75 +69,75 @@ export default function GamificationWidget({ studentEmail }) {
     return false;
   });
 
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 16 }}
-      animate={{ opacity: 1, y: 0 }} className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl p-5 mb-6 hidden">
+  return null;
 
-      
-      {/* Level + XP bar */}
-      <div className="flex items-center gap-4 mb-4">
-        <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${current.color} flex flex-col items-center justify-center shadow-lg flex-shrink-0`}>
-          <span className="text-white font-black text-lg leading-none">{current.level}</span>
-          <span className="text-white/70 text-[9px] font-bold uppercase tracking-wide">LVL</span>
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center justify-between mb-1">
-            <p className="text-white font-bold text-sm">{current.title}</p>
-            {next && <p className="text-slate-400 text-xs">{xpIntoLevel} / {xpForNextLevel} XP</p>}
-          </div>
-          <div className="h-2 bg-white/10 rounded-full overflow-hidden">
-            <motion.div
-              className={`h-full rounded-full bg-gradient-to-r ${current.color}`}
-              initial={{ width: 0 }}
-              animate={{ width: `${pct}%` }}
-              transition={{ duration: 1, ease: 'easeOut' }} />
-            
-          </div>
-          {next && <p className="text-slate-500 text-xs mt-1">Next: {next.title} at Level {next.level}</p>}
-        </div>
-      </div>
 
-      {/* Stats row */}
-      <div className="grid grid-cols-3 gap-3 mb-4">
-        <div className="text-center bg-white/5 rounded-xl p-3">
-          <div className="flex items-center justify-center gap-1 mb-1">
-            <Star className="w-4 h-4 text-amber-400" />
-            <span className="text-amber-400 font-black">{xp}</span>
-          </div>
-          <p className="text-slate-500 text-xs">Total XP</p>
-        </div>
-        <div className="text-center bg-white/5 rounded-xl p-3">
-          <div className="flex items-center justify-center gap-1 mb-1">
-            <Flame className={`w-4 h-4 ${streak >= 3 ? 'text-orange-400' : 'text-slate-500'}`} />
-            <span className={`font-black ${streak >= 3 ? 'text-orange-400' : 'text-white'}`}>{streak}</span>
-          </div>
-          <p className="text-slate-500 text-xs">Day Streak</p>
-        </div>
-        <div className="text-center bg-white/5 rounded-xl p-3">
-          <div className="flex items-center justify-center gap-1 mb-1">
-            <span className="text-yellow-400 text-base">🪙</span>
-            <span className="text-yellow-400 font-black">{coins}</span>
-          </div>
-          <p className="text-slate-500 text-xs">Coins</p>
-        </div>
-      </div>
 
-      {/* Badges */}
-      {earnedBadges.length > 0 &&
-      <div>
-          <p className="text-slate-500 text-xs font-semibold uppercase tracking-wide mb-2">Badges earned</p>
-          <div className="flex flex-wrap gap-2">
-            {earnedBadges.map((badge) =>
-          <div key={badge.id} title={badge.desc}
-          className="flex items-center gap-1.5 bg-white/5 border border-white/10 rounded-xl px-2.5 py-1.5">
-                <span>{badge.emoji}</span>
-                <span className="text-white text-xs font-semibold">{badge.label}</span>
-              </div>
-          )}
-          </div>
-        </div>
-      }
-    </motion.div>);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 }
