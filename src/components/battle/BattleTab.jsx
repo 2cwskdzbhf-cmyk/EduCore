@@ -30,27 +30,24 @@ export default function BattleTab({ classId, classData, user, isTeacher }) {
 
   const battleEnabled = classData?.battle_mode_enabled !== false; // default true unless explicitly disabled
 
-  const { data: classStudents = [], isLoading: studentsLoading } = useQuery({
-    queryKey: ['classStudentsForBattle', classId, classData?.student_emails?.join(',')],
+  const { data: classStudents = [], isLoading: studentsLoading, isError: studentsError } = useQuery({
+    queryKey: ['classStudentsForBattle', classId],
     queryFn: async () => {
-      // Use student_emails directly from classData prop to avoid extra fetch
-      const emails = classData?.student_emails || [];
-      if (!emails.length) {
-        // Fallback: re-fetch class
-        const classes = await base44.entities.Class.filter({ id: classId });
-        const cls = classes[0];
-        if (!cls?.student_emails?.length) return [];
-        const allUsers = await base44.entities.User.list();
-        console.log('[BattleTab] Fetched students (fallback):', cls.student_emails, 'users found:', allUsers.filter(u => cls.student_emails.includes(u.email)).length);
-        return allUsers.filter(u => cls.student_emails.includes(u.email));
-      }
+      console.log('[BattleTab] Class ID:', classId);
+      // Always re-fetch class to get latest student_emails
+      const classes = await base44.entities.Class.filter({ id: classId });
+      const cls = classes[0];
+      const emails = cls?.student_emails || [];
+      console.log('[BattleTab] Student emails from class:', emails);
+      if (!emails.length) return [];
       const allUsers = await base44.entities.User.list();
       const result = allUsers.filter(u => emails.includes(u.email));
-      console.log('[BattleTab] class_id:', classId, 'student_emails:', emails, 'matched users:', result.length);
+      console.log('[BattleTab] Students matched:', result.length);
       return result;
     },
     enabled: !!classId,
-    staleTime: 30000
+    staleTime: 30000,
+    retry: 1,
   });
 
   // Subscribe to BattleSession for incoming invites and active battles
@@ -284,12 +281,10 @@ export default function BattleTab({ classId, classData, user, isTeacher }) {
                   <div className="flex items-center justify-center py-12 gap-2 text-slate-400">
                     <Loader2 className="w-5 h-5 animate-spin" /> Loading students…
                   </div>
+                ) : studentsError ? (
+                  <div className="text-center py-12 text-red-400">Failed to load students. Please refresh.</div>
                 ) : classStudents.filter(s => s.email !== user.email).length === 0 ? (
-                  <div className="text-center py-12 text-slate-500">
-                    {classData?.student_emails?.length > 1
-                      ? 'Loading student profiles…'
-                      : 'No other students enrolled yet'}
-                  </div>
+                  <div className="text-center py-12 text-slate-500">No other students in this class to challenge.</div>
                 ) : (
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                     {classStudents
