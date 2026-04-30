@@ -1,0 +1,44 @@
+{
+  "name": "ClassJoinRequest",
+  "type": "object",
+  "properties": {
+    "class_id": {
+      "type": "string",
+      "description": "Reference to Class"
+    },
+    "class_name": {
+      "type": "string"
+    },
+    "student_email": {
+      "type": "string"
+    },
+    "student_name": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "approved",
+        "rejected"
+      ],
+      "default": "pending"
+    },
+    "invite_token": {
+      "type": "string",
+      "description": "Token used to join (if via invite link)"
+    },
+    "reviewed_by": {
+      "type": "string",
+      "description": "Teacher email who reviewed"
+    },
+    "reviewed_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "class_id",
+    "student_email"
+  ]
+}

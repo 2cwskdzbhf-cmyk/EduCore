@@ -1,0 +1,47 @@
+{
+  "name": "ClassInvite",
+  "type": "object",
+  "properties": {
+    "class_id": {
+      "type": "string",
+      "description": "Reference to Class"
+    },
+    "class_name": {
+      "type": "string"
+    },
+    "token": {
+      "type": "string",
+      "description": "Unique invite token (URL-safe)"
+    },
+    "created_by": {
+      "type": "string",
+      "description": "Teacher email who created the invite"
+    },
+    "expires_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the link expires (null = never)"
+    },
+    "max_uses": {
+      "type": "number",
+      "description": "Max number of uses (null = unlimited)"
+    },
+    "use_count": {
+      "type": "number",
+      "default": 0
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true
+    },
+    "label": {
+      "type": "string",
+      "description": "Optional label for this invite link"
+    }
+  },
+  "required": [
+    "class_id",
+    "token",
+    "created_by"
+  ]
+}

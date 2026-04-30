@@ -7,6 +7,7 @@ import { createPageUrl } from '@/utils';
 import { Button } from '@/components/ui/button';
 import GlassCard from '@/components/ui/GlassCard';
 import ClassMessaging from '@/components/class/ClassMessaging';
+import ClassBanner from '@/components/class/ClassBanner';
 import InteractiveWhiteboard from '@/components/whiteboard/InteractiveWhiteboard';
 import WhiteboardChat from '@/components/whiteboard/WhiteboardChat';
 import ClassLessons from '@/components/lessons/ClassLessons';
@@ -121,6 +122,14 @@ export default function StudentClassDetail() {
           </div>
 
           <div className="p-6 max-w-4xl mx-auto">
+            {/* Class Banner */}
+            {classData && (
+              <ClassBanner
+                classData={classData}
+                studentCount={classData.student_emails?.length || 0}
+                role="student"
+              />
+            )}
             <AnimatePresence mode="wait">
               <motion.div key={activeTab} initial={{ opacity:0,y:12 }} animate={{ opacity:1,y:0 }} exit={{ opacity:0,y:-12 }} transition={{ duration:0.2 }}>
 

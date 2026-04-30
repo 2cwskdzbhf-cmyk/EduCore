@@ -28,6 +28,10 @@ import AnnouncementsFeed from '@/components/class/AnnouncementsFeed';
 import AssignmentsList from '@/components/class/AssignmentsList';
 import ModernClassNav from '@/components/class/ModernClassNav';
 import BattleTab from '@/components/battle/BattleTab';
+import ClassInvitePanel from '@/components/class/ClassInvitePanel';
+import ClassJoinRequestsPanel from '@/components/class/ClassJoinRequestsPanel';
+import ClassSettingsPanel from '@/components/class/ClassSettingsPanel';
+import ClassBanner from '@/components/class/ClassBanner';
 
 const NAV_ITEMS = [
   { id: 'lessons', icon: '📖', label: 'Lessons' },
@@ -41,6 +45,9 @@ const NAV_ITEMS = [
   { id: 'messaging', icon: '💬', label: 'Messaging' },
   { id: 'polls', icon: '📊', label: 'Polls' },
   { id: 'whiteboard', icon: '✏️', label: 'Whiteboard' },
+  { id: 'invites', icon: '🔗', label: 'Invite Links' },
+  { id: 'requests', icon: '🙋', label: 'Join Requests' },
+  { id: 'settings', icon: '⚙️', label: 'Class Settings' },
   { id: 'tools', icon: '🛠', label: 'Useful Tools' },
 ];
 
@@ -53,6 +60,13 @@ export default function TeacherClassDetail() {
   const [user, setUser] = useState(null);
   const [activeTab, setActiveTab] = useState('lessons');
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  const { data: pendingRequests = [] } = useQuery({
+    queryKey: ['pendingJoinRequests', classId],
+    queryFn: () => base44.entities.ClassJoinRequest.filter({ class_id: classId, status: 'pending' }),
+    enabled: !!classId,
+    refetchInterval: 15000,
+  });
 
   // Create assignment state
   const [selectedTopic, setSelectedTopic] = useState('');
@@ -320,7 +334,12 @@ export default function TeacherClassDetail() {
                   }`}
                 >
                   <span>{item.icon}</span>
-                  <span>{item.label}</span>
+                  <span className="flex-1">{item.label}</span>
+                  {item.id === 'requests' && pendingRequests.length > 0 && (
+                    <span className="w-5 h-5 rounded-full bg-amber-500 text-white text-xs flex items-center justify-center font-bold flex-shrink-0">
+                      {pendingRequests.length}
+                    </span>
+                  )}
                 </button>
               )
             ))}
@@ -343,6 +362,15 @@ export default function TeacherClassDetail() {
           </div>
 
           <div className="p-6 max-w-5xl mx-auto">
+            {/* Class Banner */}
+            {classData && (
+              <ClassBanner
+                classData={classData}
+                subject={subject}
+                studentCount={classData.student_emails?.length || 0}
+                role="teacher"
+              />
+            )}
             <AnimatePresence mode="wait">
               <motion.div key={activeTab} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }} transition={{ duration: 0.2 }}>
 
@@ -704,6 +732,21 @@ export default function TeacherClassDetail() {
                 {/* BATTLE */}
                 {activeTab === 'battle' && user && classData && (
                   <BattleTab classId={classId} classData={classData} user={user} isTeacher={true} />
+                )}
+
+                {/* INVITE LINKS */}
+                {activeTab === 'invites' && classData && (
+                  <ClassInvitePanel classId={classId} classData={classData} />
+                )}
+
+                {/* JOIN REQUESTS */}
+                {activeTab === 'requests' && classData && (
+                  <ClassJoinRequestsPanel classId={classId} classData={classData} />
+                )}
+
+                {/* SETTINGS */}
+                {activeTab === 'settings' && classData && (
+                  <ClassSettingsPanel classId={classId} classData={classData} onUpdate={() => queryClient.invalidateQueries(['class', classId])} />
                 )}
 
                 {/* TOOLS */}

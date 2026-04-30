@@ -16,6 +16,13 @@
       },
       "description": "Additional teachers"
     },
+    "assistant_teacher_emails": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Assistant teachers"
+    },
     "subject_id": {
       "type": "string"
     },
@@ -75,8 +82,53 @@
     },
     "battle_mode_enabled": {
       "type": "boolean",
-      "default": true,
-      "description": "Whether 1v1 battle mode is enabled for this class"
+      "default": true
+    },
+    "require_join_approval": {
+      "type": "boolean",
+      "default": false,
+      "description": "If true, students must be approved before joining"
+    },
+    "theme_color": {
+      "type": "string",
+      "description": "Hex color for class theme, e.g. #7c3aed"
+    },
+    "theme_preset": {
+      "type": "string",
+      "enum": [
+        "purple",
+        "blue",
+        "emerald",
+        "amber",
+        "rose",
+        "cyan",
+        "default"
+      ],
+      "default": "default"
+    },
+    "banner_url": {
+      "type": "string",
+      "description": "URL for class banner image"
+    },
+    "icon_emoji": {
+      "type": "string",
+      "description": "Emoji icon for the class, e.g. \ud83d\udcd0"
+    },
+    "pinned_item_id": {
+      "type": "string",
+      "description": "ID of pinned lesson or announcement"
+    },
+    "pinned_item_type": {
+      "type": "string",
+      "enum": [
+        "lesson",
+        "announcement"
+      ],
+      "description": "Type of pinned item"
+    },
+    "pinned_item_label": {
+      "type": "string",
+      "description": "Cached label of pinned item"
     }
   },
   "required": [
