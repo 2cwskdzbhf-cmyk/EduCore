@@ -30,24 +30,23 @@ export default function BattleTab({ classId, classData, user, isTeacher }) {
 
   const battleEnabled = classData?.battle_mode_enabled !== false; // default true unless explicitly disabled
 
-  const { data: classStudents = [], isLoading: studentsLoading, isError: studentsError } = useQuery({
-    queryKey: ['classStudentsForBattle', classId],
+  // Use student_emails from classData prop directly — same source as Students tab
+  const studentEmails = classData?.student_emails || [];
+
+  const { data: classStudents = [], isLoading: studentsLoading, isError: studentsError, refetch: refetchStudents } = useQuery({
+    queryKey: ['classStudentsForBattle', classId, studentEmails.join(',')],
     queryFn: async () => {
-      console.log('[BattleTab] Class ID:', classId);
-      // Always re-fetch class to get latest student_emails
-      const classes = await base44.entities.Class.filter({ id: classId });
-      const cls = classes[0];
-      const emails = cls?.student_emails || [];
-      console.log('[BattleTab] Student emails from class:', emails);
-      if (!emails.length) return [];
-      const allUsers = await base44.entities.User.list();
-      const result = allUsers.filter(u => emails.includes(u.email));
-      console.log('[BattleTab] Students matched:', result.length);
-      return result;
+      console.log('1v1 class_id:', classId);
+      console.log('1v1 student_emails:', studentEmails);
+      if (!studentEmails.length) return [];
+      // Use $in filter (same as Students tab) — avoids listing all users
+      const users = await base44.entities.User.filter({ email: { $in: studentEmails } });
+      console.log('1v1 students loaded:', users.length);
+      return users;
     },
-    enabled: !!classId,
+    enabled: !!classId && studentEmails.length > 0,
     staleTime: 30000,
-    retry: 1,
+    retry: 2,
   });
 
   // Subscribe to BattleSession for incoming invites and active battles
@@ -277,12 +276,19 @@ export default function BattleTab({ classId, classData, user, isTeacher }) {
                 <p className="text-slate-400 text-sm mb-4">
                   {isTeacher ? 'Students in this class:' : 'Choose an opponent to challenge:'}
                 </p>
-                {studentsLoading ? (
+                {!classId ? (
+                  <div className="text-center py-12 text-slate-500">Class not loaded.</div>
+                ) : studentsLoading ? (
                   <div className="flex items-center justify-center py-12 gap-2 text-slate-400">
                     <Loader2 className="w-5 h-5 animate-spin" /> Loading students…
                   </div>
                 ) : studentsError ? (
-                  <div className="text-center py-12 text-red-400">Failed to load students. Please refresh.</div>
+                  <div className="text-center py-12">
+                    <p className="text-red-400 mb-3">Unable to load students. Please try again.</p>
+                    <button onClick={() => refetchStudents()} className="px-4 py-2 rounded-xl bg-white/10 text-white text-sm hover:bg-white/20 transition-colors">Retry</button>
+                  </div>
+                ) : studentEmails.length === 0 ? (
+                  <div className="text-center py-12 text-slate-500">No students enrolled in this class yet.</div>
                 ) : classStudents.filter(s => s.email !== user.email).length === 0 ? (
                   <div className="text-center py-12 text-slate-500">No other students in this class to challenge.</div>
                 ) : (
