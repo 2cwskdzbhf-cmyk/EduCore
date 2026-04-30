@@ -30,15 +30,24 @@ export default function BattleTab({ classId, classData, user, isTeacher }) {
 
   const battleEnabled = classData?.battle_mode_enabled !== false; // default true unless explicitly disabled
 
-  const { data: classStudents = [] } = useQuery({
-    queryKey: ['classStudentsForBattle', classId],
+  const { data: classStudents = [], isLoading: studentsLoading } = useQuery({
+    queryKey: ['classStudentsForBattle', classId, classData?.student_emails?.join(',')],
     queryFn: async () => {
-      // Fetch fresh class data to get current student_emails
-      const classes = await base44.entities.Class.filter({ id: classId });
-      const cls = classes[0];
-      if (!cls?.student_emails?.length) return [];
-      const users = await base44.entities.User.list();
-      return users.filter(u => cls.student_emails.includes(u.email));
+      // Use student_emails directly from classData prop to avoid extra fetch
+      const emails = classData?.student_emails || [];
+      if (!emails.length) {
+        // Fallback: re-fetch class
+        const classes = await base44.entities.Class.filter({ id: classId });
+        const cls = classes[0];
+        if (!cls?.student_emails?.length) return [];
+        const allUsers = await base44.entities.User.list();
+        console.log('[BattleTab] Fetched students (fallback):', cls.student_emails, 'users found:', allUsers.filter(u => cls.student_emails.includes(u.email)).length);
+        return allUsers.filter(u => cls.student_emails.includes(u.email));
+      }
+      const allUsers = await base44.entities.User.list();
+      const result = allUsers.filter(u => emails.includes(u.email));
+      console.log('[BattleTab] class_id:', classId, 'student_emails:', emails, 'matched users:', result.length);
+      return result;
     },
     enabled: !!classId,
     staleTime: 30000
@@ -72,31 +81,35 @@ export default function BattleTab({ classId, classData, user, isTeacher }) {
       const s = event.data;
       if (!s || s.class_id !== classId) return;
 
-      // Incoming invite for me
-      if (s.opponent_email === user.email && s.status === 'pending' && event.type === 'create') {
+      const iAmInvolved = s.challenger_email === user.email || s.opponent_email === user.email;
+      if (!iAmInvolved) return;
+
+      // Incoming invite for me (opponent)
+      if (s.opponent_email === user.email && s.status === 'pending') {
+        console.log('[BattleTab] Incoming invite received from', s.challenger_name);
         setIncomingInvite(s);
         return;
       }
-      // My pending invite was accepted → start battle
-      if (s.challenger_email === user.email && s.status === 'question') {
+
+      // Battle accepted → both players start
+      if (s.status === 'question') {
+        console.log('[BattleTab] Battle started, entering arena');
         setPendingInvite(null);
+        setIncomingInvite(null);
         setActiveBattle(s);
         return;
       }
-      // I'm in an active battle
-      if ((s.challenger_email === user.email || s.opponent_email === user.email) &&
-          ['active', 'question', 'round_result', 'finished'].includes(s.status)) {
-        if (s.status === 'finished') {
-          // Let BattleArena handle finished state
-          return;
-        }
-        if (!activeBattle) setActiveBattle(s);
-        return;
-      }
-      // Invite declined
+
+      // Invite declined → notify challenger
       if (s.challenger_email === user.email && s.status === 'declined') {
         setPendingInvite(null);
         queryClient.invalidateQueries(['battleWins', classId]);
+        return;
+      }
+
+      // Active/round_result updates
+      if (['active', 'round_result'].includes(s.status)) {
+        setActiveBattle(s);
       }
     });
 
@@ -265,29 +278,36 @@ export default function BattleTab({ classId, classData, user, isTeacher }) {
 
                 {/* Student grid */}
                 <p className="text-slate-400 text-sm mb-4">
-                  {isTeacher ? 'Students in this class:' : 'Choose an opponent:'}
+                  {isTeacher ? 'Students in this class:' : 'Choose an opponent to challenge:'}
                 </p>
-                {classStudents.length === 0 ? (
-                  <div className="text-center py-12 text-slate-500">No students enrolled yet</div>
+                {studentsLoading ? (
+                  <div className="flex items-center justify-center py-12 gap-2 text-slate-400">
+                    <Loader2 className="w-5 h-5 animate-spin" /> Loading students…
+                  </div>
+                ) : classStudents.filter(s => s.email !== user.email).length === 0 ? (
+                  <div className="text-center py-12 text-slate-500">
+                    {classData?.student_emails?.length > 1
+                      ? 'Loading student profiles…'
+                      : 'No other students enrolled yet'}
+                  </div>
                 ) : (
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                     {classStudents
                       .filter(s => s.email !== user.email)
                       .map(student => (
                         <StudentBattleCard
-                          key={student.id}
+                          key={student.id || student.email}
                           student={student}
                           classId={classId}
                           isTeacher={isTeacher}
                           disabled={!!pendingInvite || challengeMutation.isPending}
-                          onChallenge={() => !isTeacher && challengeMutation.mutate(student)}
+                          onChallenge={() => {
+                            if (isTeacher) return;
+                            console.log('[BattleTab] Invite sent to:', student.email);
+                            challengeMutation.mutate(student);
+                          }}
                         />
                       ))}
-                    {classStudents.filter(s => s.email !== user.email).length === 0 && (
-                      <div className="col-span-3 text-center py-12 text-slate-500">
-                        No other students to challenge
-                      </div>
-                    )}
                   </div>
                 )}
               </motion.div>
