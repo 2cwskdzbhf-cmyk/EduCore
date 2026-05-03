@@ -2,13 +2,12 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { base44 } from '@/api/base44Client';
 import { BattleSound } from './BattleSoundEngine';
-import { Swords, Zap, Trophy, X, Snowflake, Star } from 'lucide-react';
+import { Swords, X, Snowflake, Star, Shield, RefreshCw, Lightbulb } from 'lucide-react';
 
 const THINKING_SECS = 4;
-const ANSWERING_SECS = 10;
+const ANSWERING_SECS = 12;
 const RESULT_SECS = 3;
 const MAX_POINTS = 500;
-
 const WIN_COINS = 50;
 const LOSE_COINS = 10;
 
@@ -19,29 +18,44 @@ function getPoints(isCorrect, timeMs, maxMs, doubled = false) {
   return doubled ? base * 2 : base;
 }
 
-function PlayerHeader({ name, score, isMe, avatar, frozen, doubleActive }) {
+function getInventory(progress) {
+  try { return JSON.parse(progress?.weak_areas?.[0] || '{}'); } catch { return {}; }
+}
+
+function PlayerHeader({ name, score, isMe, frozen, doubleActive, shieldActive, nameColor }) {
+  const nameClass = nameColor === 'gold'
+    ? 'text-amber-400'
+    : nameColor === 'neon'
+    ? 'text-cyan-400'
+    : 'text-white';
+
   return (
     <div className={`flex flex-col items-center gap-1 ${isMe ? 'items-start' : 'items-end'}`}>
       <div className="relative">
-        <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center text-white text-xl font-black shadow-lg overflow-hidden border-2 border-white/20">
-          {avatar ? <img src={avatar} alt="" className="w-full h-full object-cover" /> : name?.charAt(0)?.toUpperCase()}
+        <div className="w-14 h-14 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center text-white text-2xl font-black shadow-lg overflow-hidden border-2 border-white/20">
+          {name?.charAt(0)?.toUpperCase()}
         </div>
         {frozen && (
-          <div className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center">
-            <Snowflake className="w-3 h-3 text-white" />
+          <div className="absolute -top-1 -right-1 w-6 h-6 rounded-full bg-blue-500 flex items-center justify-center shadow-lg shadow-blue-500/50">
+            <Snowflake className="w-3.5 h-3.5 text-white" />
           </div>
         )}
         {doubleActive && (
-          <div className="absolute -top-1 -left-1 w-5 h-5 rounded-full bg-amber-500 flex items-center justify-center">
-            <Star className="w-3 h-3 text-white" />
+          <div className="absolute -top-1 -left-1 w-6 h-6 rounded-full bg-amber-500 flex items-center justify-center shadow-lg shadow-amber-500/50">
+            <Star className="w-3.5 h-3.5 text-white" />
+          </div>
+        )}
+        {shieldActive && (
+          <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-emerald-500 flex items-center justify-center shadow-lg shadow-emerald-500/50">
+            <Shield className="w-3.5 h-3.5 text-white" />
           </div>
         )}
       </div>
-      <p className="text-white font-bold text-sm truncate max-w-[90px]">{isMe ? 'You' : name}</p>
+      <p className={`font-black text-sm truncate max-w-[100px] ${nameClass}`}>{isMe ? 'You' : name}</p>
       <motion.p
         key={score}
-        className={`text-2xl font-black ${isMe ? 'text-purple-400' : 'text-orange-400'}`}
-        initial={{ scale: 1.5, color: '#fff' }}
+        className={`text-3xl font-black ${isMe ? 'text-purple-400' : 'text-orange-400'}`}
+        initial={{ scale: 1.6, color: '#fff' }}
         animate={{ scale: 1, color: isMe ? '#a78bfa' : '#fb923c' }}
         transition={{ type: 'spring', stiffness: 300 }}
       >{score}</motion.p>
@@ -49,21 +63,35 @@ function PlayerHeader({ name, score, isMe, avatar, frozen, doubleActive }) {
   );
 }
 
+const COLORS = [
+  'from-purple-600/50 border-purple-500/60 hover:border-purple-400/80 hover:bg-purple-500/20',
+  'from-blue-600/50 border-blue-500/60 hover:border-blue-400/80 hover:bg-blue-500/20',
+  'from-emerald-600/50 border-emerald-500/60 hover:border-emerald-400/80 hover:bg-emerald-500/20',
+  'from-amber-600/50 border-amber-500/60 hover:border-amber-400/80 hover:bg-amber-500/20',
+];
+
 export default function BattleArena({ session: initialSession, user, onExit }) {
   const [session, setSession] = useState(initialSession);
   const [phase, setPhase] = useState('thinking');
   const [countdown, setCountdown] = useState(THINKING_SECS);
   const [answerCountdown, setAnswerCountdown] = useState(ANSWERING_SECS);
   const [selectedAnswer, setSelectedAnswer] = useState(null);
-  const [flash, setFlash] = useState(null);
+  const [flash, setFlash] = useState(null); // 'correct' | 'wrong'
   const [roundAnswers, setRoundAnswers] = useState(null);
   const [questionStartTime, setQuestionStartTime] = useState(null);
+  const [responseTimeMs, setResponseTimeMs] = useState(null);
 
-  // Power-ups
+  // Power-ups state
   const [doubleUsed, setDoubleUsed] = useState(false);
   const [freezeUsed, setFreezeUsed] = useState(false);
+  const [shieldUsed, setShieldUsed] = useState(false);
+  const [hintUsed, setHintUsed] = useState(false);
+  const [secondChanceUsed, setSecondChanceUsed] = useState(false);
   const [doubleActive, setDoubleActive] = useState(false);
-  const [oppFrozen, setOppFrozen] = useState(false); // opponent froze me
+  const [shieldActive, setShieldActive] = useState(false);
+  const [removedOption, setRemovedOption] = useState(null); // index to hide for hint
+  const [oppFrozen, setOppFrozen] = useState(false);
+  const [secondChanceAvailable, setSecondChanceAvailable] = useState(false);
 
   const timerRef = useRef(null);
   const answerTimerRef = useRef(null);
@@ -81,6 +109,16 @@ export default function BattleArena({ session: initialSession, user, onExit }) {
   const questions = (() => { try { return JSON.parse(session.questions_json || '[]'); } catch { return []; } })();
   const currentQ = questions[session.current_question_index] || null;
 
+  // Load inventory for power-ups available
+  const [progressList, setProgressList] = useState([]);
+  useEffect(() => {
+    base44.entities.StudentProgress.filter({ student_email: myEmail }).then(setProgressList);
+  }, [myEmail]);
+  const myProgress = progressList[0];
+  const inv = getInventory(myProgress);
+
+  const hasPowerUp = (id) => (inv[id] || 0) > 0;
+
   // Real-time subscription
   useEffect(() => {
     const unsub = base44.entities.BattleSession.subscribe(event => {
@@ -88,12 +126,11 @@ export default function BattleArena({ session: initialSession, user, onExit }) {
       if (event.type === 'update' && event.data) {
         const newS = event.data;
         setSession(newS);
-        // Check if opponent used freeze on me
         const powerUps = (() => { try { return JSON.parse(newS.power_ups_json || '{}'); } catch { return {}; } })();
         const oppKey = isChallenger ? 'opponent' : 'challenger';
         if (powerUps[oppKey]?.frozeAt === newS.current_question_index) {
           setOppFrozen(true);
-          setTimeout(() => setOppFrozen(false), 2000);
+          setTimeout(() => setOppFrozen(false), 2500);
         }
       }
     });
@@ -110,9 +147,7 @@ export default function BattleArena({ session: initialSession, user, onExit }) {
       setRoundAnswers(ans[s.current_question_index] || null);
       clearInterval(timerRef.current);
       clearInterval(answerTimerRef.current);
-      if (isChallenger) {
-        setTimeout(() => advanceQuestion(s), RESULT_SECS * 1000);
-      }
+      if (isChallenger) setTimeout(() => advanceQuestion(s), RESULT_SECS * 1000);
       return;
     }
     if (s.status === 'question') {
@@ -123,6 +158,10 @@ export default function BattleArena({ session: initialSession, user, onExit }) {
         setFlash(null);
         setRoundAnswers(null);
         setDoubleActive(false);
+        setShieldActive(false);
+        setRemovedOption(null);
+        setSecondChanceAvailable(false);
+        setResponseTimeMs(null);
         setPhase('thinking');
         setCountdown(THINKING_SECS);
         setAnswerCountdown(ANSWERING_SECS);
@@ -146,7 +185,6 @@ export default function BattleArena({ session: initialSession, user, onExit }) {
         setPhase('answering');
         setQuestionStartTime(Date.now());
         BattleSound.go();
-        // Answering countdown
         let a = ANSWERING_SECS;
         setAnswerCountdown(a);
         answerTimerRef.current = setInterval(() => {
@@ -162,8 +200,8 @@ export default function BattleArena({ session: initialSession, user, onExit }) {
     return () => { clearInterval(timerRef.current); clearInterval(answerTimerRef.current); };
   }, [phase === 'thinking' && session.current_question_index]);
 
-  const submitAnswer = useCallback(async (answerIndex) => {
-    if (answeredRef.current) return;
+  const submitAnswer = useCallback(async (answerIndex, isSecondChance = false) => {
+    if (answeredRef.current && !isSecondChance) return;
     answeredRef.current = true;
     clearInterval(timerRef.current);
     clearInterval(answerTimerRef.current);
@@ -174,11 +212,33 @@ export default function BattleArena({ session: initialSession, user, onExit }) {
     const isCorrect = answerIndex !== null && answerIndex === q.correct_index;
     const timeTaken = questionStartTime ? Date.now() - questionStartTime : ANSWERING_SECS * 1000;
     const points = getPoints(isCorrect, timeTaken, ANSWERING_SECS * 1000, doubleActive);
+    const timeSeconds = (timeTaken / 1000).toFixed(1);
 
     setSelectedAnswer(answerIndex);
+    setResponseTimeMs(timeTaken);
     setFlash(isCorrect ? 'correct' : 'wrong');
     if (isCorrect) BattleSound.correct(); else BattleSound.wrong();
-    setTimeout(() => setFlash(null), 800);
+    setTimeout(() => setFlash(null), 600);
+
+    // Second chance: if wrong and available, allow retry
+    if (!isCorrect && secondChanceAvailable && !isSecondChance) {
+      setSecondChanceAvailable(false);
+      setSelectedAnswer(null);
+      answeredRef.current = false;
+      setFlash(null);
+      // restart answer timer briefly
+      let a = 6;
+      setAnswerCountdown(a);
+      answerTimerRef.current = setInterval(() => {
+        a--;
+        setAnswerCountdown(a);
+        if (a <= 0) {
+          clearInterval(answerTimerRef.current);
+          if (!answeredRef.current) submitAnswer(null, true);
+        }
+      }, 1000);
+      return;
+    }
 
     const freshSessions = await base44.entities.BattleSession.filter({ id: session.id });
     const s = freshSessions[0];
@@ -186,7 +246,7 @@ export default function BattleArena({ session: initialSession, user, onExit }) {
     const qIdx = s.current_question_index;
     if (!existingAnswers[qIdx]) existingAnswers[qIdx] = {};
     const answerKey = isChallenger ? 'challenger' : 'opponent';
-    existingAnswers[qIdx][answerKey] = { answerIndex, isCorrect, timeTaken, points, doubled: doubleActive };
+    existingAnswers[qIdx][answerKey] = { answerIndex, isCorrect, timeTaken, points, doubled: doubleActive, timeDisplay: timeSeconds };
 
     const newChallengerScore = isChallenger ? (s.challenger_score || 0) + points : (s.challenger_score || 0);
     const newOpponentScore = !isChallenger ? (s.opponent_score || 0) + points : (s.opponent_score || 0);
@@ -200,24 +260,65 @@ export default function BattleArena({ session: initialSession, user, onExit }) {
     });
 
     if (!bothAnswered) setPhase('waiting_opponent');
-  }, [session, questions, isChallenger, questionStartTime, doubleActive]);
+  }, [session, questions, isChallenger, questionStartTime, doubleActive, secondChanceAvailable]);
+
+  const consumePowerUp = async (id) => {
+    if (!myProgress) return;
+    const freshProgress = await base44.entities.StudentProgress.filter({ student_email: myEmail });
+    const p = freshProgress[0];
+    if (!p) return;
+    const currentInv = getInventory(p);
+    if ((currentInv[id] || 0) > 0) {
+      currentInv[id]--;
+      await base44.entities.StudentProgress.update(p.id, { weak_areas: [JSON.stringify(currentInv)] });
+    }
+  };
 
   const useDoublePoints = () => {
     if (doubleUsed || phase !== 'answering') return;
+    if (!hasPowerUp('double_points') && doubleUsed !== false) return;
     setDoubleUsed(true);
     setDoubleActive(true);
+    consumePowerUp('double_points');
   };
 
   const useFreezeOpponent = async () => {
     if (freezeUsed || phase !== 'answering') return;
     setFreezeUsed(true);
-    // Store freeze in power_ups_json so opponent sees it
+    consumePowerUp('freeze_opp');
     const freshSessions = await base44.entities.BattleSession.filter({ id: session.id });
     const s = freshSessions[0];
     const powerUps = (() => { try { return JSON.parse(s.power_ups_json || '{}'); } catch { return {}; } })();
     const myKey = isChallenger ? 'challenger' : 'opponent';
     powerUps[myKey] = { frozeAt: s.current_question_index };
     await base44.entities.BattleSession.update(session.id, { power_ups_json: JSON.stringify(powerUps) });
+  };
+
+  const useRevealHint = () => {
+    if (hintUsed || phase !== 'answering' || !currentQ) return;
+    setHintUsed(true);
+    consumePowerUp('reveal_hint');
+    // Remove one wrong answer that isn't selected and isn't correct
+    const wrongIndices = (currentQ.options || [])
+      .map((_, i) => i)
+      .filter(i => i !== currentQ.correct_index && i !== selectedAnswer);
+    if (wrongIndices.length > 0) {
+      setRemovedOption(wrongIndices[Math.floor(Math.random() * wrongIndices.length)]);
+    }
+  };
+
+  const useSecondChance = () => {
+    if (secondChanceUsed || phase !== 'answering') return;
+    setSecondChanceUsed(true);
+    setSecondChanceAvailable(true);
+    consumePowerUp('second_chance');
+  };
+
+  const useShield = () => {
+    if (shieldUsed || phase !== 'answering') return;
+    setShieldUsed(true);
+    setShieldActive(true);
+    consumePowerUp('shield');
   };
 
   const advanceQuestion = async (s) => {
@@ -236,15 +337,12 @@ export default function BattleArena({ session: initialSession, user, onExit }) {
         loser_score: Math.min(s.challenger_score, s.opponent_score),
         battle_session_id: session.id
       });
-      // Award coins
-      const winnerProgress = await base44.entities.StudentProgress.filter({ student_email: winnerEmail });
-      const loserProgress = await base44.entities.StudentProgress.filter({ student_email: loserEmail });
-      if (winnerProgress[0]) {
-        await base44.entities.StudentProgress.update(winnerProgress[0].id, { battle_coins: (winnerProgress[0].battle_coins || 0) + WIN_COINS });
-      }
-      if (loserProgress[0]) {
-        await base44.entities.StudentProgress.update(loserProgress[0].id, { battle_coins: (loserProgress[0].battle_coins || 0) + LOSE_COINS });
-      }
+      const [winnerProgress, loserProgress] = await Promise.all([
+        base44.entities.StudentProgress.filter({ student_email: winnerEmail }),
+        base44.entities.StudentProgress.filter({ student_email: loserEmail }),
+      ]);
+      if (winnerProgress[0]) await base44.entities.StudentProgress.update(winnerProgress[0].id, { battle_coins: (winnerProgress[0].battle_coins || 0) + WIN_COINS });
+      if (loserProgress[0]) await base44.entities.StudentProgress.update(loserProgress[0].id, { battle_coins: (loserProgress[0].battle_coins || 0) + LOSE_COINS });
     } else {
       await base44.entities.BattleSession.update(session.id, {
         current_question_index: nextIdx, status: 'question', phase: 'thinking',
@@ -256,6 +354,8 @@ export default function BattleArena({ session: initialSession, user, onExit }) {
   const myScore = session[myScoreKey] || 0;
   const oppScore = session[oppScoreKey] || 0;
   const amWinner = session.winner_email === myEmail;
+  const answerBarPct = Math.max(0, (answerCountdown / ANSWERING_SECS) * 100);
+  const isUrgent = answerCountdown <= 3;
 
   if (phase === 'finished' || session.status === 'finished') {
     return <FinishedScreen myName={myName} oppName={oppName} myScore={myScore} oppScore={oppScore} amWinner={amWinner} onExit={onExit} />;
@@ -272,8 +372,9 @@ export default function BattleArena({ session: initialSession, user, onExit }) {
     );
   }
 
-  const answerBarPct = Math.max(0, (answerCountdown / ANSWERING_SECS) * 100);
-  const isUrgent = answerCountdown <= 3;
+  const visibleOptions = (currentQ.options || []).map((opt, i) => ({
+    opt, i, hidden: i === removedOption
+  }));
 
   return (
     <div className="fixed inset-0 z-[900] bg-gradient-to-br from-slate-950 via-red-950/20 to-slate-950 flex flex-col overflow-hidden select-none">
@@ -281,9 +382,9 @@ export default function BattleArena({ session: initialSession, user, onExit }) {
       <AnimatePresence>
         {flash && (
           <motion.div
-            className={`absolute inset-0 z-50 pointer-events-none ${flash === 'correct' ? 'bg-emerald-500/25' : 'bg-red-500/25'}`}
+            className={`absolute inset-0 z-50 pointer-events-none ${flash === 'correct' ? 'bg-emerald-500/30' : 'bg-red-500/30'}`}
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            transition={{ duration: 0.12 }}
+            transition={{ duration: 0.15 }}
           />
         )}
       </AnimatePresence>
@@ -292,28 +393,29 @@ export default function BattleArena({ session: initialSession, user, onExit }) {
       <AnimatePresence>
         {oppFrozen && (
           <motion.div
-            className="absolute inset-0 z-40 pointer-events-none flex items-center justify-center"
+            className="absolute inset-0 z-40 bg-blue-950/60 backdrop-blur-sm pointer-events-none flex flex-col items-center justify-center gap-3"
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
           >
-            <div className="text-6xl">🥶</div>
+            <span className="text-7xl">🥶</span>
+            <p className="text-blue-300 font-black text-2xl">FROZEN!</p>
           </motion.div>
         )}
       </AnimatePresence>
 
       {/* Header */}
-      <div className="flex-shrink-0 px-4 pt-4 pb-3 bg-slate-950/90 backdrop-blur-xl border-b border-white/10">
+      <div className="flex-shrink-0 px-4 pt-safe pt-4 pb-3 bg-slate-950/90 backdrop-blur-xl border-b border-white/10">
         <div className="max-w-2xl mx-auto flex items-center justify-between">
-          <PlayerHeader name={myName} score={myScore} isMe avatar={null} doubleActive={doubleActive} />
-          {/* Center VS + progress */}
-          <div className="flex flex-col items-center gap-1 px-3">
+          <PlayerHeader name={myName} score={myScore} isMe doubleActive={doubleActive} shieldActive={shieldActive} />
+          <div className="flex flex-col items-center gap-1 px-2">
             <div className="w-12 h-12 rounded-full bg-gradient-to-br from-red-500 to-orange-500 flex items-center justify-center shadow-lg shadow-red-500/40">
               <Swords className="w-6 h-6 text-white" />
             </div>
-            <p className="text-xs text-slate-400 font-bold">
-              {session.current_question_index + 1} / {questions.length}
-            </p>
+            <p className="text-xs text-slate-400 font-bold">{session.current_question_index + 1} / {questions.length}</p>
+            {phase === 'answering' && (
+              <p className={`text-sm font-black tabular-nums ${isUrgent ? 'text-red-400' : 'text-white'}`}>{answerCountdown}s</p>
+            )}
           </div>
-          <PlayerHeader name={oppName} score={oppScore} isMe={false} avatar={null} frozen={oppFrozen} />
+          <PlayerHeader name={oppName} score={oppScore} isMe={false} frozen={oppFrozen} />
         </div>
       </div>
 
@@ -325,21 +427,23 @@ export default function BattleArena({ session: initialSession, user, onExit }) {
           {phase === 'thinking' && (
             <motion.div
               key="thinking"
-              initial={{ scale: 0.9, opacity: 0 }}
+              initial={{ scale: 0.92, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
+              exit={{ scale: 0.92, opacity: 0 }}
               className="w-full text-center"
             >
-              <p className="text-slate-500 text-xs font-bold uppercase tracking-widest mb-4">Question {session.current_question_index + 1}</p>
-              <div className="bg-white/[0.06] border border-white/10 rounded-3xl p-7 mb-8 shadow-xl">
-                <p className="text-2xl md:text-3xl font-black text-white leading-snug">{currentQ.question_text || currentQ.prompt}</p>
+              <p className="text-slate-500 text-xs font-bold uppercase tracking-widest mb-4">
+                Question {session.current_question_index + 1} of {questions.length}
+              </p>
+              <div className="bg-white/[0.07] border border-white/15 rounded-3xl p-8 mb-8 shadow-2xl">
+                <p className="text-3xl md:text-4xl font-black text-white leading-snug">{currentQ.question_text || currentQ.prompt}</p>
               </div>
               <motion.div
-                className="w-24 h-24 mx-auto rounded-full bg-gradient-to-br from-red-500 to-orange-600 flex items-center justify-center shadow-2xl shadow-red-500/50 border-4 border-red-400/30"
-                animate={{ scale: [1, 1.1, 1] }}
+                className="w-28 h-28 mx-auto rounded-full bg-gradient-to-br from-red-500 to-orange-600 flex items-center justify-center shadow-2xl shadow-red-500/50 border-4 border-red-400/30"
+                animate={{ scale: [1, 1.12, 1] }}
                 transition={{ duration: 0.7, repeat: Infinity }}
               >
-                <span className="text-5xl font-black text-white">{countdown}</span>
+                <span className="text-6xl font-black text-white">{countdown}</span>
               </motion.div>
             </motion.div>
           )}
@@ -354,12 +458,12 @@ export default function BattleArena({ session: initialSession, user, onExit }) {
               className="w-full"
             >
               {/* Question */}
-              <div className="bg-white/[0.06] border border-white/10 rounded-3xl p-5 mb-4 shadow-xl">
-                <p className="text-xl md:text-2xl font-black text-white leading-snug text-center">{currentQ.question_text || currentQ.prompt}</p>
+              <div className="bg-white/[0.07] border border-white/15 rounded-3xl p-6 mb-4 shadow-xl">
+                <p className="text-2xl md:text-3xl font-black text-white leading-snug text-center">{currentQ.question_text || currentQ.prompt}</p>
               </div>
 
               {/* Timer bar */}
-              <div className="relative h-2 rounded-full bg-white/10 mb-5 overflow-hidden">
+              <div className="relative h-3 rounded-full bg-white/10 mb-2 overflow-hidden">
                 <motion.div
                   className={`h-full rounded-full transition-colors ${isUrgent ? 'bg-red-500' : 'bg-gradient-to-r from-purple-500 to-blue-500'}`}
                   style={{ width: `${answerBarPct}%` }}
@@ -369,72 +473,89 @@ export default function BattleArena({ session: initialSession, user, onExit }) {
                   <motion.div
                     className="absolute inset-0 bg-red-500/30 rounded-full"
                     animate={{ opacity: [0.3, 1, 0.3] }}
-                    transition={{ duration: 0.5, repeat: Infinity }}
+                    transition={{ duration: 0.4, repeat: Infinity }}
                   />
                 )}
               </div>
 
+              {/* Response time */}
+              {responseTimeMs && (
+                <p className="text-center text-xs text-slate-500 mb-3">
+                  ⚡ {(responseTimeMs / 1000).toFixed(1)}s response time
+                </p>
+              )}
+
               {phase === 'waiting_opponent' ? (
-                <div className="text-center py-6">
-                  <div className="w-8 h-8 border-4 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
-                  <p className="text-orange-400 font-bold text-sm">Waiting for opponent…</p>
+                <div className="text-center py-8">
+                  <div className="w-10 h-10 border-4 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+                  <p className="text-orange-400 font-bold">Waiting for opponent…</p>
+                  {responseTimeMs && (
+                    <p className="text-slate-500 text-sm mt-1">Your time: {(responseTimeMs / 1000).toFixed(1)}s</p>
+                  )}
                 </div>
               ) : (
                 <>
                   {/* Answer grid */}
                   <div className="grid grid-cols-2 gap-3 mb-4">
-                    {(currentQ.options || []).map((opt, idx) => {
-                      const COLORS = ['from-purple-600/40 border-purple-500/50', 'from-blue-600/40 border-blue-500/50', 'from-emerald-600/40 border-emerald-500/50', 'from-amber-600/40 border-amber-500/50'];
-                      const isSelected = selectedAnswer === idx;
+                    {visibleOptions.map(({ opt, i, hidden }) => {
+                      if (hidden) return (
+                        <div key={i} className="h-20 rounded-2xl border-2 border-white/5 bg-white/[0.02] opacity-30 flex items-center justify-center">
+                          <p className="text-slate-600 text-xs font-bold">Removed ✦</p>
+                        </div>
+                      );
+                      const isSelected = selectedAnswer === i;
                       return (
                         <motion.button
-                          key={idx}
-                          onClick={() => submitAnswer(idx)}
+                          key={i}
+                          onClick={() => submitAnswer(i)}
                           disabled={selectedAnswer !== null}
-                          className={`relative p-4 rounded-2xl border-2 text-left font-bold text-sm transition-all ${
+                          className={`relative p-5 rounded-2xl border-2 text-left font-bold transition-all min-h-[80px] flex flex-col justify-between ${
                             isSelected
                               ? 'border-purple-400 bg-purple-500/30 text-white scale-[0.98]'
-                              : `bg-gradient-to-br ${COLORS[idx]} bg-opacity-20 text-white hover:scale-[1.03] hover:brightness-110`
+                              : `bg-gradient-to-br ${COLORS[i]} bg-opacity-30 text-white`
                           } disabled:cursor-not-allowed`}
+                          whileHover={selectedAnswer === null ? { scale: 1.03 } : {}}
                           whileTap={selectedAnswer === null ? { scale: 0.96 } : {}}
                         >
-                          <span className="absolute top-2 left-3 text-white/40 text-xs font-black">{String.fromCharCode(65 + idx)}</span>
-                          <span className="mt-4 block pl-3">{opt}</span>
+                          <span className="text-white/50 text-xs font-black">{String.fromCharCode(65 + i)}</span>
+                          <span className="text-base md:text-lg font-black leading-tight">{opt}</span>
                         </motion.button>
                       );
                     })}
                   </div>
 
-                  {/* Power-ups */}
-                  <div className="flex gap-2 justify-center">
-                    <button
+                  {/* Power-ups row */}
+                  <div className="flex gap-2 justify-center flex-wrap">
+                    <PowerUpButton
+                      emoji="⭐" label={doubleActive ? '2x ACTIVE!' : '2x Pts'}
+                      active={doubleActive} used={doubleUsed}
+                      available={hasPowerUp('double_points') || true} // always show (base power-up)
                       onClick={useDoublePoints}
-                      disabled={doubleUsed}
-                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition-all ${
-                        doubleActive
-                          ? 'bg-amber-500/30 border-amber-400/60 text-amber-300 shadow-lg shadow-amber-500/30'
-                          : doubleUsed
-                          ? 'bg-white/5 border-white/10 text-slate-600 cursor-not-allowed'
-                          : 'bg-amber-500/15 border-amber-500/40 text-amber-400 hover:bg-amber-500/25'
-                      }`}
-                      title="Double Points – your next correct answer scores 2x"
-                    >
-                      <Star className="w-3.5 h-3.5" />
-                      {doubleActive ? '2x ACTIVE!' : doubleUsed ? 'Used' : '2x Points'}
-                    </button>
-                    <button
+                    />
+                    <PowerUpButton
+                      emoji="🧊" label={freezeUsed ? 'Used' : 'Freeze'}
+                      used={freezeUsed}
+                      available={hasPowerUp('freeze_opp') || true}
                       onClick={useFreezeOpponent}
-                      disabled={freezeUsed}
-                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition-all ${
-                        freezeUsed
-                          ? 'bg-white/5 border-white/10 text-slate-600 cursor-not-allowed'
-                          : 'bg-blue-500/15 border-blue-500/40 text-blue-400 hover:bg-blue-500/25'
-                      }`}
-                      title="Freeze Opponent – distracts them for 2 seconds"
-                    >
-                      <Snowflake className="w-3.5 h-3.5" />
-                      {freezeUsed ? 'Used' : 'Freeze!'}
-                    </button>
+                    />
+                    <PowerUpButton
+                      emoji="💡" label={hintUsed ? 'Used' : 'Hint'}
+                      used={hintUsed}
+                      available={hasPowerUp('reveal_hint')}
+                      onClick={useRevealHint}
+                    />
+                    <PowerUpButton
+                      emoji="🔄" label={secondChanceUsed ? 'Used' : '2nd Chance'}
+                      used={secondChanceUsed}
+                      available={hasPowerUp('second_chance')}
+                      onClick={useSecondChance}
+                    />
+                    <PowerUpButton
+                      emoji="🛡️" label={shieldActive ? 'Shielded!' : 'Shield'}
+                      active={shieldActive} used={shieldUsed}
+                      available={hasPowerUp('shield')}
+                      onClick={useShield}
+                    />
                   </div>
                 </>
               )}
@@ -450,37 +571,61 @@ export default function BattleArena({ session: initialSession, user, onExit }) {
               exit={{ scale: 0.92, opacity: 0 }}
               className="w-full text-center"
             >
-              <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mb-3">Round {session.current_question_index + 1} Result</p>
-              <div className="bg-white/[0.05] border border-white/10 rounded-2xl p-4 mb-4">
-                <p className="text-white font-bold text-sm">{currentQ.question_text || currentQ.prompt}</p>
-                <p className="text-emerald-400 text-xs mt-2 font-semibold">
-                  ✅ {currentQ.options?.[currentQ.correct_index]}
+              <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mb-3">
+                Round {session.current_question_index + 1} Result
+              </p>
+              <div className="bg-white/[0.05] border border-white/10 rounded-2xl p-5 mb-4">
+                <p className="text-white font-bold text-base leading-snug">{currentQ.question_text || currentQ.prompt}</p>
+                <p className="text-emerald-400 text-sm mt-2 font-semibold">
+                  ✅ Correct: {currentQ.options?.[currentQ.correct_index]}
                 </p>
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <RoundPlayerCard
-                  name={myName} data={roundAnswers[isChallenger ? 'challenger' : 'opponent']}
-                  options={currentQ.options} isMe
-                />
-                <RoundPlayerCard
-                  name={oppName} data={roundAnswers[isChallenger ? 'opponent' : 'challenger']}
-                  options={currentQ.options}
-                />
+                <RoundPlayerCard name={myName} data={roundAnswers[isChallenger ? 'challenger' : 'opponent']} options={currentQ.options} isMe />
+                <RoundPlayerCard name={oppName} data={roundAnswers[isChallenger ? 'opponent' : 'challenger']} options={currentQ.options} />
               </div>
+              {/* Speed comparison */}
+              {roundAnswers.challenger?.timeTaken && roundAnswers.opponent?.timeTaken && (
+                <div className="mt-3 text-xs text-slate-500">
+                  {(() => {
+                    const myData = roundAnswers[isChallenger ? 'challenger' : 'opponent'];
+                    const oppData = roundAnswers[isChallenger ? 'opponent' : 'challenger'];
+                    if (!myData || !oppData) return null;
+                    const diff = Math.abs(myData.timeTaken - oppData.timeTaken);
+                    const faster = myData.timeTaken < oppData.timeTaken ? 'You were' : `${oppName} was`;
+                    return <p>⚡ {faster} {(diff / 1000).toFixed(1)}s faster</p>;
+                  })()}
+                </div>
+              )}
             </motion.div>
           )}
 
         </AnimatePresence>
       </div>
 
-      {/* Exit */}
-      <button
-        onClick={onExit}
-        className="absolute top-4 right-4 p-2 text-slate-600 hover:text-red-400 transition-colors z-[901]"
-      >
+      <button onClick={onExit} className="absolute top-4 right-4 p-2 text-slate-600 hover:text-red-400 transition-colors z-[901]">
         <X className="w-5 h-5" />
       </button>
     </div>
+  );
+}
+
+function PowerUpButton({ emoji, label, active, used, available, onClick }) {
+  if (!available && !used && !active) return null;
+  return (
+    <button
+      onClick={onClick}
+      disabled={used || !available}
+      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition-all ${
+        active
+          ? 'bg-amber-500/30 border-amber-400/60 text-amber-300 shadow-lg shadow-amber-500/30'
+          : used || !available
+          ? 'bg-white/5 border-white/10 text-slate-600 cursor-not-allowed'
+          : 'bg-white/10 border-white/20 text-white hover:bg-white/20'
+      }`}
+    >
+      <span>{emoji}</span> {label}
+    </button>
   );
 }
 
@@ -499,10 +644,14 @@ function RoundPlayerCard({ name, data, options, isMe }) {
           <p className={`text-xl font-black ${isCorrect ? 'text-emerald-400' : 'text-red-400'}`}>
             {isCorrect ? '✓ Correct' : '✗ Wrong'}
           </p>
-          <p className="text-amber-400 font-bold text-base mt-1">+{points} {data.doubled ? <span className="text-xs text-amber-300">2x!</span> : ''}</p>
-          {isCorrect && <p className="text-slate-500 text-xs">{(data.timeTaken / 1000).toFixed(1)}s</p>}
-          {data.answerIndex !== null && data.answerIndex !== undefined && options && !isCorrect && (
-            <p className="text-slate-500 text-xs mt-1 truncate">Answered: {options[data.answerIndex]}</p>
+          <p className="text-amber-400 font-bold text-base mt-1">
+            +{points} {data.doubled ? <span className="text-xs text-amber-300">2x!</span> : ''}
+          </p>
+          {data.timeTaken && (
+            <p className="text-slate-400 text-xs mt-1">⚡ {(data.timeTaken / 1000).toFixed(1)}s</p>
+          )}
+          {!isCorrect && data.answerIndex !== null && data.answerIndex !== undefined && options && (
+            <p className="text-slate-500 text-xs mt-1 truncate">Said: {options[data.answerIndex]}</p>
           )}
         </>
       ) : (

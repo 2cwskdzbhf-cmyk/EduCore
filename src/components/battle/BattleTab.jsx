@@ -2,55 +2,36 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Swords, Trophy, Lock, Loader2, Clock } from 'lucide-react';
+import { Swords, Trophy, Lock, Loader2, ShoppingBag } from 'lucide-react';
 import BattleArena from './BattleArena';
 import BattleInvitePopup from './BattleInvitePopup';
 import BattleLeaderboard from './BattleLeaderboard';
 import BattleHistory from './BattleHistory';
-
-const BATTLE_QUESTIONS_COUNT = 5;
-
-function generateQuestions(topic) {
-  // Fallback generic questions if no topic questions available
-  return [
-    { question_text: `What is 12 × 8?`, options: ['86', '96', '106', '76'], correct_index: 1 },
-    { question_text: `What is 144 ÷ 12?`, options: ['11', '13', '12', '14'], correct_index: 2 },
-    { question_text: `What is 15² ?`, options: ['200', '225', '215', '235'], correct_index: 1 },
-    { question_text: `What is 7 × 9?`, options: ['54', '56', '63', '72'], correct_index: 2 },
-    { question_text: `What is √64?`, options: ['6', '7', '9', '8'], correct_index: 3 },
-  ];
-}
+import BattleItemShop from './BattleItemShop';
+import BattleQuestionSelector from './BattleQuestionSelector';
 
 export default function BattleTab({ classId, classData, user, isTeacher, classStudents: classStudentsProp }) {
   const queryClient = useQueryClient();
   const [activeBattle, setActiveBattle] = useState(null);
   const [incomingInvite, setIncomingInvite] = useState(null);
   const [pendingInvite, setPendingInvite] = useState(null);
-  const [tab, setTab] = useState('lobby'); // 'lobby' | 'leaderboard' | 'history'
+  const [tab, setTab] = useState('lobby');
+  const [challengingOpponent, setChallengingOpponent] = useState(null); // triggers question selector
 
   const battleEnabled = classData?.battle_mode_enabled !== false;
-
   const studentEmails = classData?.student_emails || [];
 
-  // Build student list from emails directly (no User fetch needed — same approach as BattleLeaderboard)
-  // If teacher passed classStudents prop, enrich with real names; otherwise use email-derived display objects
   const classStudents = studentEmails.map(email => {
     const match = classStudentsProp?.find(u => u.email === email);
     return match || { email, full_name: email.split('@')[0], id: email };
   });
 
-  const studentsLoading = false;
-  const studentsError = false;
-
   // Subscribe to BattleSession for incoming invites and active battles
   useEffect(() => {
     if (!user?.email || !classId) return;
 
-    // Initial check for pending invites or active battle for me
     base44.entities.BattleSession.filter({ class_id: classId, opponent_email: user.email, status: 'pending' })
-      .then(sessions => {
-        if (sessions.length > 0) setIncomingInvite(sessions[0]);
-      });
+      .then(sessions => { if (sessions.length > 0) setIncomingInvite(sessions[0]); });
 
     base44.entities.BattleSession.filter({ class_id: classId })
       .then(sessions => {
@@ -59,44 +40,31 @@ export default function BattleTab({ classId, classData, user, isTeacher, classSt
           ['active', 'question', 'round_result'].includes(s.status)
         );
         if (mine) setActiveBattle(mine);
-
-        const myPending = sessions.find(s =>
-          s.challenger_email === user.email && s.status === 'pending'
-        );
+        const myPending = sessions.find(s => s.challenger_email === user.email && s.status === 'pending');
         if (myPending) setPendingInvite(myPending);
       });
 
     const unsub = base44.entities.BattleSession.subscribe(event => {
       const s = event.data;
       if (!s || s.class_id !== classId) return;
-
       const iAmInvolved = s.challenger_email === user.email || s.opponent_email === user.email;
       if (!iAmInvolved) return;
 
-      // Incoming invite for me (opponent)
       if (s.opponent_email === user.email && s.status === 'pending') {
-        console.log('[BattleTab] Incoming invite received from', s.challenger_name);
         setIncomingInvite(s);
         return;
       }
-
-      // Battle accepted → both players start
       if (s.status === 'question') {
-        console.log('[BattleTab] Battle started, entering arena');
         setPendingInvite(null);
         setIncomingInvite(null);
         setActiveBattle(s);
         return;
       }
-
-      // Invite declined → notify challenger
       if (s.challenger_email === user.email && s.status === 'declined') {
         setPendingInvite(null);
         queryClient.invalidateQueries(['battleWins', classId]);
         return;
       }
-
-      // Active/round_result updates
       if (['active', 'round_result'].includes(s.status)) {
         setActiveBattle(s);
       }
@@ -105,10 +73,9 @@ export default function BattleTab({ classId, classData, user, isTeacher, classSt
     return () => unsub();
   }, [user?.email, classId]);
 
+  // Called after question selector confirms
   const challengeMutation = useMutation({
-    mutationFn: async (opponent) => {
-      // Generate questions
-      const questions = generateQuestions();
+    mutationFn: async ({ opponent, questions }) => {
       const session = await base44.entities.BattleSession.create({
         class_id: classId,
         challenger_email: user.email,
@@ -124,6 +91,7 @@ export default function BattleTab({ classId, classData, user, isTeacher, classSt
         total_questions: questions.length
       });
       setPendingInvite(session);
+      setChallengingOpponent(null);
     }
   });
 
@@ -151,7 +119,6 @@ export default function BattleTab({ classId, classData, user, isTeacher, classSt
     queryClient.invalidateQueries(['battleWins', classId]);
   };
 
-  // Toggle battle mode (teacher only)
   const toggleMutation = useMutation({
     mutationFn: async () => {
       await base44.entities.Class.update(classId, { battle_mode_enabled: !battleEnabled });
@@ -159,14 +126,38 @@ export default function BattleTab({ classId, classData, user, isTeacher, classSt
     onSuccess: () => queryClient.invalidateQueries(['class', classId])
   });
 
-  // Active battle screen
+  // Question selector overlay
+  if (challengingOpponent) {
+    return (
+      <BattleQuestionSelector
+        classData={classData}
+        opponent={challengingOpponent}
+        onCancel={() => setChallengingOpponent(null)}
+        onConfirm={(questions) => challengeMutation.mutate({ opponent: challengingOpponent, questions })}
+      />
+    );
+  }
+
   if (activeBattle) {
     return <BattleArena session={activeBattle} user={user} onExit={handleExitBattle} />;
   }
 
+  const TABS = [
+    { id: 'lobby', label: '⚔️ Challenge' },
+    { id: 'leaderboard', label: '🏆 Leaderboard' },
+    ...(!isTeacher ? [{ id: 'history', label: '📜 My History' }] : []),
+    ...(!isTeacher ? [{ id: 'shop', label: '🛍️ Item Shop' }] : []),
+  ];
+
+  const tabColor = {
+    lobby: 'from-red-500 to-orange-500',
+    leaderboard: 'from-amber-500 to-orange-500',
+    history: 'from-blue-500 to-cyan-500',
+    shop: 'from-yellow-500 to-orange-500',
+  };
+
   return (
     <div className="space-y-6">
-      {/* Incoming invite popup */}
       <AnimatePresence>
         {incomingInvite && (
           <BattleInvitePopup
@@ -203,7 +194,6 @@ export default function BattleTab({ classId, classData, user, isTeacher, classSt
         )}
       </div>
 
-      {/* DISABLED STATE */}
       {!battleEnabled && !isTeacher && (
         <div className="text-center py-16">
           <Lock className="w-16 h-16 text-slate-600 mx-auto mb-4" />
@@ -215,39 +205,25 @@ export default function BattleTab({ classId, classData, user, isTeacher, classSt
       {(battleEnabled || isTeacher) && (
         <>
           {/* Tabs */}
-          <div className="flex gap-2">
-            <button
-              onClick={() => setTab('lobby')}
-              className={`px-4 py-2 rounded-xl font-bold text-sm transition-all ${tab === 'lobby' ? 'bg-gradient-to-r from-red-500 to-orange-500 text-white shadow-lg shadow-red-500/30' : 'bg-white/5 text-slate-400 hover:text-white hover:bg-white/10'}`}
-            >
-              ⚔️ Challenge
-            </button>
-            <button
-              onClick={() => setTab('leaderboard')}
-              className={`px-4 py-2 rounded-xl font-bold text-sm transition-all ${tab === 'leaderboard' ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-lg shadow-amber-500/30' : 'bg-white/5 text-slate-400 hover:text-white hover:bg-white/10'}`}
-            >
-              🏆 Leaderboard
-            </button>
-            {!isTeacher && (
-              <button
-                onClick={() => setTab('history')}
-                className={`px-4 py-2 rounded-xl font-bold text-sm transition-all ${tab === 'history' ? 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white shadow-lg shadow-blue-500/30' : 'bg-white/5 text-slate-400 hover:text-white hover:bg-white/10'}`}
-              >
-                📜 My History
+          <div className="flex gap-2 flex-wrap">
+            {TABS.map(t => (
+              <button key={t.id} onClick={() => setTab(t.id)}
+                className={`px-4 py-2 rounded-xl font-bold text-sm transition-all ${
+                  tab === t.id
+                    ? `bg-gradient-to-r ${tabColor[t.id]} text-white shadow-lg`
+                    : 'bg-white/5 text-slate-400 hover:text-white hover:bg-white/10'
+                }`}>
+                {t.label}
               </button>
-            )}
+            ))}
           </div>
 
           <AnimatePresence mode="wait">
             {tab === 'lobby' && (
               <motion.div key="lobby" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }}>
-                {/* Pending invite sent */}
                 {pendingInvite && (
-                  <motion.div
-                    initial={{ opacity: 0, scale: 0.95 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    className="mb-4 p-5 rounded-2xl border-2 border-orange-500/50 bg-orange-500/10 text-center"
-                  >
+                  <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
+                    className="mb-4 p-5 rounded-2xl border-2 border-orange-500/50 bg-orange-500/10 text-center">
                     <div className="w-10 h-10 border-4 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
                     <p className="text-orange-400 font-black text-lg">Challenge Sent!</p>
                     <p className="text-slate-400 text-sm mt-1">
@@ -258,45 +234,35 @@ export default function BattleTab({ classId, classData, user, isTeacher, classSt
                         await base44.entities.BattleSession.update(pendingInvite.id, { status: 'cancelled' });
                         setPendingInvite(null);
                       }}
-                      className="mt-3 text-xs text-slate-500 hover:text-red-400 underline"
-                    >
+                      className="mt-3 text-xs text-slate-500 hover:text-red-400 underline">
                       Cancel challenge
                     </button>
                   </motion.div>
                 )}
 
-                {/* Student grid */}
                 <p className="text-slate-400 text-sm mb-4">
-                  {isTeacher ? 'Students in this class:' : 'Choose an opponent to challenge:'}
+                  {isTeacher ? 'Students in this class:' : 'Choose an opponent — you\'ll select questions next:'}
                 </p>
-                {!classId ? (
-                  <div className="text-center py-12 text-slate-500">Class not loaded.</div>
-                ) : studentsLoading ? (
-                  <div className="flex items-center justify-center py-12 gap-2 text-slate-400">
-                    <Loader2 className="w-5 h-5 animate-spin" /> Loading students…
-                  </div>
-                ) : studentEmails.length === 0 ? (
+
+                {studentEmails.length === 0 ? (
                   <div className="text-center py-12 text-slate-500">No students enrolled in this class yet.</div>
                 ) : classStudents.filter(s => s.email !== user.email).length === 0 ? (
                   <div className="text-center py-12 text-slate-500">No other students in this class to challenge.</div>
                 ) : (
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                    {classStudents
-                      .filter(s => s.email !== user.email)
-                      .map(student => (
-                        <StudentBattleCard
-                          key={student.id || student.email}
-                          student={student}
-                          classId={classId}
-                          isTeacher={isTeacher}
-                          disabled={!!pendingInvite || challengeMutation.isPending}
-                          onChallenge={() => {
-                            if (isTeacher) return;
-                            console.log('[BattleTab] Invite sent to:', student.email);
-                            challengeMutation.mutate(student);
-                          }}
-                        />
-                      ))}
+                    {classStudents.filter(s => s.email !== user.email).map(student => (
+                      <StudentBattleCard
+                        key={student.id || student.email}
+                        student={student}
+                        classId={classId}
+                        isTeacher={isTeacher}
+                        disabled={!!pendingInvite || challengeMutation.isPending}
+                        onChallenge={() => {
+                          if (isTeacher) return;
+                          setChallengingOpponent(student);
+                        }}
+                      />
+                    ))}
                   </div>
                 )}
               </motion.div>
@@ -311,6 +277,12 @@ export default function BattleTab({ classId, classData, user, isTeacher, classSt
             {tab === 'history' && (
               <motion.div key="history" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }}>
                 <BattleHistory classId={classId} userEmail={user?.email} />
+              </motion.div>
+            )}
+
+            {tab === 'shop' && !isTeacher && (
+              <motion.div key="shop" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }}>
+                <BattleItemShop userEmail={user?.email} />
               </motion.div>
             )}
           </AnimatePresence>
@@ -348,24 +320,14 @@ function StudentBattleCard({ student, classId, isTeacher, disabled, onChallenge 
           : 'border-white/10 bg-white/5 hover:border-red-500/60 hover:bg-red-500/10 hover:shadow-lg hover:shadow-red-500/20 cursor-pointer'
       }`}
       whileHover={!disabled && !isTeacher ? { scale: 1.03 } : {}}
-      whileTap={!disabled && !isTeacher ? { scale: 0.97 } : {}}
-    >
-      {/* Avatar */}
+      whileTap={!disabled && !isTeacher ? { scale: 0.97 } : {}}>
       <div className="w-14 h-14 rounded-full bg-gradient-to-br from-red-500 to-orange-500 flex items-center justify-center text-white text-xl font-black mx-auto mb-3 shadow-lg group-hover:shadow-red-500/40 transition-shadow overflow-hidden">
-        {student.avatar_url ? (
-          <img src={student.avatar_url} alt="" className="w-full h-full object-cover" />
-        ) : (
-          displayName.charAt(0).toUpperCase()
-        )}
+        {student.avatar_url ? <img src={student.avatar_url} alt="" className="w-full h-full object-cover" /> : displayName.charAt(0).toUpperCase()}
       </div>
       <p className="text-white font-bold text-sm truncate">{displayName}</p>
       <div className="flex items-center justify-center gap-2 mt-1">
-        <p className="text-amber-400 text-xs font-semibold">
-          ⚔️ {wins.length} {wins.length === 1 ? 'win' : 'wins'}
-        </p>
-        {coins > 0 && (
-          <p className="text-yellow-400 text-xs font-semibold">🪙 {coins}</p>
-        )}
+        <p className="text-amber-400 text-xs font-semibold">⚔️ {wins.length} {wins.length === 1 ? 'win' : 'wins'}</p>
+        {coins > 0 && <p className="text-yellow-400 text-xs font-semibold">🪙 {coins}</p>}
       </div>
       {!isTeacher && !disabled && (
         <div className="absolute inset-0 rounded-2xl flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-red-500/10">
