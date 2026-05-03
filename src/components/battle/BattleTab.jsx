@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -9,6 +9,7 @@ import BattleLeaderboard from './BattleLeaderboard';
 import BattleHistory from './BattleHistory';
 import BattleItemShop from './BattleItemShop';
 import BattleQuestionSelector from './BattleQuestionSelector';
+import WholeBattle from './WholeBattle';
 
 export default function BattleTab({ classId, classData, user, isTeacher, classStudents: classStudentsProp }) {
   const queryClient = useQueryClient();
@@ -16,7 +17,9 @@ export default function BattleTab({ classId, classData, user, isTeacher, classSt
   const [incomingInvite, setIncomingInvite] = useState(null);
   const [pendingInvite, setPendingInvite] = useState(null);
   const [tab, setTab] = useState('lobby');
-  const [challengingOpponent, setChallengingOpponent] = useState(null); // triggers question selector
+  const [challengingOpponent, setChallengingOpponent] = useState(null);
+  const [showWholeBattle, setShowWholeBattle] = useState(false);
+  const initialLoadDone = useRef(false); // prevent auto-redirect on tab open
 
   const battleEnabled = classData?.battle_mode_enabled !== false;
   const studentEmails = classData?.student_emails || [];
@@ -35,13 +38,11 @@ export default function BattleTab({ classId, classData, user, isTeacher, classSt
 
     base44.entities.BattleSession.filter({ class_id: classId })
       .then(sessions => {
-        const mine = sessions.find(s =>
-          (s.challenger_email === user.email || s.opponent_email === user.email) &&
-          ['active', 'question', 'round_result'].includes(s.status)
-        );
-        if (mine) setActiveBattle(mine);
+        // Only restore active battle if user was in it (not on initial tab open)
         const myPending = sessions.find(s => s.challenger_email === user.email && s.status === 'pending');
         if (myPending) setPendingInvite(myPending);
+        // Don't auto-restore activeBattle on initial load — user must explicitly re-enter
+        initialLoadDone.current = true;
       });
 
     const unsub = base44.entities.BattleSession.subscribe(event => {
@@ -126,6 +127,11 @@ export default function BattleTab({ classId, classData, user, isTeacher, classSt
     onSuccess: () => queryClient.invalidateQueries(['class', classId])
   });
 
+  // Whole class battle overlay
+  if (showWholeBattle) {
+    return <WholeBattle classId={classId} classData={classData} classStudents={classStudents} user={user} onExit={() => setShowWholeBattle(false)} />;
+  }
+
   // Question selector overlay
   if (challengingOpponent) {
     return (
@@ -180,17 +186,25 @@ export default function BattleTab({ classId, classData, user, isTeacher, classSt
           </div>
         </div>
         {isTeacher && (
-          <button
-            onClick={() => toggleMutation.mutate()}
-            disabled={toggleMutation.isPending}
-            className={`px-4 py-2 rounded-xl font-bold text-sm transition-all ${
-              battleEnabled
-                ? 'bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/30'
-                : 'bg-red-500/20 border border-red-500/40 text-red-400 hover:bg-red-500/30'
-            }`}
-          >
-            {toggleMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : battleEnabled ? '✓ Battle ON' : '✗ Battle OFF'}
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowWholeBattle(true)}
+              className="px-4 py-2 rounded-xl font-bold text-sm bg-gradient-to-r from-purple-500 to-blue-500 text-white hover:brightness-110 transition-all shadow-lg shadow-purple-500/30"
+            >
+              🏟️ Whole Class Battle
+            </button>
+            <button
+              onClick={() => toggleMutation.mutate()}
+              disabled={toggleMutation.isPending}
+              className={`px-4 py-2 rounded-xl font-bold text-sm transition-all ${
+                battleEnabled
+                  ? 'bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/30'
+                  : 'bg-red-500/20 border border-red-500/40 text-red-400 hover:bg-red-500/30'
+              }`}
+            >
+              {toggleMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : battleEnabled ? '✓ Battle ON' : '✗ Battle OFF'}
+            </button>
+          </div>
         )}
       </div>
 

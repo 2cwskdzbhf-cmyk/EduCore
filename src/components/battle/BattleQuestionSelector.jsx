@@ -2,13 +2,15 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
-import { Search, Plus, Trash2, Check, Loader2, ChevronLeft, Swords } from 'lucide-react';
+import { Search, Plus, Trash2, Check, Loader2, ChevronLeft, Swords, ClipboardPaste } from 'lucide-react';
 
-export default function BattleQuestionSelector({ classData, onConfirm, onCancel, opponent }) {
-  const [mode, setMode] = useState('bank'); // 'bank' | 'manual'
+export default function BattleQuestionSelector({ classData, onConfirm, onCancel, opponent, hideSendButton, confirmLabel }) {
+  const [mode, setMode] = useState('bank'); // 'bank' | 'manual' | 'paste'
   const [selectedQuestions, setSelectedQuestions] = useState([]);
   const [search, setSearch] = useState('');
   const [manualQ, setManualQ] = useState({ question_text: '', options: ['', '', '', ''], correct_index: 0 });
+  const [pasteText, setPasteText] = useState('');
+  const [pasteError, setPasteError] = useState('');
 
   const subjectId = classData?.subject_id;
 
@@ -21,17 +23,64 @@ export default function BattleQuestionSelector({ classData, onConfirm, onCancel,
   const topicIds = topics.map(t => t.id);
 
   const { data: questions = [], isLoading } = useQuery({
-    queryKey: ['battleQuestionBank', subjectId],
+    queryKey: ['battleQuestionBank', subjectId, topicIds.join(',')],
     queryFn: async () => {
-      if (!topicIds.length) return [];
-      return base44.entities.Question.filter({
-        topic_id: { $in: topicIds },
-        question_type: 'multiple_choice',
-        is_active: true,
-      }, null, 100);
+      let qs;
+      if (topicIds.length > 0) {
+        qs = await base44.entities.Question.filter({
+          topic_id: { $in: topicIds },
+          question_type: 'multiple_choice',
+          is_active: true,
+        }, null, 200);
+      } else {
+        // Fallback: load all multiple choice questions
+        qs = await base44.entities.Question.filter({
+          question_type: 'multiple_choice',
+          is_active: true,
+        }, null, 200);
+      }
+      console.log('Questions loaded:', qs);
+      return qs;
     },
-    enabled: topicIds.length > 0,
+    enabled: true, // always run, fallback handles no topics
   });
+
+  // Parse bulk paste text
+  const parsePastedQuestions = () => {
+    setPasteError('');
+    const blocks = pasteText.trim().split(/\n{2,}/);
+    const parsed = [];
+    for (const block of blocks) {
+      const lines = block.trim().split('\n').map(l => l.trim()).filter(Boolean);
+      if (lines.length < 6) continue;
+      const questionLine = lines.find(l => l.toLowerCase().startsWith('question:'));
+      const aLine = lines.find(l => /^a:/i.test(l));
+      const bLine = lines.find(l => /^b:/i.test(l));
+      const cLine = lines.find(l => /^c:/i.test(l));
+      const dLine = lines.find(l => /^d:/i.test(l));
+      const answerLine = lines.find(l => l.toLowerCase().startsWith('answer:'));
+      if (!questionLine || !aLine || !bLine || !cLine || !dLine || !answerLine) continue;
+      const questionText = questionLine.replace(/^question:\s*/i, '').trim();
+      const options = [
+        aLine.replace(/^a:\s*/i, '').trim(),
+        bLine.replace(/^b:\s*/i, '').trim(),
+        cLine.replace(/^c:\s*/i, '').trim(),
+        dLine.replace(/^d:\s*/i, '').trim(),
+      ];
+      const answerLetter = answerLine.replace(/^answer:\s*/i, '').trim().toUpperCase();
+      const correctIndex = ['A', 'B', 'C', 'D'].indexOf(answerLetter);
+      if (correctIndex === -1 || options.some(o => !o)) continue;
+      parsed.push({ id: `paste_${Date.now()}_${parsed.length}`, question_text: questionText, options, correct_index: correctIndex });
+    }
+    if (parsed.length === 0) {
+      setPasteError('No valid questions found. Check the format:\nQuestion: ...\nA: ...\nB: ...\nC: ...\nD: ...\nAnswer: B');
+      return;
+    }
+    const toAdd = parsed.slice(0, 10 - selectedQuestions.length);
+    setSelectedQuestions(prev => [...prev, ...toAdd]);
+    setPasteText('');
+    setMode('bank');
+  };
 
   const filtered = questions.filter(q =>
     !search || q.question_text?.toLowerCase().includes(search.toLowerCase())
@@ -85,12 +134,13 @@ export default function BattleQuestionSelector({ classData, onConfirm, onCancel,
               : 'bg-white/5 text-slate-600 cursor-not-allowed'
           }`}
           whileTap={selectedQuestions.length > 0 ? { scale: 0.95 } : {}}>
-          <Swords className="w-4 h-4" /> Send Challenge
+          {hideSendButton ? null : <Swords className="w-4 h-4" />}
+          {confirmLabel || 'Send Challenge'}
         </motion.button>
       </div>
 
       {/* Mode tabs */}
-      <div className="flex-shrink-0 px-4 pt-4 pb-3 flex gap-2">
+      <div className="flex-shrink-0 px-4 pt-4 pb-3 flex gap-2 flex-wrap">
         <button onClick={() => setMode('bank')}
           className={`px-4 py-2 rounded-xl font-bold text-sm transition-all ${mode === 'bank' ? 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white' : 'bg-white/5 text-slate-400 hover:text-white'}`}>
           📚 Question Bank
@@ -98,6 +148,10 @@ export default function BattleQuestionSelector({ classData, onConfirm, onCancel,
         <button onClick={() => setMode('manual')}
           className={`px-4 py-2 rounded-xl font-bold text-sm transition-all ${mode === 'manual' ? 'bg-gradient-to-r from-purple-500 to-blue-500 text-white' : 'bg-white/5 text-slate-400 hover:text-white'}`}>
           ✏️ Create Question
+        </button>
+        <button onClick={() => setMode('paste')}
+          className={`px-4 py-2 rounded-xl font-bold text-sm transition-all ${mode === 'paste' ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white' : 'bg-white/5 text-slate-400 hover:text-white'}`}>
+          📋 Paste Questions
         </button>
       </div>
 
@@ -179,6 +233,40 @@ export default function BattleQuestionSelector({ classData, onConfirm, onCancel,
                   })}
                 </div>
               )}
+            </motion.div>
+          )}
+
+          {mode === 'paste' && (
+            <motion.div key="paste" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}
+              className="space-y-4">
+              <div>
+                <label className="text-slate-300 text-sm font-bold mb-2 block">Paste Multiple Questions</label>
+                <p className="text-slate-500 text-xs mb-3">Each question block separated by a blank line. Format:</p>
+                <pre className="text-xs text-slate-400 bg-white/5 rounded-xl px-4 py-3 mb-3 font-mono">
+{`Question: What is 2+2?
+A: 3
+B: 4
+C: 5
+D: 6
+Answer: B`}
+                </pre>
+                <textarea
+                  value={pasteText}
+                  onChange={e => { setPasteText(e.target.value); setPasteError(''); }}
+                  placeholder="Paste your questions here..."
+                  rows={12}
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-sm placeholder:text-slate-500 focus:outline-none focus:border-emerald-500/50 resize-none font-mono"
+                />
+                {pasteError && (
+                  <p className="text-red-400 text-xs mt-2 whitespace-pre-line">{pasteError}</p>
+                )}
+              </div>
+              <button
+                onClick={parsePastedQuestions}
+                disabled={!pasteText.trim()}
+                className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-black text-sm disabled:opacity-40 disabled:cursor-not-allowed hover:brightness-110 transition-all">
+                <ClipboardPaste className="w-4 h-4" /> Parse & Add Questions
+              </button>
             </motion.div>
           )}
 
