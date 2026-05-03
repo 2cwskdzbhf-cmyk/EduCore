@@ -45,41 +45,85 @@ export default function BattleQuestionSelector({ classData, onConfirm, onCancel,
     enabled: true, // always run, fallback handles no topics
   });
 
-  // Parse bulk paste text
+  // Smart multi-format paste parser
   const parsePastedQuestions = () => {
     setPasteError('');
-    const blocks = pasteText.trim().split(/\n{2,}/);
+    if (!pasteText.trim()) { setPasteError('Please paste some questions first.'); return; }
+
     const parsed = [];
-    for (const block of blocks) {
-      const lines = block.trim().split('\n').map(l => l.trim()).filter(Boolean);
-      if (lines.length < 6) continue;
-      const questionLine = lines.find(l => l.toLowerCase().startsWith('question:'));
-      const aLine = lines.find(l => /^a:/i.test(l));
-      const bLine = lines.find(l => /^b:/i.test(l));
-      const cLine = lines.find(l => /^c:/i.test(l));
-      const dLine = lines.find(l => /^d:/i.test(l));
-      const answerLine = lines.find(l => l.toLowerCase().startsWith('answer:'));
-      if (!questionLine || !aLine || !bLine || !cLine || !dLine || !answerLine) continue;
-      const questionText = questionLine.replace(/^question:\s*/i, '').trim();
-      const options = [
-        aLine.replace(/^a:\s*/i, '').trim(),
-        bLine.replace(/^b:\s*/i, '').trim(),
-        cLine.replace(/^c:\s*/i, '').trim(),
-        dLine.replace(/^d:\s*/i, '').trim(),
-      ];
-      const answerLetter = answerLine.replace(/^answer:\s*/i, '').trim().toUpperCase();
-      const correctIndex = ['A', 'B', 'C', 'D'].indexOf(answerLetter);
-      if (correctIndex === -1 || options.some(o => !o)) continue;
-      parsed.push({ id: `paste_${Date.now()}_${parsed.length}`, question_text: questionText, options, correct_index: correctIndex });
+    const needsReview = [];
+
+    // Split into blocks by blank lines OR by numbered questions (1. / 1) / Q1:)
+    const rawBlocks = pasteText.trim().split(/\n{2,}/);
+
+    for (const rawBlock of rawBlocks) {
+      const lines = rawBlock.trim().split('\n').map(l => l.trim()).filter(Boolean);
+      if (!lines.length) continue;
+
+      // --- Try full structured format: Question/A/B/C/D/Answer ---
+      const questionLine = lines.find(l => /^(question\s*\d*\s*:|q\d+\s*:|\d+[\.\)]\s*)/i.test(l) || lines.indexOf(l) === 0);
+      const aLine = lines.find(l => /^a[\.\):\s]/i.test(l));
+      const bLine = lines.find(l => /^b[\.\):\s]/i.test(l));
+      const cLine = lines.find(l => /^c[\.\):\s]/i.test(l));
+      const dLine = lines.find(l => /^d[\.\):\s]/i.test(l));
+      const answerLine = lines.find(l => /^(answer|ans|correct)\s*:/i.test(l));
+
+      if (aLine && bLine && cLine && dLine) {
+        // Full structured format
+        const rawQ = questionLine?.replace(/^(question\s*\d*\s*:|q\d+\s*:|\d+[\.\)]\s*)/i, '').trim() || lines[0];
+        const options = [
+          aLine.replace(/^a[\.\):\s]+/i, '').trim(),
+          bLine.replace(/^b[\.\):\s]+/i, '').trim(),
+          cLine.replace(/^c[\.\):\s]+/i, '').trim(),
+          dLine.replace(/^d[\.\):\s]+/i, '').trim(),
+        ];
+        let correctIndex = 0;
+        if (answerLine) {
+          const letter = answerLine.replace(/^(answer|ans|correct)\s*:\s*/i, '').trim().toUpperCase().charAt(0);
+          const idx = ['A','B','C','D'].indexOf(letter);
+          correctIndex = idx !== -1 ? idx : 0;
+        }
+        if (rawQ && options.every(o => o)) {
+          parsed.push({ id: `paste_${Date.now()}_${parsed.length}`, question_text: rawQ, options, correct_index: correctIndex, needsReview: !answerLine });
+          if (!answerLine) needsReview.push(parsed.length);
+          continue;
+        }
+      }
+
+      // --- Simple question-only format (one or more lines, no options) ---
+      // Collect all non-empty lines as potential questions
+      const simpleLines = lines.filter(l => l.length > 4);
+      for (const line of simpleLines) {
+        const cleanQ = line.replace(/^(\d+[\.\):\s]+|q\d+[\.\):\s]+|question\s*\d*\s*:\s*)/i, '').trim();
+        if (!cleanQ) continue;
+        // Auto-generate placeholder options
+        const placeholderOptions = ['Option A', 'Option B', 'Option C', 'Option D'];
+        parsed.push({
+          id: `paste_${Date.now()}_${parsed.length}_${Math.random()}`,
+          question_text: cleanQ,
+          options: placeholderOptions,
+          correct_index: 0,
+          needsReview: true,
+        });
+        needsReview.push(parsed.length);
+      }
     }
+
     if (parsed.length === 0) {
-      setPasteError('No valid questions found. Check the format:\nQuestion: ...\nA: ...\nB: ...\nC: ...\nD: ...\nAnswer: B');
+      setPasteError('Could not parse any questions. Please try adding at least one question.');
       return;
     }
+
+    console.log('Parsed questions:', parsed);
+
+    const reviewCount = parsed.filter(q => q.needsReview).length;
     const toAdd = parsed.slice(0, 10 - selectedQuestions.length);
     setSelectedQuestions(prev => [...prev, ...toAdd]);
     setPasteText('');
     setMode('bank');
+    if (reviewCount > 0) {
+      setPasteError(`✅ ${toAdd.length} question${toAdd.length !== 1 ? 's' : ''} added (${reviewCount} need review — edit options/answers in the manual tab)`);
+    }
   };
 
   const filtered = questions.filter(q =>
@@ -241,24 +285,26 @@ export default function BattleQuestionSelector({ classData, onConfirm, onCancel,
               className="space-y-4">
               <div>
                 <label className="text-slate-300 text-sm font-bold mb-2 block">Paste Multiple Questions</label>
-                <p className="text-slate-500 text-xs mb-3">Each question block separated by a blank line. Format:</p>
-                <pre className="text-xs text-slate-400 bg-white/5 rounded-xl px-4 py-3 mb-3 font-mono">
-{`Question: What is 2+2?
-A: 3
-B: 4
-C: 5
-D: 6
-Answer: B`}
-                </pre>
+                <p className="text-slate-500 text-xs mb-3">Paste questions in any format — simple questions, or with A/B/C/D options:</p>
+                <div className="grid grid-cols-2 gap-2 mb-3">
+                  <div className="bg-white/5 rounded-xl p-3">
+                    <p className="text-emerald-400 text-xs font-bold mb-1">✅ Simple (auto-options)</p>
+                    <pre className="text-xs text-slate-400 font-mono whitespace-pre-wrap">{"What is 2+2?\nCapital of France?\nWW2 started in?"}</pre>
+                  </div>
+                  <div className="bg-white/5 rounded-xl p-3">
+                    <p className="text-blue-400 text-xs font-bold mb-1">✅ Full format</p>
+                    <pre className="text-xs text-slate-400 font-mono whitespace-pre-wrap">{"Q: What is 2+2?\nA: 3\nB: 4\nC: 5\nD: 6\nAnswer: B"}</pre>
+                  </div>
+                </div>
                 <textarea
                   value={pasteText}
                   onChange={e => { setPasteText(e.target.value); setPasteError(''); }}
-                  placeholder="Paste your questions here..."
+                  placeholder="Paste 1–20 questions here in any format..."
                   rows={12}
                   className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-sm placeholder:text-slate-500 focus:outline-none focus:border-emerald-500/50 resize-none font-mono"
                 />
                 {pasteError && (
-                  <p className="text-red-400 text-xs mt-2 whitespace-pre-line">{pasteError}</p>
+                  <p className={`text-xs mt-2 whitespace-pre-line ${pasteError.startsWith('✅') ? 'text-emerald-400' : 'text-red-400'}`}>{pasteError}</p>
                 )}
               </div>
               <button

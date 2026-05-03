@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { base44 } from '@/api/base44Client';
 import { BattleSound } from './BattleSoundEngine';
-import { Swords, X, Snowflake, Star, Shield, RefreshCw, Lightbulb } from 'lucide-react';
+import { Swords, X, Snowflake, Star, Shield, RefreshCw, Lightbulb, Zap } from 'lucide-react';
 
 const THINKING_SECS = 4;
 const ANSWERING_SECS = 12;
@@ -111,13 +111,23 @@ export default function BattleArena({ session: initialSession, user, onExit }) {
 
   // Load inventory for power-ups available
   const [progressList, setProgressList] = useState([]);
+  const [powerUpToast, setPowerUpToast] = useState(null); // { label, emoji }
+
   useEffect(() => {
-    base44.entities.StudentProgress.filter({ student_email: myEmail }).then(setProgressList);
+    base44.entities.StudentProgress.filter({ student_email: myEmail }).then(p => {
+      setProgressList(p);
+      console.log('Player inventory:', getInventory(p[0]));
+    });
   }, [myEmail]);
   const myProgress = progressList[0];
   const inv = getInventory(myProgress);
 
   const hasPowerUp = (id) => (inv[id] || 0) > 0;
+
+  const showToast = (emoji, label) => {
+    setPowerUpToast({ emoji, label });
+    setTimeout(() => setPowerUpToast(null), 2000);
+  };
 
   // Real-time subscription
   useEffect(() => {
@@ -276,16 +286,17 @@ export default function BattleArena({ session: initialSession, user, onExit }) {
 
   const useDoublePoints = () => {
     if (doubleUsed || phase !== 'answering') return;
-    if (!hasPowerUp('double_points') && doubleUsed !== false) return;
     setDoubleUsed(true);
     setDoubleActive(true);
     consumePowerUp('double_points');
+    showToast('⭐', '2x Points Active!');
   };
 
   const useFreezeOpponent = async () => {
     if (freezeUsed || phase !== 'answering') return;
     setFreezeUsed(true);
     consumePowerUp('freeze_opp');
+    showToast('🧊', 'Opponent Frozen!');
     const freshSessions = await base44.entities.BattleSession.filter({ id: session.id });
     const s = freshSessions[0];
     const powerUps = (() => { try { return JSON.parse(s.power_ups_json || '{}'); } catch { return {}; } })();
@@ -298,7 +309,7 @@ export default function BattleArena({ session: initialSession, user, onExit }) {
     if (hintUsed || phase !== 'answering' || !currentQ) return;
     setHintUsed(true);
     consumePowerUp('reveal_hint');
-    // Remove one wrong answer that isn't selected and isn't correct
+    showToast('💡', 'Wrong Answer Removed!');
     const wrongIndices = (currentQ.options || [])
       .map((_, i) => i)
       .filter(i => i !== currentQ.correct_index && i !== selectedAnswer);
@@ -312,6 +323,7 @@ export default function BattleArena({ session: initialSession, user, onExit }) {
     setSecondChanceUsed(true);
     setSecondChanceAvailable(true);
     consumePowerUp('second_chance');
+    showToast('🔄', '2nd Chance Ready!');
   };
 
   const useShield = () => {
@@ -319,6 +331,7 @@ export default function BattleArena({ session: initialSession, user, onExit }) {
     setShieldUsed(true);
     setShieldActive(true);
     consumePowerUp('shield');
+    showToast('🛡️', 'Shield Activated!');
   };
 
   const advanceQuestion = async (s) => {
@@ -386,6 +399,22 @@ export default function BattleArena({ session: initialSession, user, onExit }) {
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             transition={{ duration: 0.15 }}
           />
+        )}
+      </AnimatePresence>
+
+      {/* Power-up toast */}
+      <AnimatePresence>
+        {powerUpToast && (
+          <motion.div
+            className="absolute top-24 left-1/2 -translate-x-1/2 z-[902] flex items-center gap-2 bg-slate-900/95 border border-white/20 rounded-2xl px-5 py-3 shadow-2xl"
+            initial={{ opacity: 0, y: -20, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -20, scale: 0.9 }}
+            transition={{ type: 'spring', stiffness: 300 }}
+          >
+            <span className="text-2xl">{powerUpToast.emoji}</span>
+            <span className="text-white font-black text-sm">{powerUpToast.label}</span>
+          </motion.div>
         )}
       </AnimatePresence>
 
@@ -524,36 +553,36 @@ export default function BattleArena({ session: initialSession, user, onExit }) {
                     })}
                   </div>
 
-                  {/* Power-ups row */}
-                  <div className="flex gap-2 justify-center flex-wrap">
+                  {/* Power-ups row — always show all 5 */}
+                  <div className="flex gap-2 justify-center flex-wrap mt-1">
                     <PowerUpButton
-                      emoji="⭐" label={doubleActive ? '2x ACTIVE!' : '2x Pts'}
+                      emoji="⭐" label="2x Pts"
                       active={doubleActive} used={doubleUsed}
-                      available={hasPowerUp('double_points') || true} // always show (base power-up)
+                      count={inv['double_points'] ?? 1}
                       onClick={useDoublePoints}
                     />
                     <PowerUpButton
-                      emoji="🧊" label={freezeUsed ? 'Used' : 'Freeze'}
+                      emoji="🧊" label="Freeze"
                       used={freezeUsed}
-                      available={hasPowerUp('freeze_opp') || true}
+                      count={inv['freeze_opp'] ?? 1}
                       onClick={useFreezeOpponent}
                     />
                     <PowerUpButton
-                      emoji="💡" label={hintUsed ? 'Used' : 'Hint'}
+                      emoji="💡" label="Hint"
                       used={hintUsed}
-                      available={hasPowerUp('reveal_hint')}
+                      count={inv['reveal_hint'] ?? 0}
                       onClick={useRevealHint}
                     />
                     <PowerUpButton
-                      emoji="🔄" label={secondChanceUsed ? 'Used' : '2nd Chance'}
+                      emoji="🔄" label="2nd Try"
                       used={secondChanceUsed}
-                      available={hasPowerUp('second_chance')}
+                      count={inv['second_chance'] ?? 0}
                       onClick={useSecondChance}
                     />
                     <PowerUpButton
-                      emoji="🛡️" label={shieldActive ? 'Shielded!' : 'Shield'}
+                      emoji="🛡️" label="Shield"
                       active={shieldActive} used={shieldUsed}
-                      available={hasPowerUp('shield')}
+                      count={inv['shield'] ?? 0}
                       onClick={useShield}
                     />
                   </div>
@@ -610,21 +639,30 @@ export default function BattleArena({ session: initialSession, user, onExit }) {
   );
 }
 
-function PowerUpButton({ emoji, label, active, used, available, onClick }) {
-  if (!available && !used && !active) return null;
+function PowerUpButton({ emoji, label, active, used, count = 0, onClick }) {
+  const isAvailable = count > 0 && !used;
   return (
     <button
-      onClick={onClick}
-      disabled={used || !available}
-      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition-all ${
+      onClick={isAvailable ? onClick : undefined}
+      disabled={!isAvailable}
+      title={count === 0 ? 'Buy from Item Shop' : label}
+      className={`relative flex flex-col items-center gap-0.5 px-3 py-2 rounded-xl text-xs font-bold border transition-all min-w-[56px] ${
         active
-          ? 'bg-amber-500/30 border-amber-400/60 text-amber-300 shadow-lg shadow-amber-500/30'
-          : used || !available
-          ? 'bg-white/5 border-white/10 text-slate-600 cursor-not-allowed'
-          : 'bg-white/10 border-white/20 text-white hover:bg-white/20'
+          ? 'bg-amber-500/30 border-amber-400/60 text-amber-300 shadow-lg shadow-amber-500/30 scale-105'
+          : used
+          ? 'bg-white/5 border-white/10 text-slate-600 cursor-not-allowed opacity-50'
+          : count === 0
+          ? 'bg-white/5 border-white/10 text-slate-600 cursor-not-allowed opacity-40'
+          : 'bg-white/10 border-white/20 text-white hover:bg-white/20 hover:scale-105 cursor-pointer'
       }`}
     >
-      <span>{emoji}</span> {label}
+      <span className="text-lg leading-none">{emoji}</span>
+      <span className="text-[10px] leading-none">{used ? 'Used' : label}</span>
+      {!used && (
+        <span className={`text-[9px] leading-none ${count > 0 ? 'text-amber-400' : 'text-slate-600'}`}>
+          {count > 0 ? `×${count}` : '×0'}
+        </span>
+      )}
     </button>
   );
 }
