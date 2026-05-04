@@ -14,7 +14,7 @@ import {
   ChevronLeft, Users, Sparkles, Loader2, Trophy, ClipboardList,
   BarChart3, Plus, Trash2, RefreshCw, Save, CheckCircle2, Edit2, Zap,
   Calendar, Clock, Eye, X, AlertTriangle, BookOpen, MessageCircle,
-  Wrench, BarChart2, Menu, Copy
+  Wrench, BarChart2, Menu, Copy, Settings
 } from 'lucide-react';
 import ClassMessaging from '@/components/class/ClassMessaging';
 import InteractiveWhiteboard from '@/components/whiteboard/InteractiveWhiteboard';
@@ -32,6 +32,8 @@ import ClassInvitePanel from '@/components/class/ClassInvitePanel';
 import ClassJoinRequestsPanel from '@/components/class/ClassJoinRequestsPanel';
 import ClassSettingsPanel from '@/components/class/ClassSettingsPanel';
 import ClassBanner from '@/components/class/ClassBanner';
+import SettingsModalContent from '@/components/class/SettingsModalContent';
+import StudentsTab from '@/components/class/StudentsTab';
 
 const NAV_ITEMS = [
   { id: 'lessons', icon: '📖', label: 'Lessons' },
@@ -45,9 +47,6 @@ const NAV_ITEMS = [
   { id: 'messaging', icon: '💬', label: 'Messaging' },
   { id: 'polls', icon: '📊', label: 'Polls' },
   { id: 'whiteboard', icon: '✏️', label: 'Whiteboard' },
-  { id: 'invites', icon: '🔗', label: 'Invite Links' },
-  { id: 'requests', icon: '🙋', label: 'Join Requests' },
-  { id: 'settings', icon: '⚙️', label: 'Class Settings' },
   { id: 'tools', icon: '🛠', label: 'Useful Tools' },
 ];
 
@@ -60,6 +59,7 @@ export default function TeacherClassDetail() {
   const [user, setUser] = useState(null);
   const [activeTab, setActiveTab] = useState('lessons');
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   const { data: pendingRequests = [] } = useQuery({
     queryKey: ['pendingJoinRequests', classId],
@@ -293,13 +293,19 @@ export default function TeacherClassDetail() {
           ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
         `}>
           {/* Header */}
-          <div className="p-4 border-b border-white/10">
+          <div className="p-4 border-b border-white/10 relative">
             <Link to={createPageUrl('TeacherDashboard')}
               className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors mb-4 text-sm">
               <ChevronLeft className="w-4 h-4" /> Dashboard
             </Link>
             <h2 className="text-white font-bold text-base leading-tight truncate">{classData.name}</h2>
             <p className="text-slate-400 text-xs mt-0.5">{subject?.name} · {classData.student_emails?.length || 0} students</p>
+            {/* Settings gear */}
+            <button onClick={() => setSettingsOpen(true)}
+              className="absolute top-4 right-4 p-1.5 rounded-lg text-slate-500 hover:text-white hover:bg-white/10 transition-colors">
+              <Settings className="w-4 h-4" />
+            </button>
+
             {/* Join code */}
             <button onClick={() => copyJoinCode(classData.join_code)}
               className="mt-2 w-full flex items-center justify-between bg-white/5 border border-white/10 rounded-xl px-3 py-2 hover:bg-white/10 transition-colors group">
@@ -642,46 +648,12 @@ export default function TeacherClassDetail() {
 
                 {/* STUDENTS */}
                 {activeTab === 'students' && (
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <h2 className="text-2xl font-bold text-white">Students</h2>
-                      <span className="text-slate-400 text-sm">{classData.student_emails?.length||0} enrolled</span>
-                    </div>
-                    {classStudents.length > 0 ? (
-                      <div className="space-y-2">
-                        {classStudents.map(student => (
-                          <motion.div key={student.id} initial={{ opacity:0,y:8 }} animate={{ opacity:1,y:0 }}
-                            className="flex items-center justify-between p-4 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 transition-all">
-                            <div className="flex items-center gap-3">
-                              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center text-white font-bold flex-shrink-0">
-                                {(student.full_name||student.email).charAt(0).toUpperCase()}
-                              </div>
-                              <div>
-                                <p className="text-white font-medium">{student.full_name || student.email.split('@')[0]}</p>
-                                <p className="text-xs text-slate-400">{student.email}</p>
-                                {student.year_group && <p className="text-xs text-slate-500">Year {student.year_group}</p>}
-                              </div>
-                            </div>
-                            <Button size="sm" variant="outline" onClick={() => setDeleteConfirmStudent(student)} className="border-red-500/30 text-red-400 hover:bg-red-500/10">
-                              <Trash2 className="w-3.5 h-3.5 mr-1.5"/> Remove
-                            </Button>
-                          </motion.div>
-                        ))}
-                      </div>
-                    ) : classData.student_emails?.length > 0 ? (
-                      <GlassCard className="p-8 text-center">
-                        <Loader2 className="w-8 h-8 text-purple-400 animate-spin mx-auto mb-3"/>
-                        <p className="text-slate-400">Loading student profiles...</p>
-                        <p className="text-slate-500 text-sm mt-1">{classData.student_emails.length} students enrolled (emails: {classData.student_emails.slice(0,2).join(', ')}{classData.student_emails.length>2?'...':''})</p>
-                      </GlassCard>
-                    ) : (
-                      <GlassCard className="p-12 text-center">
-                        <Users className="w-12 h-12 text-slate-600 mx-auto mb-4"/>
-                        <p className="text-slate-400 mb-2">No students yet</p>
-                        <p className="text-slate-500 text-sm">Share the join code <span className="text-white font-bold font-mono">{classData.join_code}</span> for students to enroll.</p>
-                      </GlassCard>
-                    )}
-                  </div>
+                  <StudentsTab
+                    classData={classData}
+                    classStudents={classStudents}
+                    studentEmails={classData.student_emails || []}
+                    onRemove={(student) => setDeleteConfirmStudent(student)}
+                  />
                 )}
 
                 {/* ANALYTICS / LEADERBOARD */}
@@ -734,20 +706,7 @@ export default function TeacherClassDetail() {
                   <BattleTab classId={classId} classData={classData} user={user} isTeacher={true} classStudents={classStudents} />
                 )}
 
-                {/* INVITE LINKS */}
-                {activeTab === 'invites' && classData && (
-                  <ClassInvitePanel classId={classId} classData={classData} />
-                )}
 
-                {/* JOIN REQUESTS */}
-                {activeTab === 'requests' && classData && (
-                  <ClassJoinRequestsPanel classId={classId} classData={classData} />
-                )}
-
-                {/* SETTINGS */}
-                {activeTab === 'settings' && classData && (
-                  <ClassSettingsPanel classId={classId} classData={classData} onUpdate={() => queryClient.invalidateQueries(['class', classId])} />
-                )}
 
                 {/* TOOLS */}
                 {activeTab === 'tools' && (
@@ -789,6 +748,30 @@ export default function TeacherClassDetail() {
             onCancel={() => setDeleteConfirmStudent(null)}
             confirmLabel="Remove Student"
           />
+        )}
+      </AnimatePresence>
+
+      {/* ── CLASS SETTINGS MODAL ── */}
+      <AnimatePresence>
+        {settingsOpen && classData && (
+          <motion.div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setSettingsOpen(false)}>
+            <motion.div className="max-w-3xl w-full max-h-[90vh] flex flex-col bg-slate-950/95 border border-white/10 rounded-3xl overflow-hidden"
+              initial={{ scale: 0.95, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.95, y: 20 }} onClick={e => e.stopPropagation()}>
+              {/* Modal header */}
+              <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 flex-shrink-0">
+                <h2 className="text-white font-black text-lg flex items-center gap-2"><Settings className="w-5 h-5 text-purple-400" /> Class Settings</h2>
+                <button onClick={() => setSettingsOpen(false)} className="text-slate-400 hover:text-white p-1"><X className="w-5 h-5" /></button>
+              </div>
+              {/* Modal tabs */}
+              <SettingsModalContent
+                classId={classId}
+                classData={classData}
+                pendingRequests={pendingRequests}
+                onUpdate={() => { queryClient.invalidateQueries(['class', classId]); queryClient.invalidateQueries(['pendingJoinRequests', classId]); }}
+              />
+            </motion.div>
+          </motion.div>
         )}
       </AnimatePresence>
 

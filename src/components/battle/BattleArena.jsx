@@ -129,12 +129,21 @@ export default function BattleArena({ session: initialSession, user, onExit }) {
     setTimeout(() => setPowerUpToast(null), 2000);
   };
 
+  const [endedByTeacher, setEndedByTeacher] = useState(false);
+
   // Real-time subscription
   useEffect(() => {
     const unsub = base44.entities.BattleSession.subscribe(event => {
       if (event.id !== session.id) return;
       if (event.type === 'update' && event.data) {
         const newS = event.data;
+        // Detect teacher-forced finish (no winner set = teacher ended it)
+        if (newS.status === 'finished' && !newS.winner_email && session.status !== 'finished') {
+          setEndedByTeacher(true);
+          clearInterval(timerRef.current);
+          clearInterval(answerTimerRef.current);
+          return;
+        }
         setSession(newS);
         const powerUps = (() => { try { return JSON.parse(newS.power_ups_json || '{}'); } catch { return {}; } })();
         const oppKey = isChallenger ? 'opponent' : 'challenger';
@@ -369,6 +378,21 @@ export default function BattleArena({ session: initialSession, user, onExit }) {
   const amWinner = session.winner_email === myEmail;
   const answerBarPct = Math.max(0, (answerCountdown / ANSWERING_SECS) * 100);
   const isUrgent = answerCountdown <= 3;
+
+  if (endedByTeacher) {
+    return (
+      <motion.div className="fixed inset-0 z-[901] bg-slate-950 flex flex-col items-center justify-center p-6"
+        initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+        <div className="text-6xl mb-4">🏁</div>
+        <h2 className="text-3xl font-black text-white mb-2">Battle Ended</h2>
+        <p className="text-slate-400 text-center mb-6">Your teacher has ended the battle.</p>
+        <button onClick={onExit}
+          className="px-8 py-3 rounded-2xl bg-gradient-to-r from-purple-500 to-blue-500 text-white font-black hover:brightness-110 transition-all">
+          Back to Battle Hub
+        </button>
+      </motion.div>
+    );
+  }
 
   if (phase === 'finished' || session.status === 'finished') {
     return <FinishedScreen myName={myName} oppName={oppName} myScore={myScore} oppScore={oppScore} amWinner={amWinner} onExit={onExit} />;

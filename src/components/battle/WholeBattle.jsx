@@ -78,7 +78,15 @@ export default function WholeBattle({ classId, classData, classStudents, user, o
     setActiveSessions(ids);
   };
 
-  const finishEvent = () => setPhase('results');
+  const finishEvent = async () => {
+    // Mark all active sessions as finished so students exit immediately
+    await Promise.all(
+      activeSessions.map(id =>
+        base44.entities.BattleSession.update(id, { status: 'finished', winner_email: '' })
+      )
+    );
+    setPhase('results');
+  };
 
   // Build leaderboard from results
   const buildLeaderboard = () => {
