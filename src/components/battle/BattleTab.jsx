@@ -8,7 +8,7 @@ import BattleInvitePopup from './BattleInvitePopup';
 import BattleLeaderboard from './BattleLeaderboard';
 import BattleHistory from './BattleHistory';
 import BattleItemShop from './BattleItemShop';
-import BattleQuestionSelector from './BattleQuestionSelector';
+import BattleQuestionSelector from './BattleQuestionSelector.jsx';
 import WholeBattle from './WholeBattle';
 
 export default function BattleTab({ classId, classData, user, isTeacher, classStudents: classStudentsProp }) {
