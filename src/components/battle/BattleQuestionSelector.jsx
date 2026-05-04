@@ -6,6 +6,7 @@ import { Search, Plus, Trash2, Check, Loader2, ChevronLeft, Swords, ClipboardPas
 
 // Step-based question selection flow for 1v1 Battle
 // Steps: topic → subtopic → difficulty → questions
+// Uses GlobalTopic + GlobalQuestion (same as Global Question Bank)
 
 export default function BattleQuestionSelector({ classData, onConfirm, onCancel, opponent, hideSendButton, confirmLabel }) {
   const [mode, setMode] = useState('steps'); // 'steps' | 'manual' | 'paste' | 'confirm' | 'review'
@@ -22,39 +23,67 @@ export default function BattleQuestionSelector({ classData, onConfirm, onCancel,
 
   const subjectId = classData?.subject_id;
 
-  // Load topics for this class's subject only
+  // ── Load top-level GlobalTopics for this subject ──────────────────────────
   const { data: topics = [], isLoading: loadingTopics } = useQuery({
-    queryKey: ['battleTopics', subjectId],
-    queryFn: () => subjectId
-      ? base44.entities.Topic.filter({ subject_id: subjectId }, 'order')
-      : base44.entities.Topic.list(),
+    queryKey: ['battleGlobalTopics', subjectId],
+    queryFn: async () => {
+      // Top-level topics have parent_topic_id = null/undefined
+      let results;
+      if (subjectId) {
+        results = await base44.entities.GlobalTopic.filter({ subject_id: subjectId });
+      } else {
+        results = await base44.entities.GlobalTopic.list();
+      }
+      // Only top-level (no parent)
+      const topLevel = results.filter(t => !t.parent_topic_id);
+      console.log('Class subject_id:', subjectId);
+      console.log('GlobalTopics found:', results.length, '| Top-level:', topLevel.length);
+      return topLevel.sort((a, b) => (a.order_index || 0) - (b.order_index || 0));
+    },
     enabled: true,
   });
 
-  // Load subtopics for selected topic
+  // ── Load subtopics (GlobalTopics with parent_topic_id = selectedTopic.id) ──
   const { data: subtopics = [], isLoading: loadingSubtopics } = useQuery({
-    queryKey: ['battleSubtopics', selectedTopic?.id],
-    queryFn: () => base44.entities.Subtopic.filter({ topic_id: selectedTopic.id }),
+    queryKey: ['battleGlobalSubtopics', selectedTopic?.id],
+    queryFn: async () => {
+      const results = await base44.entities.GlobalTopic.filter({ parent_topic_id: selectedTopic.id });
+      console.log('Subtopics for', selectedTopic.name, ':', results.length);
+      return results.sort((a, b) => (a.order_index || 0) - (b.order_index || 0));
+    },
     enabled: !!selectedTopic,
   });
 
-  // Load questions filtered by subject + topic + subtopic + difficulty
-  const topicIds = selectedTopic ? [selectedTopic.id] : topics.map(t => t.id);
-
+  // ── Load GlobalQuestions filtered by subject + topic + subtopic + difficulty ──
   const { data: filteredQuestions = [], isLoading: loadingQuestions } = useQuery({
-    queryKey: ['battleBankQ', subjectId, selectedTopic?.id, selectedSubtopic?.id, selectedDifficulties.join(',')],
+    queryKey: ['battleGlobalQ', subjectId, selectedTopic?.id, selectedSubtopic?.id, selectedDifficulties.join(',')],
     queryFn: async () => {
-      const filter = {
-        question_type: 'multiple_choice',
-        is_active: true,
-      };
-      if (selectedTopic) filter.topic_id = selectedTopic.id;
-      else if (topicIds.length > 0) filter.topic_id = { $in: topicIds };
-      if (selectedSubtopic) filter.subtopic_id = selectedSubtopic.id;
+      // Build filter: only MCQ questions work for battles
+      const filter = { question_type: 'mcq' };
+      if (subjectId) filter.subject_id = subjectId;
+
+      // Determine which GlobalTopic IDs to filter by
+      if (selectedSubtopic) {
+        filter.global_topic_id = selectedSubtopic.id;
+      } else if (selectedTopic) {
+        // Get all subtopics under this topic
+        const subs = await base44.entities.GlobalTopic.filter({ parent_topic_id: selectedTopic.id });
+        const subIds = subs.map(s => s.id);
+        // Also include questions directly tagged to the parent topic
+        const allIds = [selectedTopic.id, ...subIds];
+        if (allIds.length === 1) {
+          filter.global_topic_id = allIds[0];
+        } else {
+          filter.global_topic_id = { $in: allIds };
+        }
+      }
+
       if (selectedDifficulties.length === 1) filter.difficulty = selectedDifficulties[0];
 
-      const qs = await base44.entities.Question.filter(filter, null, 200);
-      // Multi-difficulty client filter
+      const qs = await base44.entities.GlobalQuestion.filter(filter, null, 200);
+      console.log('GlobalQuestions found:', qs.length, '| filter:', JSON.stringify(filter));
+
+      // Multi-difficulty client-side filter
       if (selectedDifficulties.length > 1) {
         return qs.filter(q => selectedDifficulties.includes(q.difficulty));
       }
@@ -63,9 +92,19 @@ export default function BattleQuestionSelector({ classData, onConfirm, onCancel,
     enabled: step === 4,
   });
 
-  const questionsToShow = filteredQuestions.filter(q =>
-    !search || q.question_text?.toLowerCase().includes(search.toLowerCase())
-  );
+  // Normalize GlobalQuestion → battle format (GlobalQuestions use `choices` not `options`)
+  const normalizeGlobalQ = (q) => ({
+    id: q.id,
+    question_text: q.question_text,
+    options: q.choices || [],
+    correct_index: q.correct_index ?? 0,
+    difficulty: q.difficulty,
+    unverified: false,
+  });
+
+  const questionsToShow = filteredQuestions
+    .filter(q => !search || q.question_text?.toLowerCase().includes(search.toLowerCase()))
+    .map(normalizeGlobalQ);
 
   const toggle = (q) => {
     setSelectedQuestions(prev =>
@@ -131,8 +170,6 @@ export default function BattleQuestionSelector({ classData, onConfirm, onCancel,
 
     const unverifiedCount = parsed.filter(q => q.unverified).length;
     const toAdd = parsed.slice(0, 10 - selectedQuestions.length);
-    console.log('1v1 pasted questions:', toAdd);
-    console.log('1v1 unverified questions:', toAdd.filter(q => q.unverified));
 
     setSelectedQuestions(prev => [...prev, ...toAdd]);
     setPasteText('');
@@ -235,7 +272,7 @@ export default function BattleQuestionSelector({ classData, onConfirm, onCancel,
             ))}
           </div>
           <p className="text-xs text-slate-500 mt-1">
-            {selectedQuestions.length} selected for 1v1 Battle ✔
+            {selectedQuestions.length} selected
             {unverifiedCount > 0 && <span className="text-amber-400 ml-2">· {unverifiedCount} need review</span>}
           </p>
         </div>
@@ -254,7 +291,7 @@ export default function BattleQuestionSelector({ classData, onConfirm, onCancel,
               </div>
               <div className="text-center">
                 <h3 className="text-2xl font-black text-white mb-1">Questions Added!</h3>
-                <p className="text-emerald-400 font-bold">✅ Successfully added to 1v1 Battle</p>
+                <p className="text-emerald-400 font-bold">✅ Successfully added</p>
               </div>
               <div className="w-full grid grid-cols-2 gap-3">
                 <div className="bg-white/5 border border-white/10 rounded-2xl p-4 text-center">
@@ -269,12 +306,9 @@ export default function BattleQuestionSelector({ classData, onConfirm, onCancel,
               {lastPasteResult.unverified > 0 && (
                 <div className="w-full bg-amber-500/10 border border-amber-500/30 rounded-2xl p-4 flex gap-3">
                   <AlertTriangle className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
-                  <p className="text-amber-300 text-sm">{lastPasteResult.unverified} question{lastPasteResult.unverified !== 1 ? 's' : ''} need a correct answer set. Use "Edit Questions" to fix them.</p>
+                  <p className="text-amber-300 text-sm">{lastPasteResult.unverified} question{lastPasteResult.unverified !== 1 ? 's' : ''} need a correct answer set.</p>
                 </div>
               )}
-              <div className="w-full bg-emerald-500/10 border border-emerald-500/30 rounded-2xl p-3 text-center">
-                <p className="text-emerald-400 text-sm font-bold">✔ Ready for 1v1 Battle</p>
-              </div>
               <div className="w-full space-y-2">
                 <button onClick={handleSend} className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl bg-gradient-to-r from-red-500 to-orange-500 text-white font-black text-sm hover:brightness-110 transition-all">
                   <Swords className="w-4 h-4" /> Start Battle Now
@@ -318,7 +352,6 @@ export default function BattleQuestionSelector({ classData, onConfirm, onCancel,
                       </div>
                     ))}
                   </div>
-                  <p className="text-slate-600 text-xs">Click circle = mark correct answer</p>
                 </div>
               ))}
               <button onClick={() => setMode('confirm')} className="w-full py-3 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-black text-sm hover:brightness-110 transition-all">
@@ -327,7 +360,7 @@ export default function BattleQuestionSelector({ classData, onConfirm, onCancel,
             </motion.div>
           )}
 
-          {/* ── STEP-BASED QUESTION BANK ── */}
+          {/* ── STEP-BASED QUESTION BANK (uses GlobalTopic + GlobalQuestion) ── */}
           {mode === 'steps' && (
             <motion.div key="steps" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="p-4">
 
@@ -352,15 +385,24 @@ export default function BattleQuestionSelector({ classData, onConfirm, onCancel,
                 ))}
               </div>
 
-              {/* STEP 1: Topic */}
+              {/* STEP 1: Topic (from GlobalTopic, top-level) */}
               {step === 1 && (
                 <div>
                   <h3 className="text-white font-black text-xl mb-1">Select a Topic</h3>
                   <p className="text-slate-400 text-sm mb-4">Choose which topic to draw questions from</p>
                   {loadingTopics ? (
-                    <div className="flex items-center justify-center py-12 gap-2 text-slate-400"><Loader2 className="w-5 h-5 animate-spin" /> Loading topics...</div>
+                    <div className="flex items-center justify-center py-12 gap-2 text-slate-400">
+                      <Loader2 className="w-5 h-5 animate-spin" /> Loading topics...
+                    </div>
                   ) : topics.length === 0 ? (
-                    <div className="text-center py-12 text-slate-500">No topics found for this subject.</div>
+                    <div className="text-center py-12">
+                      <p className="text-slate-400 text-lg mb-2">No structured topics found.</p>
+                      <p className="text-slate-500 text-sm mb-4">Showing all available questions instead.</p>
+                      <button onClick={() => { setSelectedTopic(null); setSelectedSubtopic(null); setStep(3); }}
+                        className="px-6 py-2.5 rounded-xl bg-blue-500/20 border border-blue-500/40 text-blue-300 font-bold text-sm hover:bg-blue-500/30 transition-all">
+                        Continue with all questions →
+                      </button>
+                    </div>
                   ) : (
                     <div className="space-y-2">
                       {topics.map(t => (
@@ -376,7 +418,6 @@ export default function BattleQuestionSelector({ classData, onConfirm, onCancel,
                           </div>
                         </motion.button>
                       ))}
-                      {/* Option to skip to all questions */}
                       <button onClick={() => { setSelectedTopic(null); setSelectedSubtopic(null); setStep(3); }}
                         className="w-full text-center py-3 text-slate-500 hover:text-slate-300 text-sm transition-colors">
                         Skip — show all topics →
@@ -386,13 +427,15 @@ export default function BattleQuestionSelector({ classData, onConfirm, onCancel,
                 </div>
               )}
 
-              {/* STEP 2: Subtopic */}
+              {/* STEP 2: Subtopic (GlobalTopic children) */}
               {step === 2 && selectedTopic && (
                 <div>
                   <h3 className="text-white font-black text-xl mb-1">{selectedTopic.name}</h3>
                   <p className="text-slate-400 text-sm mb-4">Select a subtopic (optional)</p>
                   {loadingSubtopics ? (
-                    <div className="flex items-center justify-center py-12 gap-2 text-slate-400"><Loader2 className="w-5 h-5 animate-spin" /> Loading subtopics...</div>
+                    <div className="flex items-center justify-center py-12 gap-2 text-slate-400">
+                      <Loader2 className="w-5 h-5 animate-spin" /> Loading subtopics...
+                    </div>
                   ) : (
                     <div className="space-y-2">
                       {subtopics.map(st => (
@@ -438,7 +481,7 @@ export default function BattleQuestionSelector({ classData, onConfirm, onCancel,
                             <p className="text-white font-black text-lg">{d.label}</p>
                             <p className="text-slate-400 text-sm">{d.sub}</p>
                           </div>
-                          <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${isSelected ? `border-${d.color}-400 bg-${d.color}-500` : 'border-slate-600'}`}>
+                          <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${isSelected ? 'border-white bg-white/30' : 'border-slate-600'}`}>
                             {isSelected && <Check className="w-3 h-3 text-white" />}
                           </div>
                         </motion.button>
@@ -449,7 +492,7 @@ export default function BattleQuestionSelector({ classData, onConfirm, onCancel,
                     onClick={() => setStep(4)}
                     disabled={selectedDifficulties.length === 0}
                     className="w-full py-3 rounded-2xl bg-gradient-to-r from-blue-500 to-cyan-500 text-white font-black text-sm disabled:opacity-40 disabled:cursor-not-allowed hover:brightness-110 transition-all">
-                    Load Questions ({selectedDifficulties.join(' + ') || 'none selected'}) →
+                    Load Questions →
                   </button>
                   <button onClick={() => { setSelectedDifficulties([]); setStep(4); }} className="w-full text-center py-3 text-slate-500 hover:text-slate-300 text-sm transition-colors mt-1">
                     Skip — show all difficulties →
@@ -474,11 +517,13 @@ export default function BattleQuestionSelector({ classData, onConfirm, onCancel,
                   </div>
 
                   {loadingQuestions ? (
-                    <div className="flex items-center justify-center py-12 gap-2 text-slate-400"><Loader2 className="w-5 h-5 animate-spin" /> Loading questions...</div>
+                    <div className="flex items-center justify-center py-12 gap-2 text-slate-400">
+                      <Loader2 className="w-5 h-5 animate-spin" /> Loading questions...
+                    </div>
                   ) : questionsToShow.length === 0 ? (
                     <div className="text-center py-12">
-                      <p className="text-slate-500 text-lg mb-2">No questions found for this selection</p>
-                      <p className="text-slate-600 text-sm mb-4">Try changing the topic, subtopic, or difficulty filters.</p>
+                      <p className="text-slate-500 text-lg mb-2">No questions found</p>
+                      <p className="text-slate-600 text-sm mb-4">Try different filters.</p>
                       <button onClick={() => setStep(1)} className="text-blue-400 text-sm hover:underline">← Change filters</button>
                     </div>
                   ) : (
@@ -499,7 +544,7 @@ export default function BattleQuestionSelector({ classData, onConfirm, onCancel,
                                   <p className="text-white text-sm font-medium leading-snug">{q.question_text}</p>
                                   <div className="flex items-center gap-2 mt-1 flex-wrap">
                                     <span className={`text-xs px-2 py-0.5 rounded-full ${q.difficulty === 'easy' ? 'bg-emerald-500/20 text-emerald-400' : q.difficulty === 'hard' ? 'bg-red-500/20 text-red-400' : 'bg-amber-500/20 text-amber-400'}`}>{q.difficulty || 'medium'}</span>
-                                    {isSelected && <span className="text-xs text-purple-300 font-bold">Selected for 1v1 Battle ✔</span>}
+                                    {isSelected && <span className="text-xs text-purple-300 font-bold">Selected ✔</span>}
                                   </div>
                                 </div>
                               </div>
