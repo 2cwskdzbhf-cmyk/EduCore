@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
 import { X, ChevronLeft, Swords, Trophy, Users, Loader2, Play, StopCircle } from 'lucide-react';
-import BattleQuestionSelector from './BattleQuestionSelector.jsx';
+import BattleQuestionSelector from './BattleQuestionSelector';
 
 // Phases: 'setup' | 'lobby' | 'battling' | 'results'
 
