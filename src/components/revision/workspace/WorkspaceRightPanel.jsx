@@ -1,12 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { base44 } from '@/api/base44Client';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import {
   Headphones, Video, Network, FileBarChart2, Layers, Zap, Table2,
-  Plus, Pencil, Copy, Trash2, ExternalLink, Share2, Loader2, X, Check,
-  FileText, ChevronDown, ChevronUp
+  Plus, Pencil, Copy, Trash2, ExternalLink, Loader2, X, Check,
+  ChevronDown, ChevronUp, Play
 } from 'lucide-react';
+import FlashcardStudyOverlay from './FlashcardStudyOverlay';
 
 const STUDIO_ACTIONS = [
   { type: 'audio_overview', label: 'Audio Overview', icon: Headphones, color: 'from-violet-600 to-purple-700', desc: 'AI podcast-style audio' },
@@ -29,7 +30,7 @@ const PROMPT_MAP = {
   video_overview: 'Create a video script for a revision overview. Include scene descriptions, key points to cover, visual suggestions, and a clear narrative structure covering all main topics.',
   mind_map: 'Create a detailed mind map outline in text format. Show the central topic, main branches, and sub-branches with key concepts, facts, and connections. Use indented formatting.',
   report: 'Write a comprehensive revision report covering all key topics from my sources. Include an executive summary, detailed sections for each main topic, key findings, and exam preparation tips.',
-  flashcards: 'Generate 15 high-quality revision flashcards as Q&A pairs. Format each as "Q: [question]\nA: [answer]". Cover the most important concepts, definitions, and facts.',
+  flashcards: null, // handled separately — creates RevisionFlashcard records, not text
   quiz: 'Generate a 10-question multiple choice quiz. For each question provide: the question, 4 options (A-D), the correct answer, and a brief explanation.',
   data_table: 'Organise all key information from my sources into well-structured tables. Include relevant columns and categorise the data clearly with headings.',
 };
@@ -43,6 +44,14 @@ export default function WorkspaceRightPanel({ notebook, user, resources, selecte
   const [addNoteMode, setAddNoteMode] = useState(false);
   const [noteText, setNoteText] = useState('');
   const [noteTitle, setNoteTitle] = useState('');
+  const [studyCards, setStudyCards] = useState(null); // {cards, title} when overlay open
+
+  // Load all flashcards for this notebook so we can show sets
+  const { data: allFlashcards = [], refetch: refetchFlashcards } = useQuery({
+    queryKey: ['notebookFlashcards', notebook.id],
+    queryFn: () => base44.entities.RevisionFlashcard.filter({ notebook_id: notebook.id }, '-created_date'),
+    enabled: !!notebook.id,
+  });
 
   const deleteMutation = useMutation({
     mutationFn: (id) => base44.entities.NotebookResource.delete(id),
@@ -73,6 +82,50 @@ export default function WorkspaceRightPanel({ notebook, user, resources, selecte
 
       if (!contextParts) { alert('Please add sources with content first.'); setGenerating(null); return; }
 
+      // ── Flashcards: create real RevisionFlashcard records, open study mode ──
+      if (type === 'flashcards') {
+        const result = await base44.integrations.Core.InvokeLLM({
+          prompt: `Generate 15 high-quality revision flashcards from the source materials. Return a JSON object with a "flashcards" array. Each item must have "front" (the question/term) and "back" (the answer/definition). Cover the most important concepts, definitions, and facts.\n\nSOURCE MATERIALS:\n${contextParts}`,
+          response_json_schema: {
+            type: 'object',
+            properties: {
+              flashcards: {
+                type: 'array',
+                items: { type: 'object', properties: { front: { type: 'string' }, back: { type: 'string' } }, required: ['front', 'back'] }
+              }
+            }
+          }
+        });
+        const cards = result?.flashcards || [];
+        if (cards.length === 0) { alert('No flashcards could be generated. Please try again.'); setGenerating(null); return; }
+
+        const created = [];
+        for (const card of cards) {
+          const rec = await base44.entities.RevisionFlashcard.create({
+            notebook_id: notebook.id, student_email: user.email,
+            front: card.front, back: card.back, is_ai_generated: true,
+          });
+          created.push(rec);
+        }
+
+        // Also save a resource record so it appears in "Created Resources"
+        const num = resources.filter(r => r.resource_type === 'flashcards').length + 1;
+        const title = `${notebook.name} — Flashcards #${num}`;
+        const res = await base44.entities.NotebookResource.create({
+          notebook_id: notebook.id, student_email: user.email,
+          title, resource_type: 'flashcards',
+          content: JSON.stringify(cards), // store raw pairs for reference
+          source_ids: activeSources.map(s => s.id), source_count: activeSources.length,
+        });
+        onResourceCreated(res);
+        await refetchFlashcards();
+        // Open study mode immediately
+        setStudyCards({ cards: created, title });
+        setGenerating(null);
+        return;
+      }
+
+      // ── All other resource types ──
       const prompt = `${PROMPT_MAP[type]}\n\nSOURCE MATERIALS:\n${contextParts}`;
       const content = await base44.integrations.Core.InvokeLLM({ prompt });
       const action = STUDIO_ACTIONS.find(a => a.type === type);
@@ -102,7 +155,26 @@ export default function WorkspaceRightPanel({ notebook, user, resources, selecte
 
   const displayResources = showAllResources ? resources : resources.slice(0, 5);
 
+  // Open flashcard resource → find matching RevisionFlashcard records and study them
+  const openFlashcardResource = async (resource) => {
+    // Try to find flashcards created around the same time as this resource (within 2 min)
+    const resTime = new Date(resource.created_date).getTime();
+    const nearby = allFlashcards.filter(fc => Math.abs(new Date(fc.created_date).getTime() - resTime) < 120000);
+    const cards = nearby.length > 0 ? nearby : allFlashcards;
+    if (cards.length === 0) { alert('No flashcards found for this set. Try generating new ones.'); return; }
+    setStudyCards({ cards, title: resource.title });
+  };
+
   return (
+    <>
+    {studyCards && (
+      <FlashcardStudyOverlay
+        cards={studyCards.cards}
+        title={studyCards.title}
+        onClose={() => setStudyCards(null)}
+        onRefresh={refetchFlashcards}
+      />
+    )}
     <div className="flex flex-col h-full overflow-y-auto">
       {/* Header */}
       <div className="flex-shrink-0 px-4 py-3.5 border-b border-white/10">
@@ -149,7 +221,7 @@ export default function WorkspaceRightPanel({ notebook, user, resources, selecte
           {displayResources.map((r, i) => (
             <motion.div key={r.id} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }}>
               <div className="group rounded-xl border border-white/8 bg-white/[0.03] hover:bg-white/[0.06] transition-all overflow-hidden">
-                <div className="flex items-center gap-2.5 p-2.5 cursor-pointer" onClick={() => setOpenResourceId(openResourceId === r.id ? null : r.id)}>
+                <div className="flex items-center gap-2.5 p-2.5 cursor-pointer" onClick={() => r.resource_type === 'flashcards' ? openFlashcardResource(r) : setOpenResourceId(openResourceId === r.id ? null : r.id)}>
                   <span className="text-base flex-shrink-0 leading-none">{RESOURCE_ICONS[r.resource_type] || '📄'}</span>
                   <div className="flex-1 min-w-0">
                     {renamingId === r.id ? (
@@ -184,7 +256,7 @@ export default function WorkspaceRightPanel({ notebook, user, resources, selecte
                   </div>
                 </div>
                 <AnimatePresence>
-                  {openResourceId === r.id && (
+                  {openResourceId === r.id && r.resource_type !== 'flashcards' && (
                     <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }}
                       className="border-t border-white/10 overflow-hidden">
                       <div className="p-3 bg-white/[0.02]">
@@ -262,5 +334,6 @@ export default function WorkspaceRightPanel({ notebook, user, resources, selecte
         </div>
       </div>
     </div>
+    </>
   );
 }

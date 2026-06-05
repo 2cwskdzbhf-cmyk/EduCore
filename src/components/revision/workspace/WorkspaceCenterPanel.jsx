@@ -9,7 +9,7 @@ import {
 const QUICK_CHIPS = [
   { label: '📋 Summarise', prompt: 'Summarise the key content from my sources with clear headings and bullet points.' },
   { label: '💡 Explain Simply', prompt: 'Explain the main concepts simply, as if I am a GCSE student.' },
-  { label: '🗂️ Create Flashcards', prompt: 'Generate 10 flashcard Q&A pairs from the most important content.' },
+  { label: '🗂️ Create Flashcards', prompt: 'Generate 12 revision flashcards. Return a JSON array: [{"front":"question","back":"answer"},...]. Cover the most important concepts and definitions.' },
   { label: '❓ Generate Quiz', prompt: 'Create a 5-question multiple choice quiz with answers from my notes.' },
   { label: '🧠 Mind Map', prompt: 'Create a structured mind map outline with main topics and subtopics from the content.' },
   { label: '📖 Revision Guide', prompt: 'Generate a complete structured revision guide with topic summary, key facts, definitions, and exam tips.' },
@@ -94,7 +94,41 @@ ${contextParts ? `\nSOURCE MATERIALS:\n\n${contextParts}` : '\nNote: No sources 
       else if (lowerPrompt.includes('table') || lowerPrompt.includes('data table')) resourceType = 'data_table';
       else if (lowerPrompt.includes('report')) resourceType = 'report';
 
-      if (resourceType) {
+      if (resourceType === 'flashcards') {
+        // Parse the AI response to extract Q&A pairs and create real RevisionFlashcard records
+        const lines = resp.split('\n').filter(l => l.trim());
+        const pairs = [];
+        let front = null;
+        for (const line of lines) {
+          const qMatch = line.match(/^(?:Q:|Question:|Front:|\d+[\.\)])\s*(.+)/i);
+          const aMatch = line.match(/^(?:A:|Answer:|Back:)\s*(.+)/i);
+          if (qMatch) { front = qMatch[1].trim(); }
+          else if (aMatch && front) { pairs.push({ front, back: aMatch[1].trim() }); front = null; }
+        }
+        // Fallback: try JSON parse
+        if (pairs.length === 0) {
+          try {
+            const parsed = JSON.parse(resp);
+            const arr = Array.isArray(parsed) ? parsed : parsed.flashcards;
+            if (Array.isArray(arr)) arr.forEach(c => { if (c.front && c.back) pairs.push(c); });
+          } catch {}
+        }
+        if (pairs.length > 0) {
+          for (const pair of pairs) {
+            await base44.entities.RevisionFlashcard.create({
+              notebook_id: notebook.id, student_email: user.email,
+              front: pair.front, back: pair.back, is_ai_generated: true,
+            });
+          }
+          const title = `${notebook.name} — Flashcards`;
+          const res = await base44.entities.NotebookResource.create({
+            notebook_id: notebook.id, student_email: user.email,
+            title, resource_type: 'flashcards', content: JSON.stringify(pairs),
+            source_ids: activeSources.map(s => s.id), source_count: activeSources.length,
+          });
+          onResourceCreated(res);
+        }
+      } else if (resourceType) {
         const title = `${notebook.name} — ${resourceType.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}`;
         const res = await base44.entities.NotebookResource.create({
           notebook_id: notebook.id, student_email: user.email,
