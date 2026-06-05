@@ -208,6 +208,8 @@ export default function NotebookWorkspace({ notebook, user, onBack }) {
                 user={user}
                 selectedSources={selectedSources}
                 allSources={sources}
+                resources={resources}
+                flashcards={flashcards}
                 onResourceCreated={handleResourceCreated}
               />
             </motion.div>
