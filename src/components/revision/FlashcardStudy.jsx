@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { base44 } from '@/api/base44Client';
 import { useMutation } from '@tanstack/react-query';
@@ -43,8 +43,24 @@ export default function FlashcardStudy({ notebook, user, flashcards, sources, on
   const [matchWrong, setMatchWrong] = useState([]);
 
   const now = new Date();
+  const tomorrow = new Date(now); tomorrow.setDate(tomorrow.getDate() + 1);
   const dueCards = flashcards.filter(f => !f.next_review || new Date(f.next_review) <= now);
+  const dueTomorrow = flashcards.filter(f => {
+    if (!f.next_review) return false;
+    const d = new Date(f.next_review);
+    return d > now && d <= tomorrow;
+  });
+  const overdue = flashcards.filter(f => f.next_review && new Date(f.next_review) < new Date(now - 86400000));
   const allCards = flashcards;
+
+  // Timed mode timer
+  useEffect(() => {
+    if (mode === 'timed' && timeLeft !== null && !flipped) {
+      if (timeLeft <= 0) { setFlipped(true); return; }
+      timerRef.current = setTimeout(() => setTimeLeft(t => t - 1), 1000);
+    }
+    return () => clearTimeout(timerRef.current);
+  }, [mode, timeLeft, flipped]);
 
   const rateMutation = useMutation({
     mutationFn: async ({ card, rating }) => {
@@ -122,12 +138,138 @@ export default function FlashcardStudy({ notebook, user, flashcards, sources, on
     setGenerating(false);
   };
 
-  const startStudy = (cards) => {
-    setStudyQueue([...cards].sort(() => Math.random() - 0.5));
+  const startStudy = (cards, studyMode = 'study') => {
+    const shuffled = [...cards].sort(() => Math.random() - 0.5);
+    setStudyQueue(shuffled);
     setStudyIndex(0);
     setFlipped(false);
-    setMode('study');
+    if (studyMode === 'timed') {
+      setTimeLeft(timedSeconds);
+      setMode('timed');
+    } else if (studyMode === 'match') {
+      // Build match game: 6 pairs max
+      const pairs = shuffled.slice(0, 6);
+      const items = [...pairs.map((c, i) => ({ id: `f${i}`, cardId: c.id, text: c.front, type: 'front' })),
+                     ...pairs.map((c, i) => ({ id: `b${i}`, cardId: c.id, text: c.back, type: 'back' }))];
+      setMatchPairs(items.sort(() => Math.random() - 0.5));
+      setMatchSelected(null);
+      setMatchMatched([]);
+      setMatchWrong([]);
+      setMode('match');
+    } else {
+      setMode('study');
+    }
   };
+
+  // Match mode
+  if (mode === 'match') {
+    const handleMatchSelect = (item) => {
+      if (matchMatched.includes(item.id) || matchWrong.includes(item.id)) return;
+      if (!matchSelected) {
+        setMatchSelected(item);
+        return;
+      }
+      if (matchSelected.id === item.id) { setMatchSelected(null); return; }
+      if (matchSelected.cardId === item.cardId && matchSelected.type !== item.type) {
+        setMatchMatched(m => [...m, matchSelected.id, item.id]);
+        setMatchSelected(null);
+      } else {
+        setMatchWrong([matchSelected.id, item.id]);
+        setTimeout(() => { setMatchWrong([]); setMatchSelected(null); }, 800);
+      }
+    };
+    const allMatched = matchMatched.length === matchPairs.length;
+    return (
+      <div className="space-y-5 max-w-xl mx-auto">
+        <div className="flex items-center justify-between">
+          <button onClick={() => setMode('browse')} className="text-slate-400 hover:text-white text-sm flex items-center gap-1"><X className="w-4 h-4" /> Exit Match</button>
+          <p className="text-slate-400 text-sm">{matchMatched.length / 2} / {matchPairs.length / 2} matched</p>
+        </div>
+        {allMatched ? (
+          <div className="text-center py-12">
+            <div className="text-5xl mb-3">🎉</div>
+            <p className="text-white font-black text-2xl mb-2">All matched!</p>
+            <button onClick={() => startStudy(allCards, 'match')} className="px-5 py-2.5 rounded-xl bg-violet-500 text-white font-bold">Play Again</button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            {matchPairs.map(item => {
+              const isMatched = matchMatched.includes(item.id);
+              const isSelected = matchSelected?.id === item.id;
+              const isWrong = matchWrong.includes(item.id);
+              return (
+                <motion.button key={item.id} onClick={() => handleMatchSelect(item)}
+                  animate={{ scale: isWrong ? [1, 1.05, 0.95, 1] : 1 }}
+                  className={`p-3 rounded-2xl border-2 text-sm font-medium text-left transition-all min-h-[70px] flex items-center ${
+                    isMatched ? 'border-emerald-500/50 bg-emerald-500/10 text-emerald-300 opacity-50' :
+                    isWrong ? 'border-red-500 bg-red-500/20 text-red-300' :
+                    isSelected ? 'border-violet-400 bg-violet-500/30 text-violet-200' :
+                    'border-white/10 bg-white/5 text-slate-300 hover:border-violet-500/40 hover:bg-white/10'
+                  }`}>
+                  {item.text}
+                </motion.button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // Timed mode (same as study but with countdown)
+  if (mode === 'timed' && studyQueue.length > 0) {
+    const card = studyQueue[studyIndex];
+    if (!card) { setMode('browse'); return null; }
+    const timerPct = (timeLeft / timedSeconds) * 100;
+    return (
+      <div className="max-w-lg mx-auto space-y-6">
+        <div className="flex items-center justify-between">
+          <button onClick={() => setMode('browse')} className="text-slate-400 hover:text-white text-sm flex items-center gap-1"><X className="w-4 h-4" /> Exit</button>
+          <div className="flex items-center gap-2">
+            <Timer className="w-4 h-4 text-amber-400" />
+            <span className={`font-black text-lg ${timeLeft <= 3 ? 'text-red-400' : 'text-white'}`}>{timeLeft}s</span>
+          </div>
+          <p className="text-slate-400 text-sm">{studyIndex + 1} / {studyQueue.length}</p>
+        </div>
+        <div className="h-2 bg-white/10 rounded-full overflow-hidden">
+          <motion.div className={`h-full rounded-full transition-all ${timerPct > 50 ? 'bg-emerald-500' : timerPct > 25 ? 'bg-amber-500' : 'bg-red-500'}`}
+            style={{ width: `${timerPct}%` }} transition={{ duration: 0.3 }} />
+        </div>
+        <motion.div className="relative cursor-pointer" style={{ perspective: 1000 }} onClick={() => { setFlipped(f => !f); clearTimeout(timerRef.current); }}>
+          <motion.div animate={{ rotateY: flipped ? 180 : 0 }} transition={{ duration: 0.5, type: 'spring', stiffness: 200 }}
+            style={{ transformStyle: 'preserve-3d' }} className="relative">
+            <div className="backface-hidden bg-white/5 border border-white/15 rounded-3xl p-10 min-h-[200px] flex flex-col items-center justify-center text-center"
+              style={{ backfaceVisibility: 'hidden' }}>
+              <p className="text-xs text-slate-500 font-semibold uppercase tracking-wider mb-4">Question</p>
+              <p className="text-white font-bold text-xl leading-relaxed">{card.front}</p>
+              {!flipped && <p className="text-slate-500 text-xs mt-4">Tap to reveal · Timer running!</p>}
+            </div>
+            <div className="absolute inset-0 backface-hidden bg-gradient-to-br from-violet-900/40 to-purple-900/30 border border-violet-500/30 rounded-3xl p-10 flex flex-col items-center justify-center text-center"
+              style={{ backfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}>
+              <p className="text-xs text-violet-400 font-semibold uppercase tracking-wider mb-4">Answer</p>
+              <p className="text-white font-bold text-xl leading-relaxed">{card.back}</p>
+            </div>
+          </motion.div>
+        </motion.div>
+        <AnimatePresence>
+          {flipped && (
+            <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="grid grid-cols-4 gap-2">
+              {RATING_BUTTONS.map(r => (
+                <button key={r.id} onClick={() => {
+                  rateMutation.mutate({ card, rating: r.id });
+                  const next = studyIndex + 1;
+                  if (next < studyQueue.length) { setTimeLeft(timedSeconds); setFlipped(false); }
+                }} disabled={rateMutation.isPending}
+                  className={`${r.color} text-white font-bold py-3 rounded-2xl text-sm transition-all flex flex-col items-center`}>
+                  {r.label}<span className="text-xs opacity-70 mt-0.5">{r.desc}</span>
+                </button>
+              ))}
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    );
+  }
 
   // Study mode
   if (mode === 'study' && studyQueue.length > 0) {
@@ -195,7 +337,12 @@ export default function FlashcardStudy({ notebook, user, flashcards, sources, on
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-white font-black text-xl">Flashcards</h2>
-          <p className="text-slate-400 text-sm">{allCards.length} cards · {dueCards.length} due now</p>
+          <div className="flex items-center gap-3 text-sm mt-0.5">
+            <span className="text-slate-400">{allCards.length} cards</span>
+            {dueCards.length > 0 && <span className="text-amber-400 font-medium">· {dueCards.length} due now</span>}
+            {overdue.length > 0 && <span className="text-red-400 font-medium">· {overdue.length} overdue</span>}
+            {dueTomorrow.length > 0 && <span className="text-slate-500">· {dueTomorrow.length} due tomorrow</span>}
+          </div>
         </div>
         <div className="flex gap-2">
           <button onClick={() => setMode('create')}
