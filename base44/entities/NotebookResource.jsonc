@@ -1,0 +1,52 @@
+{
+  "name": "NotebookResource",
+  "type": "object",
+  "properties": {
+    "notebook_id": {
+      "type": "string"
+    },
+    "student_email": {
+      "type": "string"
+    },
+    "title": {
+      "type": "string"
+    },
+    "resource_type": {
+      "type": "string",
+      "enum": [
+        "flashcards",
+        "quiz",
+        "mind_map",
+        "study_guide",
+        "report",
+        "formula_sheet",
+        "exam_questions",
+        "summary",
+        "data_table",
+        "audio_overview",
+        "video_overview",
+        "notes"
+      ]
+    },
+    "content": {
+      "type": "string",
+      "description": "Generated content (markdown, JSON, etc.)"
+    },
+    "source_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "source_count": {
+      "type": "number",
+      "default": 0
+    }
+  },
+  "required": [
+    "notebook_id",
+    "student_email",
+    "title",
+    "resource_type"
+  ]
+}

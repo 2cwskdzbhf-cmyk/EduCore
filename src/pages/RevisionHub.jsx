@@ -8,6 +8,7 @@ import {
 import RevisionDashboard from '@/components/revision/RevisionDashboard';
 import NotebooksView from '@/components/revision/NotebooksView';
 import NotebookDetail from '@/components/revision/NotebookDetail';
+import NotebookWorkspace from '@/components/revision/workspace/NotebookWorkspace';
 
 const NAV = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -33,11 +34,10 @@ export default function RevisionHub() {
 
   if (openNotebook) {
     return (
-      <NotebookDetail
+      <NotebookWorkspace
         notebook={openNotebook}
         user={user}
         onBack={() => { setOpenNotebook(null); setQuickUploadNotebook(null); refetchNotebooks(); }}
-        autoOpenUpload={quickUploadNotebook?.id === openNotebook?.id}
       />
     );
   }
