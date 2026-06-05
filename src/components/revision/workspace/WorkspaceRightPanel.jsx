@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { base44 } from '@/api/base44Client';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation } from '@tanstack/react-query';
 import {
   Headphones, Video, Network, FileBarChart2, Layers, Zap, Table2,
   Plus, Pencil, Copy, Trash2, ExternalLink, Loader2, X, Check,
   ChevronDown, ChevronUp, Play
 } from 'lucide-react';
-import FlashcardStudyOverlay from './FlashcardStudyOverlay';
+
 
 const STUDIO_ACTIONS = [
   { type: 'audio_overview', label: 'Audio Overview', icon: Headphones, color: 'from-violet-600 to-purple-700', desc: 'AI podcast-style audio' },
@@ -35,7 +35,7 @@ const PROMPT_MAP = {
   data_table: 'Organise all key information from my sources into well-structured tables. Include relevant columns and categorise the data clearly with headings.',
 };
 
-export default function WorkspaceRightPanel({ notebook, user, resources, selectedSources, allSources, onResourceCreated, onRefresh }) {
+export default function WorkspaceRightPanel({ notebook, user, resources, flashcards: allFlashcards = [], selectedSources, allSources, onResourceCreated, onRefresh, onOpenStudy }) {
   const [generating, setGenerating] = useState(null);
   const [renamingId, setRenamingId] = useState(null);
   const [renameValue, setRenameValue] = useState('');
@@ -44,14 +44,6 @@ export default function WorkspaceRightPanel({ notebook, user, resources, selecte
   const [addNoteMode, setAddNoteMode] = useState(false);
   const [noteText, setNoteText] = useState('');
   const [noteTitle, setNoteTitle] = useState('');
-  const [studyCards, setStudyCards] = useState(null); // {cards, title} when overlay open
-
-  // Load all flashcards for this notebook so we can show sets
-  const { data: allFlashcards = [], refetch: refetchFlashcards } = useQuery({
-    queryKey: ['notebookFlashcards', notebook.id],
-    queryFn: () => base44.entities.RevisionFlashcard.filter({ notebook_id: notebook.id }, '-created_date'),
-    enabled: !!notebook.id,
-  });
 
   const deleteMutation = useMutation({
     mutationFn: (id) => base44.entities.NotebookResource.delete(id),
@@ -118,9 +110,8 @@ export default function WorkspaceRightPanel({ notebook, user, resources, selecte
           source_ids: activeSources.map(s => s.id), source_count: activeSources.length,
         });
         onResourceCreated(res);
-        await refetchFlashcards();
-        // Open study mode immediately
-        setStudyCards({ cards: created, title });
+        // Open study mode via parent (overlay lives at workspace root)
+        onOpenStudy(created, title);
         setGenerating(null);
         return;
       }
@@ -157,24 +148,15 @@ export default function WorkspaceRightPanel({ notebook, user, resources, selecte
 
   // Open flashcard resource → find matching RevisionFlashcard records and study them
   const openFlashcardResource = async (resource) => {
-    // Try to find flashcards created around the same time as this resource (within 2 min)
     const resTime = new Date(resource.created_date).getTime();
     const nearby = allFlashcards.filter(fc => Math.abs(new Date(fc.created_date).getTime() - resTime) < 120000);
     const cards = nearby.length > 0 ? nearby : allFlashcards;
     if (cards.length === 0) { alert('No flashcards found for this set. Try generating new ones.'); return; }
-    setStudyCards({ cards, title: resource.title });
+    onOpenStudy(cards, resource.title);
   };
 
   return (
     <>
-    {studyCards && (
-      <FlashcardStudyOverlay
-        cards={studyCards.cards}
-        title={studyCards.title}
-        onClose={() => setStudyCards(null)}
-        onRefresh={refetchFlashcards}
-      />
-    )}
     <div className="flex flex-col h-full overflow-y-auto">
       {/* Header */}
       <div className="flex-shrink-0 px-4 py-3.5 border-b border-white/10">

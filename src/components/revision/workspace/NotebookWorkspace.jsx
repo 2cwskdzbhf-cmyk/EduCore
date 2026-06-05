@@ -1,10 +1,12 @@
 import React, { useState, useCallback } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ChevronLeft, BookOpen, Layers, Zap, Menu, X } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { ChevronLeft, BookOpen, Layers, Zap, X } from 'lucide-react';
 import WorkspaceLeftPanel from './WorkspaceLeftPanel';
 import WorkspaceCenterPanel from './WorkspaceCenterPanel';
 import WorkspaceRightPanel from './WorkspaceRightPanel';
+import FlashcardStudyOverlay from './FlashcardStudyOverlay';
 
 const COLOR_MAP = {
   purple: 'from-violet-600 to-purple-700',
@@ -19,6 +21,9 @@ export default function NotebookWorkspace({ notebook, user, onBack }) {
   const queryClient = useQueryClient();
   const [selectedSourceIds, setSelectedSourceIds] = useState([]);
   const [mobilePanel, setMobilePanel] = useState(null); // 'left' | 'right' | null
+  // Lifted flashcard study state — so the overlay renders at the top level
+  // and is never clipped by a sidebar's overflow:hidden or transform
+  const [studyCards, setStudyCards] = useState(null); // { cards, title } | null
 
   const { data: sources = [], refetch: refetchSources } = useQuery({
     queryKey: ['revisionSources', notebook.id],
@@ -26,7 +31,7 @@ export default function NotebookWorkspace({ notebook, user, onBack }) {
     enabled: !!notebook.id,
   });
 
-  const { data: flashcards = [] } = useQuery({
+  const { data: flashcards = [], refetch: refetchFlashcards } = useQuery({
     queryKey: ['revisionFlashcards', notebook.id],
     queryFn: () => base44.entities.RevisionFlashcard.filter({ notebook_id: notebook.id }),
     enabled: !!notebook.id,
@@ -59,6 +64,16 @@ export default function NotebookWorkspace({ notebook, user, onBack }) {
   const handleResourceCreated = useCallback(() => {
     refetchResources();
   }, [refetchResources]);
+
+  // Called by WorkspaceRightPanel to launch study mode
+  const openStudyMode = useCallback((cards, title) => {
+    setStudyCards({ cards, title });
+  }, []);
+
+  const closeStudyMode = useCallback(() => {
+    setStudyCards(null);
+    refetchFlashcards();
+  }, [refetchFlashcards]);
 
   return (
     <div className="fixed inset-0 bg-slate-950 flex flex-col z-50">
@@ -160,13 +175,28 @@ export default function NotebookWorkspace({ notebook, user, onBack }) {
             notebook={notebook}
             user={user}
             resources={resources}
+            flashcards={flashcards}
             selectedSources={selectedSources}
             allSources={sources}
             onResourceCreated={handleResourceCreated}
             onRefresh={refetchResources}
+            onOpenStudy={openStudyMode}
           />
         </div>
       </div>
+
+      {/* ── Flashcard Study Overlay — rendered at workspace root so it's never clipped ── */}
+      <AnimatePresence>
+        {studyCards && (
+          <FlashcardStudyOverlay
+            key="flashcard-study"
+            cards={studyCards.cards}
+            title={studyCards.title}
+            onClose={closeStudyMode}
+            onRefresh={refetchFlashcards}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }
