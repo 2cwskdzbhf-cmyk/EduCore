@@ -235,9 +235,9 @@ export default function WorkspaceRightPanel({ notebook, user, resources, selecte
                     ) : (
                       <p className="text-white text-xs font-medium truncate">{r.title}</p>
                     )}
-                    <p className="text-[10px] text-slate-600 mt-0.5">
-                      {r.resource_type?.replace(/_/g, ' ')} · {new Date(r.created_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
-                      {r.source_count > 0 && ` · ${r.source_count} src`}
+                    <p className="text-[10px] text-slate-600 mt-0.5 flex items-center gap-1.5">
+                      <span>{r.resource_type?.replace(/_/g, ' ')} · {new Date(r.created_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}{r.source_count > 0 && ` · ${r.source_count} src`}</span>
+                      {r.resource_type === 'flashcards' && <span className="text-amber-400 font-semibold">▶ Study</span>}
                     </p>
                   </div>
                   <div className="flex-shrink-0 flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity" onClick={e => e.stopPropagation()}>
