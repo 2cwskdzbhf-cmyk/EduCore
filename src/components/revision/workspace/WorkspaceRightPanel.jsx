@@ -37,6 +37,8 @@ const PROMPT_MAP = {
 
 export default function WorkspaceRightPanel({ notebook, user, resources, flashcards: allFlashcards = [], selectedSources, allSources, onResourceCreated, onRefresh, onOpenStudy }) {
   const [generating, setGenerating] = useState(null);
+  const [flashcardProgress, setFlashcardProgress] = useState(null); // { generated, total, batchLabel }
+  const [cancelRef] = useState({ cancelled: false });
   const [renamingId, setRenamingId] = useState(null);
   const [renameValue, setRenameValue] = useState('');
   const [openResourceId, setOpenResourceId] = useState(null);
@@ -74,44 +76,96 @@ export default function WorkspaceRightPanel({ notebook, user, resources, flashca
 
       if (!contextParts) { alert('Please add sources with content first.'); setGenerating(null); return; }
 
-      // ── Flashcards: create real RevisionFlashcard records, open study mode ──
+      // ── Flashcards: batched max-coverage generation ──
       if (type === 'flashcards') {
-        const result = await base44.integrations.Core.InvokeLLM({
-          prompt: `Generate 15 high-quality revision flashcards from the source materials. Return a JSON object with a "flashcards" array. Each item must have "front" (the question/term) and "back" (the answer/definition). Cover the most important concepts, definitions, and facts.\n\nSOURCE MATERIALS:\n${contextParts}`,
-          response_json_schema: {
-            type: 'object',
-            properties: {
-              flashcards: {
-                type: 'array',
-                items: { type: 'object', properties: { front: { type: 'string' }, back: { type: 'string' } }, required: ['front', 'back'] }
-              }
-            }
-          }
-        });
-        const cards = result?.flashcards || [];
-        if (cards.length === 0) { alert('No flashcards could be generated. Please try again.'); setGenerating(null); return; }
+        cancelRef.cancelled = false;
+        const allCreated = [];
+        const BATCH_SIZE = 60; // cards per LLM call
+        const sourceParts = activeSources.filter(s => s.content_text);
 
-        const created = [];
-        for (const card of cards) {
-          const rec = await base44.entities.RevisionFlashcard.create({
-            notebook_id: notebook.id, student_email: user.email,
-            front: card.front, back: card.back, is_ai_generated: true,
-          });
-          created.push(rec);
+        if (sourceParts.length === 0) { alert('Please add sources with content first.'); setGenerating(null); return; }
+
+        // Build per-source batches so every source gets full coverage
+        const batches = [];
+        for (const src of sourceParts) {
+          const text = src.content_text;
+          // Split long sources into ~6000-char chunks
+          const CHUNK = 6000;
+          for (let offset = 0; offset < text.length; offset += CHUNK) {
+            batches.push({ sourceName: src.name, chunk: text.slice(offset, offset + CHUNK) });
+          }
         }
 
-        // Also save a resource record so it appears in "Created Resources"
+        // Estimate total cards
+        const estimatedTotal = batches.length * BATCH_SIZE;
+        setFlashcardProgress({ generated: 0, total: estimatedTotal, batchLabel: 'Starting…' });
+
+        let batchNum = 0;
+        for (const batch of batches) {
+          if (cancelRef.cancelled) break;
+          batchNum++;
+          setFlashcardProgress(p => ({ ...p, batchLabel: `Batch ${batchNum}/${batches.length} — ${batch.sourceName}` }));
+
+          const result = await base44.integrations.Core.InvokeLLM({
+            prompt: `You are creating revision flashcards for a GCSE/A-Level student studying "${notebook.subject || notebook.name}".
+
+Extract EVERY distinct concept, definition, formula, fact, and example from the following text segment from source "${batch.sourceName}". Generate as many flashcards as needed — aim for ${BATCH_SIZE} cards covering maximum detail. Do not skip any testable fact.
+
+Rules:
+- Front: concise question or prompt (e.g. "Define X", "What is the formula for Y?", "Explain Z")
+- Back: accurate, complete answer with key terms in bold using **bold**
+- No duplicates
+- Cover breadth AND depth
+
+Return a JSON object with a "flashcards" array.
+
+TEXT:
+${batch.chunk}`,
+            response_json_schema: {
+              type: 'object',
+              properties: {
+                flashcards: {
+                  type: 'array',
+                  items: {
+                    type: 'object',
+                    properties: { front: { type: 'string' }, back: { type: 'string' } },
+                    required: ['front', 'back']
+                  }
+                }
+              }
+            }
+          });
+
+          const cards = result?.flashcards || [];
+          for (const card of cards) {
+            if (cancelRef.cancelled) break;
+            if (!card.front?.trim() || !card.back?.trim()) continue;
+            const rec = await base44.entities.RevisionFlashcard.create({
+              notebook_id: notebook.id, student_email: user.email,
+              front: card.front, back: card.back, is_ai_generated: true,
+              source_id: activeSources.find(s => s.name === batch.sourceName)?.id || null,
+            });
+            allCreated.push(rec);
+          }
+
+          setFlashcardProgress(p => ({ ...p, generated: allCreated.length }));
+          // Partial save after each batch
+          onRefresh();
+        }
+
+        if (allCreated.length === 0) { alert('No flashcards could be generated. Please try again.'); setGenerating(null); setFlashcardProgress(null); return; }
+
         const num = resources.filter(r => r.resource_type === 'flashcards').length + 1;
-        const title = `${notebook.name} — Flashcards #${num}`;
+        const title = `${notebook.name} — Flashcards #${num} (${allCreated.length} cards)`;
         const res = await base44.entities.NotebookResource.create({
           notebook_id: notebook.id, student_email: user.email,
           title, resource_type: 'flashcards',
-          content: JSON.stringify(cards), // store raw pairs for reference
+          content: JSON.stringify({ totalCards: allCreated.length, batches: batches.length }),
           source_ids: activeSources.map(s => s.id), source_count: activeSources.length,
         });
         onResourceCreated(res);
-        // Open study mode via parent (overlay lives at workspace root)
-        onOpenStudy(created, title);
+        setFlashcardProgress(null);
+        onOpenStudy(allCreated, title);
         setGenerating(null);
         return;
       }
@@ -164,19 +218,58 @@ export default function WorkspaceRightPanel({ notebook, user, resources, flashca
         <p className="text-xs text-slate-500 mt-0.5">Generate & manage study materials</p>
       </div>
 
+      {/* Flashcard generation progress overlay */}
+      <AnimatePresence>
+        {flashcardProgress && (
+          <motion.div
+            initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}
+            className="mx-3 mt-3 rounded-2xl p-4 border border-amber-500/25"
+            style={{ background: 'linear-gradient(135deg, rgba(245,158,11,0.1), rgba(234,88,12,0.08))' }}
+          >
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <Loader2 className="w-3.5 h-3.5 text-amber-400 animate-spin flex-shrink-0" />
+                <p className="text-amber-300 text-xs font-bold">Generating flashcards…</p>
+              </div>
+              <button
+                onClick={() => { cancelRef.cancelled = true; }}
+                className="text-slate-500 hover:text-red-400 text-xs transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+            <p className="text-slate-400 text-[10px] mb-2 truncate">{flashcardProgress.batchLabel}</p>
+            <div className="h-1.5 w-full rounded-full overflow-hidden bg-white/10">
+              <motion.div
+                className="h-full rounded-full bg-gradient-to-r from-amber-500 to-orange-400"
+                animate={{ width: flashcardProgress.total > 0 ? `${Math.min((flashcardProgress.generated / flashcardProgress.total) * 100, 95)}%` : '10%' }}
+                transition={{ duration: 0.4 }}
+              />
+            </div>
+            <p className="text-slate-500 text-[10px] mt-1.5">{flashcardProgress.generated} cards saved so far</p>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Studio action cards */}
       <div className="flex-shrink-0 p-3">
         <p className="text-xs text-slate-500 font-semibold uppercase tracking-wider mb-2.5 px-1">Generate</p>
         <div className="grid grid-cols-2 gap-2">
           {STUDIO_ACTIONS.map(action => (
             <motion.button key={action.type}
-              whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
+              whileHover={{ scale: generating ? 1 : 1.02 }} whileTap={{ scale: generating ? 1 : 0.98 }}
               onClick={() => generateResource(action.type)}
               disabled={!!generating}
               className={`relative overflow-hidden flex flex-col items-start p-3 rounded-2xl bg-gradient-to-br ${action.color} text-white text-left transition-all shadow-lg disabled:opacity-60 disabled:cursor-not-allowed`}>
-              {generating === action.type && (
+              {generating === action.type && action.type !== 'flashcards' && (
                 <div className="absolute inset-0 bg-black/30 flex items-center justify-center rounded-2xl">
                   <Loader2 className="w-5 h-5 animate-spin text-white" />
+                </div>
+              )}
+              {generating === 'flashcards' && action.type === 'flashcards' && (
+                <div className="absolute inset-0 bg-black/40 flex flex-col items-center justify-center rounded-2xl gap-1">
+                  <Loader2 className="w-4 h-4 animate-spin text-amber-300" />
+                  <span className="text-amber-300 text-[10px] font-bold">{flashcardProgress?.generated ?? 0} cards</span>
                 </div>
               )}
               <action.icon className="w-5 h-5 mb-2 opacity-90" />

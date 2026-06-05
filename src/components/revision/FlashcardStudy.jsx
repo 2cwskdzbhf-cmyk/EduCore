@@ -30,6 +30,8 @@ export default function FlashcardStudy({ notebook, user, flashcards, sources, on
   const [correct, setCorrect] = useState(0);
   const [incorrect, setIncorrect] = useState(0);
   const [generating, setGenerating] = useState(false);
+  const [genProgress, setGenProgress] = useState(null); // { generated, batchLabel }
+  const [cancelGen] = useState({ cancelled: false });
   const [newFront, setNewFront] = useState('');
   const [newBack, setNewBack] = useState('');
   const [showCreate, setShowCreate] = useState(false);
@@ -72,29 +74,72 @@ export default function FlashcardStudy({ notebook, user, flashcards, sources, on
   const generateFromAI = async () => {
     if (generating) return;
     setGenerating(true);
-    const contextParts = sources.filter(s => s.content_text).map(s => s.content_text.slice(0, 5000)).join('\n\n');
-    if (!contextParts) { setGenerating(false); alert('Upload some sources first!'); return; }
-    try {
-      const result = await base44.integrations.Core.InvokeLLM({
-        prompt: `Generate 15 high-quality revision flashcards from this content. Return ONLY a JSON array like: [{"front": "question", "back": "answer"}, ...]. Make the questions test key concepts, definitions, and important facts.`,
-        system_prompt: `You are creating flashcards for a GCSE/A-Level student studying ${notebook.subject || 'the subject'}. Content: ${contextParts}`,
-        response_json_schema: {
-          type: 'object',
-          properties: {
-            flashcards: { type: 'array', items: { type: 'object', properties: { front: { type: 'string' }, back: { type: 'string' } } } }
-          }
-        }
-      });
-      const cards = result?.flashcards || [];
-      for (const card of cards) {
-        await base44.entities.RevisionFlashcard.create({
-          notebook_id: notebook.id, student_email: user.email,
-          front: card.front, back: card.back, is_ai_generated: true,
-        });
+    cancelGen.cancelled = false;
+    const sourceParts = sources.filter(s => s.content_text);
+    if (!sourceParts.length) { setGenerating(false); alert('Upload some sources first!'); return; }
+
+    // Build chunks per source for max coverage
+    const CHUNK = 6000;
+    const batches = [];
+    for (const src of sourceParts) {
+      for (let offset = 0; offset < src.content_text.length; offset += CHUNK) {
+        batches.push({ sourceName: src.name, sourceId: src.id, chunk: src.content_text.slice(offset, offset + CHUNK) });
       }
-      onRefresh();
-    } catch (e) {}
+    }
+
+    setGenProgress({ generated: 0, batchLabel: 'Starting…' });
+    let totalCreated = 0;
+
+    try {
+      for (let i = 0; i < batches.length; i++) {
+        if (cancelGen.cancelled) break;
+        const batch = batches[i];
+        setGenProgress({ generated: totalCreated, batchLabel: `Batch ${i + 1}/${batches.length} — ${batch.sourceName}` });
+
+        const result = await base44.integrations.Core.InvokeLLM({
+          prompt: `Create comprehensive revision flashcards for a GCSE/A-Level student studying "${notebook.subject || notebook.name}".
+
+Extract EVERY distinct concept, definition, formula, fact, and example from this text (source: "${batch.sourceName}"). Generate as many cards as the content supports — aim for maximum coverage.
+
+Rules:
+- Front: concise question/prompt (e.g. "Define X", "What is the formula for Y?")
+- Back: accurate, complete answer with **bold** key terms
+- No duplicates, no vague questions
+
+Return a JSON object with a "flashcards" array.
+
+TEXT:
+${batch.chunk}`,
+          response_json_schema: {
+            type: 'object',
+            properties: {
+              flashcards: {
+                type: 'array',
+                items: { type: 'object', properties: { front: { type: 'string' }, back: { type: 'string' } }, required: ['front', 'back'] }
+              }
+            }
+          }
+        });
+
+        const cards = result?.flashcards || [];
+        for (const card of cards) {
+          if (cancelGen.cancelled) break;
+          if (!card.front?.trim() || !card.back?.trim()) continue;
+          await base44.entities.RevisionFlashcard.create({
+            notebook_id: notebook.id, student_email: user.email,
+            front: card.front, back: card.back, is_ai_generated: true,
+            source_id: batch.sourceId || null,
+          });
+          totalCreated++;
+        }
+        setGenProgress(p => ({ ...p, generated: totalCreated }));
+        onRefresh();
+      }
+    } catch (e) { console.error(e); }
+
     setGenerating(false);
+    setGenProgress(null);
+    onRefresh();
   };
 
   // ─── Start study mode ─────────────────────────────────────────────────────
