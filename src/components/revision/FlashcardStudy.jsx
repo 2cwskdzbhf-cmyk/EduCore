@@ -252,12 +252,41 @@ ${batch.chunk}`,
             className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-slate-300 hover:text-white text-sm font-medium transition-all">
             <Plus className="w-4 h-4" /> Manual
           </button>
-          <button onClick={generateFromAI} disabled={generating}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-violet-300 hover:text-violet-200 text-sm font-medium transition-all">
-            {generating ? <Loader2 className="w-4 h-4 animate-spin" /> : '✨'} AI Generate
-          </button>
+          {generating ? (
+            <button onClick={() => { cancelGen.cancelled = true; }}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm font-medium transition-all">
+              <Loader2 className="w-4 h-4 animate-spin" /> Cancel
+            </button>
+          ) : (
+            <button onClick={generateFromAI}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-violet-300 hover:text-violet-200 text-sm font-medium transition-all">
+              ✨ AI Generate
+            </button>
+          )}
         </div>
       </div>
+
+      {/* Generation progress */}
+      <AnimatePresence>
+        {genProgress && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
+            className="rounded-2xl p-4 border border-amber-500/25 overflow-hidden"
+            style={{ background: 'rgba(245,158,11,0.07)' }}
+          >
+            <div className="flex items-center gap-2 mb-1.5">
+              <Loader2 className="w-3.5 h-3.5 text-amber-400 animate-spin" />
+              <p className="text-amber-300 text-sm font-bold">Generating flashcards…</p>
+            </div>
+            <p className="text-slate-400 text-xs mb-2 truncate">{genProgress.batchLabel}</p>
+            <div className="h-1.5 w-full rounded-full bg-white/10 overflow-hidden">
+              <motion.div className="h-full rounded-full bg-gradient-to-r from-amber-500 to-orange-400"
+                animate={{ width: '60%' }} transition={{ duration: 1, repeat: Infinity, repeatType: 'reverse' }} />
+            </div>
+            <p className="text-slate-500 text-xs mt-1.5">{genProgress.generated} cards saved so far</p>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Study buttons */}
       {allCards.length > 0 && (
