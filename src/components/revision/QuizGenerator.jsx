@@ -7,6 +7,7 @@ const QUESTION_TYPES = [
   { id: 'mcq', label: 'Multiple Choice' },
   { id: 'truefalse', label: 'True / False' },
   { id: 'short', label: 'Short Answer' },
+  { id: 'fillin', label: 'Fill in Blank' },
 ];
 
 const DIFFICULTIES = ['Easy', 'Medium', 'Hard', 'Mixed'];
@@ -32,7 +33,9 @@ export default function QuizGenerator({ notebook, user, sources }) {
       ? 'multiple choice with 4 options and a correct_index (0-3)'
       : config.type === 'truefalse'
       ? 'true/false with options ["True","False"] and correct_index 0 or 1'
-      : 'short answer with a brief correct_answer';
+      : config.type === 'fillin'
+      ? 'fill-in-the-blank where the question has a blank (___) and options has 4 choices including the correct answer at correct_index'
+      : 'short answer with a brief correct_answer that goes in options[0]';
 
     try {
       const result = await base44.integrations.Core.InvokeLLM({

@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { base44 } from '@/api/base44Client';
 import { useMutation } from '@tanstack/react-query';
-import { Upload, Link2, FileText, Trash2, Eye, X, Loader2, Plus, FilePlus2 } from 'lucide-react';
+import { Upload, Link2, FileText, Trash2, Eye, X, Loader2, Plus, FilePlus2, Pencil, Check, Search } from 'lucide-react';
 
 const SOURCE_ICONS = {
   pdf: '📄', pptx: '📊', docx: '📝', image: '🖼️', text: '📄',
@@ -24,11 +24,23 @@ export default function SourceUploader({ notebook, user, sources, onRefresh }) {
   const [textName, setTextName] = useState('');
   const [viewSource, setViewSource] = useState(null);
   const [uploading, setUploading] = useState(false);
+  const [searchSources, setSearchSources] = useState('');
+  const [renamingId, setRenamingId] = useState(null);
+  const [renameValue, setRenameValue] = useState('');
 
   const deleteMutation = useMutation({
     mutationFn: (id) => base44.entities.RevisionSource.delete(id),
     onSuccess: onRefresh,
   });
+
+  const renameMutation = useMutation({
+    mutationFn: ({ id, name }) => base44.entities.RevisionSource.update(id, { name }),
+    onSuccess: () => { setRenamingId(null); setRenameValue(''); onRefresh(); },
+  });
+
+  const filteredSources = sources.filter(s =>
+    !searchSources || s.name.toLowerCase().includes(searchSources.toLowerCase())
+  );
 
   const handleFileUpload = async (e) => {
     const files = Array.from(e.target.files || []);
@@ -102,12 +114,12 @@ export default function SourceUploader({ notebook, user, sources, onRefresh }) {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h2 className="text-white font-black text-xl">Sources</h2>
           <p className="text-slate-400 text-sm">{sources.length} source{sources.length !== 1 ? 's' : ''} · The AI will use these to answer your questions</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <button onClick={() => { setAddMode('url'); }} className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-slate-300 hover:text-white text-sm font-medium transition-all">
             <Link2 className="w-4 h-4" /> URL
           </button>
@@ -153,6 +165,16 @@ export default function SourceUploader({ notebook, user, sources, onRefresh }) {
         )}
       </AnimatePresence>
 
+      {/* Search sources */}
+      {sources.length > 3 && (
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+          <input value={searchSources} onChange={e => setSearchSources(e.target.value)}
+            placeholder="Search sources..."
+            className="w-full pl-9 pr-4 py-2 bg-white/5 border border-white/10 rounded-xl text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-violet-500/50" />
+        </div>
+      )}
+
       {/* Drop zone */}
       {sources.length === 0 && !addMode && (
         <div onClick={() => fileInputRef.current?.click()}
@@ -164,14 +186,26 @@ export default function SourceUploader({ notebook, user, sources, onRefresh }) {
       )}
 
       {/* Source list */}
-      {sources.length > 0 && (
+      {filteredSources.length > 0 && (
         <div className="space-y-2">
-          {sources.map((s, i) => (
+          {filteredSources.map((s, i) => (
             <motion.div key={s.id} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.04 }}
               className="group flex items-center gap-4 bg-white/[0.04] border border-white/10 hover:bg-white/[0.08] rounded-2xl p-4 transition-all">
               <span className="text-2xl flex-shrink-0">{SOURCE_ICONS[s.type] || '📄'}</span>
               <div className="flex-1 min-w-0">
-                <p className="text-white font-medium truncate text-sm">{s.name}</p>
+                {renamingId === s.id ? (
+                  <div className="flex items-center gap-2">
+                    <input autoFocus value={renameValue} onChange={e => setRenameValue(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') renameMutation.mutate({ id: s.id, name: renameValue }); if (e.key === 'Escape') setRenamingId(null); }}
+                      className="flex-1 px-2 py-1 bg-white/10 border border-violet-500/50 rounded-lg text-white text-sm focus:outline-none" />
+                    <button onClick={() => renameMutation.mutate({ id: s.id, name: renameValue })}
+                      className="p-1 rounded-lg text-emerald-400 hover:bg-emerald-500/10"><Check className="w-4 h-4" /></button>
+                    <button onClick={() => setRenamingId(null)}
+                      className="p-1 rounded-lg text-slate-400 hover:bg-white/10"><X className="w-4 h-4" /></button>
+                  </div>
+                ) : (
+                  <p className="text-white font-medium truncate text-sm">{s.name}</p>
+                )}
                 <div className="flex items-center gap-3 text-xs text-slate-500 mt-0.5">
                   <span className="capitalize">{s.type}</span>
                   {s.file_size_bytes && <span>{formatBytes(s.file_size_bytes)}</span>}
@@ -187,6 +221,10 @@ export default function SourceUploader({ notebook, user, sources, onRefresh }) {
                     <Eye className="w-4 h-4" />
                   </button>
                 )}
+                <button onClick={() => { setRenamingId(s.id); setRenameValue(s.name); }}
+                  className="p-2 rounded-lg text-slate-400 hover:text-violet-400 hover:bg-violet-500/10 transition-all">
+                  <Pencil className="w-4 h-4" />
+                </button>
                 <button onClick={() => deleteMutation.mutate(s.id)}
                   className="p-2 rounded-lg text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-all">
                   <Trash2 className="w-4 h-4" />

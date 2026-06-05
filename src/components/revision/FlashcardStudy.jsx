@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { base44 } from '@/api/base44Client';
 import { useMutation } from '@tanstack/react-query';
-import { Plus, Loader2, RotateCcw, Zap, X, Check, ChevronRight } from 'lucide-react';
+import { Plus, Loader2, RotateCcw, Zap, X, Check, ChevronRight, Timer, Shuffle } from 'lucide-react';
 
 const RATING_BUTTONS = [
   { id: 'again', label: 'Again', color: 'bg-red-500 hover:bg-red-400', desc: '<1 min' },
@@ -27,13 +27,20 @@ function getNextReview(rating, interval = 1, ease = 2.5) {
 }
 
 export default function FlashcardStudy({ notebook, user, flashcards, sources, onRefresh }) {
-  const [mode, setMode] = useState('browse'); // 'browse' | 'study' | 'create'
+  const [mode, setMode] = useState('browse'); // 'browse' | 'study' | 'create' | 'match' | 'timed'
   const [studyIndex, setStudyIndex] = useState(0);
   const [flipped, setFlipped] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [newFront, setNewFront] = useState('');
   const [newBack, setNewBack] = useState('');
   const [studyQueue, setStudyQueue] = useState([]);
+  const [timedSeconds, setTimedSeconds] = useState(10);
+  const [timeLeft, setTimeLeft] = useState(null);
+  const timerRef = React.useRef(null);
+  const [matchPairs, setMatchPairs] = useState([]);
+  const [matchSelected, setMatchSelected] = useState(null);
+  const [matchMatched, setMatchMatched] = useState([]);
+  const [matchWrong, setMatchWrong] = useState([]);
 
   const now = new Date();
   const dueCards = flashcards.filter(f => !f.next_review || new Date(f.next_review) <= now);

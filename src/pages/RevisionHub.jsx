@@ -19,6 +19,7 @@ export default function RevisionHub() {
   const [activeSection, setActiveSection] = useState('dashboard');
   const [openNotebook, setOpenNotebook] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [quickUploadNotebook, setQuickUploadNotebook] = useState(null);
 
   useEffect(() => {
     base44.auth.me().then(setUser);
@@ -35,7 +36,8 @@ export default function RevisionHub() {
       <NotebookDetail
         notebook={openNotebook}
         user={user}
-        onBack={() => { setOpenNotebook(null); refetchNotebooks(); }}
+        onBack={() => { setOpenNotebook(null); setQuickUploadNotebook(null); refetchNotebooks(); }}
+        autoOpenUpload={quickUploadNotebook?.id === openNotebook?.id}
       />
     );
   }
@@ -109,6 +111,14 @@ export default function RevisionHub() {
                   notebooks={notebooks}
                   onOpenNotebook={setOpenNotebook}
                   onGoToNotebooks={() => setActiveSection('notebooks')}
+                  onQuickUpload={() => {
+                    if (notebooks.length > 0) {
+                      setQuickUploadNotebook(notebooks[0]);
+                      setOpenNotebook(notebooks[0]);
+                    } else {
+                      setActiveSection('notebooks');
+                    }
+                  }}
                 />
               </motion.div>
             )}

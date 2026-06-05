@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { base44 } from '@/api/base44Client';
 import { useMutation } from '@tanstack/react-query';
@@ -26,9 +26,16 @@ const COLOR_MAP = {
   amber: 'from-amber-500 to-orange-600',
 };
 
-export default function NotebooksView({ user, notebooks, searchQuery, onOpenNotebook, onRefresh }) {
+export default function NotebooksView({ user, notebooks, searchQuery, onOpenNotebook, onRefresh, autoCreate, onAutoCreateHandled }) {
   const [showCreate, setShowCreate] = useState(false);
   const [form, setForm] = useState({ name: '', description: '', icon: '📚', color: 'purple', subject: '', exam_board: '' });
+
+  useEffect(() => {
+    if (autoCreate && !showCreate) {
+      setShowCreate(true);
+      onAutoCreateHandled?.();
+    }
+  }, [autoCreate]);
 
   const filtered = notebooks.filter(nb =>
     !searchQuery || nb.name.toLowerCase().includes(searchQuery.toLowerCase()) || (nb.subject || '').toLowerCase().includes(searchQuery.toLowerCase())
@@ -97,11 +104,14 @@ export default function NotebooksView({ user, notebooks, searchQuery, onOpenNote
                 <h3 className="text-white font-bold truncate text-base">{nb.name}</h3>
                 {nb.subject && <p className="text-slate-500 text-xs mt-0.5">{nb.subject}{nb.exam_board ? ` · ${nb.exam_board}` : ''}</p>}
                 {nb.description && <p className="text-slate-400 text-xs mt-2 line-clamp-2">{nb.description}</p>}
-                <div className="flex items-center gap-3 mt-4 pt-3 border-t border-white/10 text-xs text-slate-500">
+                <div className="flex items-center gap-3 mt-4 pt-3 border-t border-white/10 text-xs text-slate-500 flex-wrap">
                   <span>{nb.source_count || 0} sources</span>
                   <span>{nb.flashcard_count || 0} cards</span>
-                  {nb.last_studied && <span>studied {new Date(nb.last_studied).toLocaleDateString()}</span>}
+                  {nb.updated_date && <span>edited {new Date(nb.updated_date).toLocaleDateString()}</span>}
                 </div>
+                {nb.created_date && (
+                  <p className="text-xs text-slate-600 mt-1">Created {new Date(nb.created_date).toLocaleDateString()}</p>
+                )}
               </div>
             </motion.div>
           ))}

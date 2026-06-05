@@ -12,6 +12,7 @@ import FlashcardStudy from './FlashcardStudy';
 import QuizGenerator from './QuizGenerator';
 import StudyGuideGenerator from './StudyGuideGenerator';
 
+
 const TABS = [
   { id: 'sources', label: 'Sources', icon: Upload },
   { id: 'chat', label: 'AI Chat', icon: MessageSquare },
@@ -26,9 +27,10 @@ const COLOR_MAP = {
   emerald: 'from-emerald-600 to-teal-700',
   rose: 'from-rose-600 to-pink-700',
   amber: 'from-amber-500 to-orange-600',
+  slate: 'from-slate-600 to-slate-700',
 };
 
-export default function NotebookDetail({ notebook, user, onBack }) {
+export default function NotebookDetail({ notebook, user, onBack, autoOpenUpload }) {
   const [activeTab, setActiveTab] = useState('sources');
   const queryClient = useQueryClient();
 
@@ -98,7 +100,7 @@ export default function NotebookDetail({ notebook, user, onBack }) {
         <AnimatePresence mode="wait">
           {activeTab === 'sources' && (
             <motion.div key="sources" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}>
-              <SourceUploader notebook={notebook} user={user} sources={sources} onRefresh={refetchSources} />
+              <SourceUploader notebook={notebook} user={user} sources={sources} onRefresh={refetchSources} autoOpenUpload={autoOpenUpload} />
             </motion.div>
           )}
           {activeTab === 'chat' && (

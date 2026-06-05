@@ -4,12 +4,15 @@ import { base44 } from '@/api/base44Client';
 import { Send, Loader2, Lightbulb, BookOpen, Layers, FileText, RefreshCw } from 'lucide-react';
 
 const QUICK_ACTIONS = [
-  { label: '📋 Summarise', prompt: 'Summarise the key content from my sources in this notebook.' },
-  { label: '💡 Explain', prompt: 'Explain the main concepts simply, as if I am a GCSE student.' },
-  { label: '❓ Create Quiz', prompt: 'Create a 5-question multiple choice quiz from my notes.' },
-  { label: '🗂️ Key Facts', prompt: 'List the most important facts and definitions I need to remember.' },
-  { label: '📊 Compare', prompt: 'Compare and contrast the main ideas across my sources.' },
-  { label: '🧠 Explain Like I\'m 13', prompt: 'Explain the most important topic from my notes as simply as possible, like I am 13 years old.' },
+  { label: '📋 Summarise', prompt: 'Summarise the key content from my sources in this notebook. Use clear headings and bullet points.' },
+  { label: '💡 Explain Simply', prompt: 'Explain the main concepts simply, as if I am a GCSE student. Use plain language.' },
+  { label: '🔬 Explain Deeply', prompt: 'Explain the main concepts in depth, covering all nuances and connections between ideas. Suitable for A-Level study.' },
+  { label: '❓ Create Quiz', prompt: 'Create a 5-question multiple choice quiz from my notes with answers.' },
+  { label: '🗂️ Create Flashcards', prompt: 'Generate 10 flashcard-style Q&A pairs from the most important content in my notes.' },
+  { label: '📖 Study Guide', prompt: 'Generate a structured study guide with topic summary, key facts, definitions, and exam tips.' },
+  { label: '📊 Compare Sources', prompt: 'Compare and contrast the main ideas across my different sources. Highlight agreements and disagreements.' },
+  { label: '🔍 Find Info', prompt: 'What are the most important pieces of information in my notes that I should know for an exam?' },
+  { label: '🧠 ELI13', prompt: 'Explain the most important topic from my notes as simply as possible, like I am 13 years old. Use analogies and simple language.' },
 ];
 
 const SUGGESTED = [

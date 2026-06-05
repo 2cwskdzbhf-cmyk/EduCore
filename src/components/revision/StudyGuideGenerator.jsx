@@ -5,11 +5,13 @@ import { Loader2, Download, BookOpen, FileText, Lightbulb, AlertTriangle } from 
 
 const GUIDE_TYPES = [
   { id: 'summary', label: '📋 Topic Summary', icon: '📋', prompt: 'Create a comprehensive topic summary with key concepts clearly explained.' },
-  { id: 'keyfacts', label: '⭐ Key Facts', icon: '⭐', prompt: 'List all the key facts, dates, formulas, and definitions I must know for the exam.' },
-  { id: 'glossary', label: '📖 Glossary', icon: '📖', prompt: 'Create a full glossary of all important terms and definitions.' },
+  { id: 'keyfacts', label: '⭐ Key Facts', icon: '⭐', prompt: 'List all the key facts, important information, and things I must know for the exam.' },
+  { id: 'dates', label: '📅 Important Dates', icon: '📅', prompt: 'Extract and list all important dates, events, and timelines mentioned in the notes in chronological order.' },
+  { id: 'definitions', label: '📝 Definitions', icon: '📝', prompt: 'Create a comprehensive list of all key terms and their definitions from the notes. Format as Term: Definition.' },
+  { id: 'formulas', label: '🔢 Formula Sheet', icon: '🔢', prompt: 'Extract all formulas, equations, and mathematical/scientific relationships from the notes. List each with its name and what the variables mean.' },
+  { id: 'glossary', label: '📖 Glossary', icon: '📖', prompt: 'Create a full A-Z glossary of all important terms and definitions.' },
   { id: 'examtips', label: '🎯 Exam Tips', icon: '🎯', prompt: 'Give me specific exam tips, common mistakes to avoid, and how to structure answers for this topic.' },
   { id: 'mistakes', label: '⚠️ Common Mistakes', icon: '⚠️', prompt: 'List the most common exam mistakes students make on this topic and how to avoid them.' },
-  { id: 'mindmap', label: '🗺️ Mind Map Outline', icon: '🗺️', prompt: 'Create a structured mind map outline with the main topic, sub-topics, and key points for each branch.' },
 ];
 
 export default function StudyGuideGenerator({ notebook, user, sources }) {
@@ -39,6 +41,21 @@ export default function StudyGuideGenerator({ notebook, user, sources }) {
     navigator.clipboard.writeText(output || '');
   };
 
+  const printGuide = () => {
+    const win = window.open('', '_blank');
+    win.document.write(`
+      <html><head><title>${activeType?.label} - ${notebook.name}</title>
+      <style>body{font-family:system-ui,sans-serif;max-width:800px;margin:40px auto;padding:20px;color:#111}
+      h2{color:#5b21b6;border-bottom:2px solid #5b21b6;padding-bottom:8px}
+      h3{color:#7c3aed}p{margin:4px 0;line-height:1.6}
+      @media print{body{margin:0}}</style></head>
+      <body><h1>${notebook.name} — ${activeType?.label}</h1>
+      <div>${output.replace(/\n/g,'<br>').replace(/## (.*)/g,'<h2>$1</h2>').replace(/### (.*)/g,'<h3>$1</h3>').replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>').replace(/^- (.*)/gm,'<p>• $1</p>')}</div>
+      </body></html>`);
+    win.document.close();
+    win.print();
+  };
+
   return (
     <div className="space-y-6 max-w-3xl">
       <div>
@@ -53,7 +70,7 @@ export default function StudyGuideGenerator({ notebook, user, sources }) {
       )}
 
       {/* Guide type buttons */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {GUIDE_TYPES.map(type => (
           <motion.button key={type.id} onClick={() => generate(type)} disabled={!!loading || !contextText}
             whileHover={!loading ? { scale: 1.02 } : {}} whileTap={!loading ? { scale: 0.98 } : {}}
@@ -76,9 +93,12 @@ export default function StudyGuideGenerator({ notebook, user, sources }) {
           <div className="flex items-center justify-between px-5 py-3 border-b border-white/10">
             <p className="text-white font-bold text-sm">{activeType?.icon} {activeType?.label}</p>
             <div className="flex gap-2">
-              <button onClick={copyToClipboard} className="text-xs text-slate-400 hover:text-white px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 transition-all">
-                Copy
-              </button>
+            <button onClick={copyToClipboard} className="text-xs text-slate-400 hover:text-white px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 transition-all">
+              Copy
+            </button>
+            <button onClick={printGuide} className="text-xs text-slate-400 hover:text-white px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 transition-all flex items-center gap-1">
+              🖨️ Print
+            </button>
             </div>
           </div>
           <div className="p-6 prose prose-invert prose-sm max-w-none">
