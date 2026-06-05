@@ -130,7 +130,6 @@ Format in clear markdown with headings and bullet points. Aim for ${isDeep ? '12
 
       const launchPicker = () => {
         window.gapi.load('picker', () => {
-          // Allow Docs, Slides, PDFs, and text files
           const docsView = new window.google.picker.DocsView()
             .setIncludeFolders(false)
             .setMimeTypes([
@@ -140,7 +139,7 @@ Format in clear markdown with headings and bullet points. Aim for ${isDeep ? '12
               'text/plain',
             ].join(','));
 
-          const picker = new window.google.picker.PickerBuilder()
+          new window.google.picker.PickerBuilder()
             .addView(docsView)
             .setOAuthToken(token)
             .setCallback(async (data) => {
@@ -159,15 +158,11 @@ Format in clear markdown with headings and bullet points. Aim for ${isDeep ? '12
               let content_text = '';
               try {
                 if (isGoogleDoc || isGoogleSlides) {
-                  // Google Workspace files: export as plain text
                   const r = await fetch(
                     `https://www.googleapis.com/drive/v3/files/${doc.id}/export?mimeType=text/plain`,
                     { headers: { Authorization: `Bearer ${token}` } }
                   );
                   if (r.ok) content_text = await r.text();
-                } else {
-                  // Binary files (PDF etc): just store the link, no text export
-                  content_text = '';
                 }
               } catch (_) {}
 
@@ -184,8 +179,8 @@ Format in clear markdown with headings and bullet points. Aim for ${isDeep ? '12
               onRefresh();
               onClose();
             })
-            .build();
-          picker.setVisible(true);
+            .build()
+            .setVisible(true);
         });
       };
 
@@ -198,7 +193,7 @@ Format in clear markdown with headings and bullet points. Aim for ${isDeep ? '12
         launchPicker();
       }
     } catch (e) {
-      setDriveError('Google Drive access failed: ' + e.message);
+      setDriveError('Drive access failed: ' + e.message);
       setGdrivePicking(false);
     }
   };
@@ -380,6 +375,11 @@ Format in clear markdown with headings and bullet points. Aim for ${isDeep ? '12
               <span className="text-xs font-semibold text-white">Copied text</span>
             </button>
           </div>
+
+          {/* Drive error */}
+          {driveError && (
+            <p className="text-red-400 text-xs text-center mb-3 px-2">{driveError}</p>
+          )}
 
           {/* ── Inline sub-forms ── */}
           <AnimatePresence>
