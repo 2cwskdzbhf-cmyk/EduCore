@@ -1,22 +1,19 @@
-import React from 'react';
+/**
+ * AITutorMode — Studio-powered AI chat, fully source-linked.
+ * Re-uses WorkspaceCenterPanel so both the Workspace and any legacy
+ * notebook views share identical AI capabilities, source context,
+ * batched flashcard generation, and Studio save behaviour.
+ */
 import WorkspaceCenterPanel from './workspace/WorkspaceCenterPanel';
 
-/**
- * AITutorMode — thin wrapper that renders the unified WorkspaceCenterPanel
- * in tutor mode. All data flows through the same shared layer as the Studio.
- */
-export default function AITutorMode({ notebook, user, sources, resources, onResourceCreated }) {
+export default function AITutorMode({ notebook, user, sources, onResourceCreated }) {
   return (
-    <div className="h-full">
-      <WorkspaceCenterPanel
-        notebook={notebook}
-        user={user}
-        selectedSources={[]}
-        allSources={sources}
-        resources={resources}
-        onResourceCreated={onResourceCreated}
-        tutorMode={true}
-      />
-    </div>
+    <WorkspaceCenterPanel
+      notebook={notebook}
+      user={user}
+      selectedSources={[]}
+      allSources={sources || []}
+      onResourceCreated={onResourceCreated || (() => {})}
+    />
   );
 }
