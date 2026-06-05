@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   GraduationCap, 
   LayoutDashboard, 
-  BookOpen,
+  BookOpen, 
   MessageSquare, 
   Menu,
   X,
@@ -21,6 +21,7 @@ import {
   Calendar,
   Wrench
 } from 'lucide-react';
+
 // Note: BookOpen, ClipboardList, TrendingUp, Brain, Users already imported above
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -118,13 +119,13 @@ export default function Layout({ children, currentPageName }) {
 
   const studentNav = [
     { name: 'Dashboard', icon: LayoutDashboard, page: 'StudentDashboard' },
-    { name: 'Revision Hub', icon: BookOpen, page: 'RevisionHub' },
     { name: 'Timetable', icon: Calendar, page: 'MyTimetable' },
     { name: 'Grades', icon: TrendingUp, page: 'StudentGrades' },
     { name: 'Collaborate', icon: Users, page: 'CollaborationHub' },
     { name: 'Portfolio', icon: Brain, page: 'StudentPortfolio' },
     { name: 'Test Scores', icon: ClipboardList, page: 'TestScores' },
     { name: 'AI Tutor', icon: MessageSquare, page: 'AITutor' },
+    { name: 'Revision Hub', icon: Brain, page: 'RevisionHub' },
     { name: 'Useful Tools', icon: Wrench, page: 'UsefulTools' },
   ];
 

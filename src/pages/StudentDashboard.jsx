@@ -27,8 +27,7 @@ import {
   ChevronRight,
   X,
   Loader2,
-  Zap,
-  BookOpen } from
+  Zap } from
 'lucide-react';
 
 export default function StudentDashboard() {
@@ -421,6 +420,21 @@ export default function StudentDashboard() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900/20 to-slate-900 p-6">
+      {/* Revision Hub banner */}
+      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="max-w-7xl mx-auto mb-6">
+        <Link to={createPageUrl('RevisionHub')}>
+          <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-violet-600/30 to-purple-600/20 border border-violet-500/30 p-4 flex items-center gap-4 hover:from-violet-600/40 hover:to-purple-600/30 transition-all group cursor-pointer">
+            <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-lg shadow-violet-500/30 flex-shrink-0">
+              <Zap className="w-6 h-6 text-white" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-white font-black text-base">Revision Hub ✨</p>
+              <p className="text-slate-400 text-sm">AI notebooks, flashcards, quizzes & study guides</p>
+            </div>
+            <ChevronRight className="w-5 h-5 text-violet-400 group-hover:translate-x-1 transition-transform flex-shrink-0" />
+          </div>
+        </Link>
+      </motion.div>
       {/* New lobby popup */}
       {showLobbyPopup && user && lobbySession && (
         <LiveQuizPopup
@@ -538,24 +552,6 @@ export default function StudentDashboard() {
             </GlassCard>
           </motion.div>
         )}
-
-        {/* Revision Hub CTA */}
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }} className="mb-8">
-          <Link to={createPageUrl('RevisionHub')}>
-            <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-violet-600/30 to-purple-700/30 border border-violet-500/30 hover:border-violet-400/50 transition-all p-5 flex items-center justify-between group cursor-pointer">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-lg shadow-violet-500/30 flex-shrink-0">
-                  <BookOpen className="w-6 h-6 text-white" />
-                </div>
-                <div>
-                  <p className="text-white font-black text-lg">Revision Hub</p>
-                  <p className="text-slate-400 text-sm">Notebooks · Flashcards · AI Chat · Quizzes · Study Guides</p>
-                </div>
-              </div>
-              <ChevronRight className="w-5 h-5 text-violet-400 group-hover:translate-x-1 transition-transform flex-shrink-0" />
-            </div>
-          </Link>
-        </motion.div>
 
         {/* Gamification */}
         <GamificationWidget studentEmail={user?.email} />
