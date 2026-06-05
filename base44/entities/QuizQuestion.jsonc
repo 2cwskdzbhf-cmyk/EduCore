@@ -1,0 +1,192 @@
+{
+  "name": "QuizQuestion",
+  "type": "object",
+  "properties": {
+    "quiz_set_id": {
+      "type": "string",
+      "description": "Reference to QuizSet"
+    },
+    "order": {
+      "type": "number",
+      "description": "Display order in quiz"
+    },
+    "prompt": {
+      "type": "string",
+      "description": "Question text"
+    },
+    "question_type": {
+      "type": "string",
+      "enum": [
+        "multiple_choice",
+        "true_false",
+        "short_answer",
+        "written"
+      ],
+      "default": "multiple_choice",
+      "description": "Type of question"
+    },
+    "options": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Answer options - for multiple_choice and true_false"
+    },
+    "correct_index": {
+      "type": "number",
+      "description": "Index of correct answer - for multiple_choice and true_false"
+    },
+    "correct_answer": {
+      "type": "string",
+      "description": "Correct answer text - for short_answer"
+    },
+    "answer_keywords": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Accepted answer keywords - for written and short_answer"
+    },
+    "require_working": {
+      "type": "boolean",
+      "default": false,
+      "description": "Require explanation/working - for written only"
+    },
+    "working_keywords": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Required working keywords - for written only"
+    },
+    "explanation": {
+      "type": "string",
+      "description": "Optional explanation shown after answer"
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Question tags for categorization"
+    },
+    "lesson_ref": {
+      "type": "string",
+      "description": "Lesson ID if imported from lesson"
+    },
+    "difficulty": {
+      "type": "string",
+      "enum": [
+        "easy",
+        "medium",
+        "hard"
+      ],
+      "description": "Question difficulty"
+    },
+    "year_group": {
+      "type": "number",
+      "description": "Year group (7-11) for curriculum filtering"
+    },
+    "seed_key": {
+      "type": "string",
+      "description": "Unique key for global seeded questions (e.g., y7-fractions-easy-01)"
+    },
+    "time_limit_ms": {
+      "type": "number",
+      "description": "Override time limit for this question"
+    },
+    "image_url": {
+      "type": "string",
+      "description": "Optional question image"
+    },
+    "option_images": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Optional images for each option"
+    },
+    "points": {
+      "type": "number",
+      "default": 1,
+      "description": "Points awarded for correct answer"
+    },
+    "is_reusable": {
+      "type": "boolean",
+      "default": false,
+      "description": "Available in question bank"
+    },
+    "visibility": {
+      "type": "string",
+      "enum": [
+        "global",
+        "private"
+      ],
+      "default": "private",
+      "description": "Global shared questions vs private user questions"
+    },
+    "owner_email": {
+      "type": "string",
+      "description": "Creator of the question"
+    },
+    "folder_id": {
+      "type": "string",
+      "description": "Reference to QuestionFolder"
+    },
+    "collaborator_emails": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Teachers who can edit this question"
+    },
+    "current_version": {
+      "type": "number",
+      "default": 1,
+      "description": "Current version number"
+    },
+    "last_edited_by": {
+      "type": "string",
+      "description": "Email of last editor"
+    },
+    "last_edited_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Last edit timestamp"
+    },
+    "source_global_id": {
+      "type": "string",
+      "description": "Reference to GlobalQuestion if copied from global library"
+    },
+    "usage_count": {
+      "type": "number",
+      "default": 0,
+      "description": "Number of times question has been used"
+    },
+    "average_rating": {
+      "type": "number",
+      "description": "Average teacher rating (1-5)"
+    },
+    "rating_count": {
+      "type": "number",
+      "default": 0,
+      "description": "Number of ratings"
+    },
+    "effectiveness_score": {
+      "type": "number",
+      "description": "Calculated score based on student performance"
+    },
+    "topic_id": {
+      "type": "string",
+      "description": "Reference to Topic for filtering"
+    },
+    "subject_id": {
+      "type": "string",
+      "description": "Reference to Subject for filtering"
+    }
+  },
+  "required": [
+    "quiz_set_id",
+    "prompt"
+  ]
+}

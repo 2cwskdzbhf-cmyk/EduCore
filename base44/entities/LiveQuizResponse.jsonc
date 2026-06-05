@@ -1,0 +1,41 @@
+{
+  "name": "LiveQuizResponse",
+  "type": "object",
+  "properties": {
+    "session_id": {
+      "type": "string",
+      "description": "Reference to LiveQuizSession"
+    },
+    "student_email": {
+      "type": "string"
+    },
+    "question_index": {
+      "type": "number"
+    },
+    "question_id": {
+      "type": "string"
+    },
+    "answer": {
+      "type": "string"
+    },
+    "is_correct": {
+      "type": "boolean"
+    },
+    "time_taken_seconds": {
+      "type": "number"
+    },
+    "points_earned": {
+      "type": "number"
+    },
+    "submitted_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "session_id",
+    "student_email",
+    "question_index",
+    "answer"
+  ]
+}

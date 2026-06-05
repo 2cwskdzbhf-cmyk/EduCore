@@ -1,0 +1,91 @@
+{
+  "name": "TutorConversation",
+  "type": "object",
+  "properties": {
+    "student_email": {
+      "type": "string"
+    },
+    "subject_id": {
+      "type": "string"
+    },
+    "topic_id": {
+      "type": "string"
+    },
+    "lesson_id": {
+      "type": "string"
+    },
+    "mode": {
+      "type": "string",
+      "enum": [
+        "chat",
+        "revision",
+        "homework_help",
+        "exam_prep"
+      ],
+      "default": "chat"
+    },
+    "title": {
+      "type": "string",
+      "description": "Auto-generated conversation title"
+    },
+    "messages": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "role": {
+            "type": "string",
+            "enum": [
+              "user",
+              "assistant"
+            ]
+          },
+          "content": {
+            "type": "string"
+          },
+          "timestamp": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "context_snapshot": {
+      "type": "object",
+      "properties": {
+        "weak_skills": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "strong_skills": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "recent_scores": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          }
+        },
+        "current_mastery": {
+          "type": "number"
+        }
+      },
+      "description": "Student data snapshot when conversation started"
+    },
+    "feedback_rating": {
+      "type": "number",
+      "description": "Student rating 1-5"
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true
+    }
+  },
+  "required": [
+    "student_email"
+  ]
+}

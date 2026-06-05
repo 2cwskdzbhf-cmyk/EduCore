@@ -1,0 +1,66 @@
+{
+  "name": "LiveQuizPlayer",
+  "type": "object",
+  "properties": {
+    "session_id": {
+      "type": "string",
+      "description": "Reference to LiveQuizSession"
+    },
+    "nickname": {
+      "type": "string",
+      "description": "Player display name"
+    },
+    "student_email": {
+      "type": "string",
+      "description": "Optional student email if logged in"
+    },
+    "total_points": {
+      "type": "number",
+      "default": 0,
+      "description": "Cumulative points earned"
+    },
+    "correct_count": {
+      "type": "number",
+      "default": 0,
+      "description": "Number of correct answers"
+    },
+    "questions_answered": {
+      "type": "number",
+      "default": 0,
+      "description": "Total questions answered"
+    },
+    "average_response_time_ms": {
+      "type": "number",
+      "default": 0,
+      "description": "Average response time"
+    },
+    "fastest_answer_time_ms": {
+      "type": "number",
+      "description": "Fastest correct answer time"
+    },
+    "current_streak": {
+      "type": "number",
+      "default": 0,
+      "description": "Current correct answer streak"
+    },
+    "longest_streak": {
+      "type": "number",
+      "default": 0,
+      "description": "Longest correct answer streak"
+    },
+    "last_seen": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Last activity timestamp"
+    },
+    "connected": {
+      "type": "boolean",
+      "default": true,
+      "description": "Connection status"
+    }
+  },
+  "required": [
+    "session_id",
+    "nickname"
+  ]
+}

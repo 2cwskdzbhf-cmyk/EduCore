@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   GraduationCap, 
   LayoutDashboard, 
-  BookOpen, 
+  BookOpen,
   MessageSquare, 
   Menu,
   X,
@@ -118,6 +118,7 @@ export default function Layout({ children, currentPageName }) {
 
   const studentNav = [
     { name: 'Dashboard', icon: LayoutDashboard, page: 'StudentDashboard' },
+    { name: 'Revision Hub', icon: BookOpen, page: 'RevisionHub' },
     { name: 'Timetable', icon: Calendar, page: 'MyTimetable' },
     { name: 'Grades', icon: TrendingUp, page: 'StudentGrades' },
     { name: 'Collaborate', icon: Users, page: 'CollaborationHub' },

@@ -1,0 +1,117 @@
+{
+  "name": "Quiz",
+  "type": "object",
+  "properties": {
+    "topic_id": {
+      "type": "string",
+      "description": "Reference to Topic"
+    },
+    "lesson_id": {
+      "type": "string",
+      "description": "Optional reference to specific Lesson"
+    },
+    "title": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string"
+    },
+    "quiz_type": {
+      "type": "string",
+      "enum": [
+        "practice",
+        "assessment",
+        "exam_prep",
+        "live"
+      ],
+      "description": "Type of quiz"
+    },
+    "question_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Ordered list of Question IDs"
+    },
+    "question_count": {
+      "type": "number",
+      "description": "Number of questions (for random selection from bank)"
+    },
+    "question_filters": {
+      "type": "object",
+      "properties": {
+        "difficulty": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "skills": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "question_types": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "description": "Filters for random question selection"
+    },
+    "difficulty": {
+      "type": "string",
+      "enum": [
+        "easy",
+        "medium",
+        "hard",
+        "mixed"
+      ]
+    },
+    "time_limit_minutes": {
+      "type": "number"
+    },
+    "passing_score": {
+      "type": "number",
+      "description": "Minimum percentage to pass"
+    },
+    "xp_reward": {
+      "type": "number"
+    },
+    "allow_retakes": {
+      "type": "boolean",
+      "default": true
+    },
+    "max_attempts": {
+      "type": "number"
+    },
+    "shuffle_questions": {
+      "type": "boolean",
+      "default": false
+    },
+    "shuffle_options": {
+      "type": "boolean",
+      "default": false
+    },
+    "show_answers_after": {
+      "type": "string",
+      "enum": [
+        "immediately",
+        "after_submit",
+        "after_due_date",
+        "never"
+      ],
+      "default": "after_submit"
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true
+    }
+  },
+  "required": [
+    "topic_id",
+    "title"
+  ]
+}

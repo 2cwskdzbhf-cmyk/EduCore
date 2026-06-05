@@ -1,0 +1,28 @@
+{
+  "name": "StudentAssignmentStatus",
+  "type": "object",
+  "properties": {
+    "assignment_id": {
+      "type": "string",
+      "description": "Reference to Assignment"
+    },
+    "student_email": {
+      "type": "string",
+      "description": "Email of student"
+    },
+    "class_id": {
+      "type": "string",
+      "description": "Reference to Class"
+    },
+    "marked_done_by_student": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether student marked assignment as done (hidden from their view)"
+    }
+  },
+  "required": [
+    "assignment_id",
+    "student_email",
+    "class_id"
+  ]
+}

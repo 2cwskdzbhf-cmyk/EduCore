@@ -1,0 +1,47 @@
+{
+  "name": "PracticeAttempt",
+  "type": "object",
+  "properties": {
+    "student_email": {
+      "type": "string"
+    },
+    "lesson_id": {
+      "type": "string",
+      "description": "Reference to Lesson if applicable"
+    },
+    "topic_id": {
+      "type": "string",
+      "description": "Reference to Topic"
+    },
+    "question_id": {
+      "type": "string",
+      "description": "Reference to QuestionBankItem"
+    },
+    "submitted_answer": {
+      "type": "string",
+      "description": "What the student typed"
+    },
+    "is_correct": {
+      "type": "boolean"
+    },
+    "attempts_count": {
+      "type": "number",
+      "default": 1,
+      "description": "How many tries before correct"
+    },
+    "time_to_answer_ms": {
+      "type": "number",
+      "description": "Time taken to answer in milliseconds"
+    },
+    "session_id": {
+      "type": "string",
+      "description": "Groups attempts in same practice session"
+    }
+  },
+  "required": [
+    "student_email",
+    "topic_id",
+    "question_id",
+    "is_correct"
+  ]
+}

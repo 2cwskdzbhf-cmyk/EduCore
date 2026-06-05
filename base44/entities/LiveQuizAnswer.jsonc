@@ -1,0 +1,52 @@
+{
+  "name": "LiveQuizAnswer",
+  "type": "object",
+  "properties": {
+    "session_id": {
+      "type": "string",
+      "description": "Reference to LiveQuizSession"
+    },
+    "player_id": {
+      "type": "string",
+      "description": "Reference to LiveQuizPlayer"
+    },
+    "question_id": {
+      "type": "string",
+      "description": "Reference to QuizQuestion"
+    },
+    "question_index": {
+      "type": "number",
+      "description": "Question number in session"
+    },
+    "selected_option": {
+      "type": "number",
+      "description": "Index of selected answer (0-3)"
+    },
+    "is_correct": {
+      "type": "boolean",
+      "description": "Whether answer was correct"
+    },
+    "response_time_ms": {
+      "type": "number",
+      "description": "Time taken to answer in milliseconds"
+    },
+    "points_awarded": {
+      "type": "number",
+      "description": "Points earned for this answer"
+    },
+    "round_multiplier": {
+      "type": "number",
+      "description": "Multiplier applied this round"
+    }
+  },
+  "required": [
+    "session_id",
+    "player_id",
+    "question_id",
+    "question_index",
+    "selected_option",
+    "is_correct",
+    "response_time_ms",
+    "points_awarded"
+  ]
+}

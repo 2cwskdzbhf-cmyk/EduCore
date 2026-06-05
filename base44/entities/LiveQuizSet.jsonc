@@ -1,0 +1,44 @@
+{
+  "name": "LiveQuizSet",
+  "type": "object",
+  "properties": {
+    "class_id": {
+      "type": "string",
+      "description": "Class this quiz set is created for"
+    },
+    "title": {
+      "type": "string",
+      "description": "Quiz set title"
+    },
+    "source_lesson_id": {
+      "type": "string",
+      "description": "Optional lesson reference"
+    },
+    "source_topic_id": {
+      "type": "string",
+      "description": "Topic reference"
+    },
+    "created_by": {
+      "type": "string",
+      "description": "Teacher email"
+    },
+    "question_count": {
+      "type": "number",
+      "default": 0
+    },
+    "difficulty": {
+      "type": "string",
+      "enum": [
+        "easy",
+        "medium",
+        "hard",
+        "mixed"
+      ]
+    }
+  },
+  "required": [
+    "class_id",
+    "title",
+    "created_by"
+  ]
+}

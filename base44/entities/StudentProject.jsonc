@@ -1,0 +1,92 @@
+{
+  "name": "StudentProject",
+  "type": "object",
+  "properties": {
+    "student_email": {
+      "type": "string",
+      "description": "Student who created the project"
+    },
+    "title": {
+      "type": "string",
+      "description": "Project title"
+    },
+    "description": {
+      "type": "string",
+      "description": "Project description"
+    },
+    "subject_id": {
+      "type": "string",
+      "description": "Related subject"
+    },
+    "topic_id": {
+      "type": "string",
+      "description": "Related topic"
+    },
+    "project_type": {
+      "type": "string",
+      "enum": [
+        "research",
+        "creative",
+        "practical",
+        "presentation",
+        "experiment",
+        "other"
+      ],
+      "description": "Type of project"
+    },
+    "files": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          }
+        }
+      },
+      "description": "Project files (PDFs, images, videos, etc.)"
+    },
+    "external_link": {
+      "type": "string",
+      "description": "Link to external project (e.g., GitHub, YouTube)"
+    },
+    "completion_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "skills_demonstrated": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Skills shown in this project"
+    },
+    "self_rating": {
+      "type": "number",
+      "minimum": 1,
+      "maximum": 5,
+      "description": "Student's self-assessment rating"
+    },
+    "teacher_feedback": {
+      "type": "string",
+      "description": "Optional teacher feedback"
+    },
+    "is_featured": {
+      "type": "boolean",
+      "default": false,
+      "description": "Featured on portfolio"
+    }
+  },
+  "required": [
+    "student_email",
+    "title",
+    "description",
+    "project_type"
+  ]
+}

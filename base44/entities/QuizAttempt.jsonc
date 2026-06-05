@@ -1,0 +1,74 @@
+{
+  "name": "QuizAttempt",
+  "type": "object",
+  "properties": {
+    "student_email": {
+      "type": "string"
+    },
+    "class_id": {
+      "type": "string",
+      "description": "Reference to Class if applicable"
+    },
+    "quiz_id": {
+      "type": "string"
+    },
+    "topic_id": {
+      "type": "string"
+    },
+    "lesson_id": {
+      "type": "string",
+      "description": "If quiz is linked to a lesson"
+    },
+    "assignment_id": {
+      "type": "string",
+      "description": "If quiz was part of an assignment"
+    },
+    "questions_answered": {
+      "type": "number",
+      "description": "Number of questions answered"
+    },
+    "correct_answers": {
+      "type": "number",
+      "description": "Number of correct answers"
+    },
+    "accuracy_percent": {
+      "type": "number",
+      "description": "Percentage accuracy for this attempt"
+    },
+    "time_taken_seconds": {
+      "type": "number"
+    },
+    "completed_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "answers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "question_id": {
+            "type": "string"
+          },
+          "answer": {
+            "type": "string"
+          },
+          "is_correct": {
+            "type": "boolean"
+          },
+          "time_spent_seconds": {
+            "type": "number"
+          }
+        }
+      },
+      "description": "Student's answers per question"
+    }
+  },
+  "required": [
+    "student_email",
+    "quiz_id",
+    "questions_answered",
+    "correct_answers",
+    "accuracy_percent"
+  ]
+}

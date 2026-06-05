@@ -1,0 +1,69 @@
+{
+  "name": "Resource",
+  "type": "object",
+  "properties": {
+    "title": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string"
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "slide",
+        "pdf",
+        "video",
+        "link",
+        "document",
+        "image",
+        "worksheet",
+        "notes"
+      ],
+      "description": "Type of resource"
+    },
+    "url": {
+      "type": "string",
+      "description": "File URL or external link"
+    },
+    "file_size_bytes": {
+      "type": "number"
+    },
+    "subject_id": {
+      "type": "string"
+    },
+    "topic_id": {
+      "type": "string"
+    },
+    "lesson_id": {
+      "type": "string"
+    },
+    "uploaded_by": {
+      "type": "string"
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "is_public": {
+      "type": "boolean",
+      "default": false,
+      "description": "Visible to all teachers"
+    },
+    "download_count": {
+      "type": "number",
+      "default": 0
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true
+    }
+  },
+  "required": [
+    "title",
+    "type",
+    "url"
+  ]
+}

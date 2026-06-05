@@ -1,0 +1,27 @@
+{
+  "name": "QuestionRating",
+  "type": "object",
+  "properties": {
+    "question_id": {
+      "type": "string",
+      "description": "Reference to QuizQuestion"
+    },
+    "teacher_email": {
+      "type": "string",
+      "description": "Teacher who rated the question"
+    },
+    "rating": {
+      "type": "number",
+      "description": "Rating value 1-5"
+    },
+    "feedback": {
+      "type": "string",
+      "description": "Optional feedback text"
+    }
+  },
+  "required": [
+    "question_id",
+    "teacher_email",
+    "rating"
+  ]
+}

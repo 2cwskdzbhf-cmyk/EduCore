@@ -1,0 +1,52 @@
+{
+  "name": "QuizTemplate",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Template name"
+    },
+    "description": {
+      "type": "string",
+      "description": "Template description"
+    },
+    "owner_email": {
+      "type": "string",
+      "description": "Teacher who created this template"
+    },
+    "subject_id": {
+      "type": "string",
+      "description": "Subject reference"
+    },
+    "topic_id": {
+      "type": "string",
+      "description": "Topic reference"
+    },
+    "time_limit_per_question": {
+      "type": "number",
+      "default": 15000,
+      "description": "Default time per question in ms"
+    },
+    "questions": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      },
+      "description": "Question structure snapshot"
+    },
+    "is_shared": {
+      "type": "boolean",
+      "default": false,
+      "description": "Available to all teachers"
+    },
+    "usage_count": {
+      "type": "number",
+      "default": 0,
+      "description": "How many times this template was used"
+    }
+  },
+  "required": [
+    "name",
+    "owner_email"
+  ]
+}

@@ -1,0 +1,26 @@
+{
+  "name": "Subtopic",
+  "type": "object",
+  "properties": {
+    "topic_id": {
+      "type": "string",
+      "description": "Reference to Topic"
+    },
+    "name": {
+      "type": "string",
+      "description": "Subtopic name (e.g., Mixed Numbers, Adding Fractions)"
+    },
+    "description": {
+      "type": "string",
+      "description": "Optional description"
+    },
+    "order": {
+      "type": "number",
+      "description": "Display order within topic"
+    }
+  },
+  "required": [
+    "topic_id",
+    "name"
+  ]
+}

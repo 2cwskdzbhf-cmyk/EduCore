@@ -1,0 +1,66 @@
+{
+  "name": "Lesson",
+  "type": "object",
+  "properties": {
+    "topic_id": {
+      "type": "string",
+      "description": "Reference to Topic"
+    },
+    "title": {
+      "type": "string",
+      "description": "Lesson title"
+    },
+    "content": {
+      "type": "string",
+      "description": "Lesson content in markdown format"
+    },
+    "content_type": {
+      "type": "string",
+      "enum": [
+        "text",
+        "video",
+        "interactive",
+        "mixed"
+      ],
+      "default": "text"
+    },
+    "video_url": {
+      "type": "string",
+      "description": "Optional video URL"
+    },
+    "order": {
+      "type": "number",
+      "description": "Display order within topic"
+    },
+    "duration_minutes": {
+      "type": "number",
+      "description": "Estimated duration"
+    },
+    "xp_reward": {
+      "type": "number",
+      "description": "XP for completing lesson"
+    },
+    "skills_covered": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Skills taught in this lesson"
+    },
+    "learning_objectives": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "What students will learn"
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true
+    }
+  },
+  "required": [
+    "topic_id",
+    "title"
+  ]
+}

@@ -1,0 +1,39 @@
+{
+  "name": "RevisionChat",
+  "type": "object",
+  "properties": {
+    "notebook_id": {
+      "type": "string"
+    },
+    "student_email": {
+      "type": "string"
+    },
+    "messages": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "role": {
+            "type": "string"
+          },
+          "content": {
+            "type": "string"
+          },
+          "timestamp": {
+            "type": "string"
+          },
+          "citations": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    }
+  },
+  "required": [
+    "notebook_id",
+    "student_email"
+  ]
+}

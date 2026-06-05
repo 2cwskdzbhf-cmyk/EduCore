@@ -1,0 +1,57 @@
+{
+  "name": "RevisionNotebook",
+  "type": "object",
+  "properties": {
+    "student_email": {
+      "type": "string"
+    },
+    "name": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string"
+    },
+    "icon": {
+      "type": "string",
+      "default": "\ud83d\udcda"
+    },
+    "color": {
+      "type": "string",
+      "default": "purple"
+    },
+    "subject": {
+      "type": "string"
+    },
+    "exam_board": {
+      "type": "string"
+    },
+    "source_count": {
+      "type": "number",
+      "default": 0
+    },
+    "flashcard_count": {
+      "type": "number",
+      "default": 0
+    },
+    "last_studied": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "study_streak": {
+      "type": "number",
+      "default": 0
+    },
+    "total_study_minutes": {
+      "type": "number",
+      "default": 0
+    },
+    "mastery_percent": {
+      "type": "number",
+      "default": 0
+    }
+  },
+  "required": [
+    "student_email",
+    "name"
+  ]
+}

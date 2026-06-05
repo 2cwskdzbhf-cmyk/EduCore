@@ -1,0 +1,33 @@
+{
+  "name": "GlobalTopic",
+  "type": "object",
+  "properties": {
+    "subject_id": {
+      "type": "string",
+      "description": "Reference to Subject"
+    },
+    "subject_name": {
+      "type": "string",
+      "description": "Subject name for easier filtering"
+    },
+    "name": {
+      "type": "string",
+      "description": "Topic or subtopic name"
+    },
+    "parent_topic_id": {
+      "type": "string",
+      "description": "Parent topic ID - null for top-level topics, has value for subtopics"
+    },
+    "order_index": {
+      "type": "number",
+      "description": "Display order within parent"
+    },
+    "description": {
+      "type": "string",
+      "description": "Optional description"
+    }
+  },
+  "required": [
+    "name"
+  ]
+}

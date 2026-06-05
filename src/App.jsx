@@ -43,6 +43,7 @@ import TeacherLobbyPanel from "./pages/TeacherLobbyPanel";
 import LiveQuizLobbyNew from "./pages/LiveQuizLobbyNew";
 import LiveQuizPlay from "./pages/LiveQuizPlay";
 import ClassAnalytics from "./pages/ClassAnalytics";
+import RevisionHub from "./pages/RevisionHub";
 
 const { Pages, Layout, mainPage } = pagesConfig;
 
@@ -131,6 +132,7 @@ const AuthenticatedApp = () => {
       <Route path="/live-quiz-lobby-new" element={<LiveQuizLobbyNew />} />
       <Route path="/live-quiz-play" element={<LiveQuizPlay />} />
       <Route path="/ClassAnalytics" element={<LayoutWrapper currentPageName="ClassAnalytics"><ClassAnalytics /></LayoutWrapper>} />
+      <Route path="/RevisionHub" element={<LayoutWrapper currentPageName="RevisionHub"><RevisionHub /></LayoutWrapper>} />
       <Route path="*" element={<PageNotFound />} />
     </Routes>
   );

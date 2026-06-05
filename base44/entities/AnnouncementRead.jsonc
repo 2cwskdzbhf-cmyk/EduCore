@@ -1,0 +1,23 @@
+{
+  "name": "AnnouncementRead",
+  "type": "object",
+  "properties": {
+    "announcement_id": {
+      "type": "string",
+      "description": "Reference to Announcement"
+    },
+    "student_email": {
+      "type": "string",
+      "description": "Email of student who read it"
+    },
+    "class_id": {
+      "type": "string",
+      "description": "Reference to Class"
+    }
+  },
+  "required": [
+    "announcement_id",
+    "student_email",
+    "class_id"
+  ]
+}

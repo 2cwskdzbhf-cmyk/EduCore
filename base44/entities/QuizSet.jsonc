@@ -1,0 +1,63 @@
+{
+  "name": "QuizSet",
+  "type": "object",
+  "properties": {
+    "owner_email": {
+      "type": "string",
+      "description": "Teacher who created this quiz set"
+    },
+    "title": {
+      "type": "string",
+      "description": "Quiz set title"
+    },
+    "description": {
+      "type": "string",
+      "description": "Quiz set description"
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Tags for organization"
+    },
+    "subject_id": {
+      "type": "string",
+      "description": "Reference to subject"
+    },
+    "topic_id": {
+      "type": "string",
+      "description": "Reference to topic"
+    },
+    "lesson_refs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Lesson IDs questions were imported from"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "draft",
+        "published"
+      ],
+      "default": "draft",
+      "description": "Publication status"
+    },
+    "question_count": {
+      "type": "number",
+      "default": 0,
+      "description": "Number of questions in this set"
+    },
+    "time_limit_per_question": {
+      "type": "number",
+      "default": 15000,
+      "description": "Default time limit per question in milliseconds"
+    }
+  },
+  "required": [
+    "owner_email",
+    "title"
+  ]
+}

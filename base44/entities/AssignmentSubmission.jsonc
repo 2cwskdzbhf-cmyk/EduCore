@@ -1,0 +1,115 @@
+{
+  "name": "AssignmentSubmission",
+  "type": "object",
+  "properties": {
+    "assignment_id": {
+      "type": "string"
+    },
+    "student_email": {
+      "type": "string"
+    },
+    "class_id": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "not_started",
+        "in_progress",
+        "submitted",
+        "graded",
+        "returned",
+        "late"
+      ],
+      "default": "not_started"
+    },
+    "quiz_attempt_id": {
+      "type": "string",
+      "description": "For quiz-type assignments"
+    },
+    "written_response": {
+      "type": "string",
+      "description": "For written assignments"
+    },
+    "attachments": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "filename": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          }
+        }
+      },
+      "description": "Student uploaded files"
+    },
+    "submitted_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "is_late": {
+      "type": "boolean",
+      "default": false
+    },
+    "score": {
+      "type": "number"
+    },
+    "max_score": {
+      "type": "number"
+    },
+    "percentage": {
+      "type": "number"
+    },
+    "rubric_scores": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "criteria": {
+            "type": "string"
+          },
+          "score": {
+            "type": "number"
+          },
+          "max_score": {
+            "type": "number"
+          },
+          "feedback": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "teacher_feedback": {
+      "type": "string"
+    },
+    "graded_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "graded_by": {
+      "type": "string"
+    },
+    "ai_feedback": {
+      "type": "string",
+      "description": "AI-generated feedback"
+    },
+    "attempt_count": {
+      "type": "number",
+      "default": 1
+    }
+  },
+  "required": [
+    "assignment_id",
+    "student_email"
+  ]
+}

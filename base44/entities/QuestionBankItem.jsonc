@@ -1,0 +1,88 @@
+{
+  "name": "QuestionBankItem",
+  "type": "object",
+  "properties": {
+    "subject_id": {
+      "type": "string",
+      "description": "Reference to Subject"
+    },
+    "topic_id": {
+      "type": "string",
+      "description": "Reference to Topic"
+    },
+    "lesson_id": {
+      "type": "string",
+      "description": "Optional reference to specific Lesson"
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "fraction",
+        "percentage",
+        "ratio",
+        "algebra",
+        "indices"
+      ],
+      "description": "Question category"
+    },
+    "prompt": {
+      "type": "string",
+      "description": "Question text"
+    },
+    "correct_answer": {
+      "type": "string",
+      "description": "The correct answer (normalized form)"
+    },
+    "allowed_forms": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "fraction",
+          "decimal",
+          "mixed",
+          "simplified"
+        ]
+      },
+      "description": "Which answer formats are accepted"
+    },
+    "difficulty": {
+      "type": "string",
+      "enum": [
+        "easy",
+        "medium",
+        "hard"
+      ],
+      "default": "medium"
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Tags for filtering"
+    },
+    "hint": {
+      "type": "string",
+      "description": "Optional hint text"
+    },
+    "explanation": {
+      "type": "string",
+      "description": "Explanation shown after answer"
+    },
+    "teacher_email": {
+      "type": "string",
+      "description": "Creator of the question"
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true
+    }
+  },
+  "required": [
+    "topic_id",
+    "type",
+    "prompt",
+    "correct_answer"
+  ]
+}

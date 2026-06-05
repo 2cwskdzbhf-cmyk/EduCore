@@ -1,0 +1,55 @@
+{
+  "name": "RevisionSource",
+  "type": "object",
+  "properties": {
+    "notebook_id": {
+      "type": "string"
+    },
+    "student_email": {
+      "type": "string"
+    },
+    "name": {
+      "type": "string"
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "pdf",
+        "pptx",
+        "docx",
+        "image",
+        "text",
+        "url",
+        "youtube",
+        "audio",
+        "gdoc",
+        "gslides"
+      ]
+    },
+    "content_text": {
+      "type": "string",
+      "description": "Extracted text content"
+    },
+    "file_url": {
+      "type": "string"
+    },
+    "url": {
+      "type": "string"
+    },
+    "file_size_bytes": {
+      "type": "number"
+    },
+    "page_count": {
+      "type": "number"
+    },
+    "summary": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "notebook_id",
+    "student_email",
+    "name",
+    "type"
+  ]
+}

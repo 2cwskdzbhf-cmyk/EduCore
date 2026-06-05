@@ -1,0 +1,66 @@
+{
+  "name": "QuestionVersion",
+  "type": "object",
+  "properties": {
+    "question_id": {
+      "type": "string",
+      "description": "Reference to QuizQuestion"
+    },
+    "version_number": {
+      "type": "number",
+      "description": "Version number (incremental)"
+    },
+    "prompt": {
+      "type": "string",
+      "description": "Question text at this version"
+    },
+    "question_type": {
+      "type": "string",
+      "description": "Question type at this version"
+    },
+    "options": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Answer options at this version"
+    },
+    "correct_index": {
+      "type": "number",
+      "description": "Correct answer index at this version"
+    },
+    "correct_answer": {
+      "type": "string",
+      "description": "Correct answer text at this version"
+    },
+    "explanation": {
+      "type": "string",
+      "description": "Explanation at this version"
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Tags at this version"
+    },
+    "difficulty": {
+      "type": "string",
+      "description": "Difficulty at this version"
+    },
+    "edited_by": {
+      "type": "string",
+      "description": "Email of editor"
+    },
+    "change_notes": {
+      "type": "string",
+      "description": "Notes about what changed"
+    }
+  },
+  "required": [
+    "question_id",
+    "version_number",
+    "prompt",
+    "edited_by"
+  ]
+}

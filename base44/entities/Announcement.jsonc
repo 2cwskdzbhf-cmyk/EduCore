@@ -1,0 +1,33 @@
+{
+  "name": "Announcement",
+  "type": "object",
+  "properties": {
+    "class_id": {
+      "type": "string",
+      "description": "Reference to Class"
+    },
+    "teacher_email": {
+      "type": "string",
+      "description": "Email of teacher who created announcement"
+    },
+    "title": {
+      "type": "string",
+      "description": "Announcement title"
+    },
+    "message": {
+      "type": "string",
+      "description": "Announcement message/content"
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether announcement is visible"
+    }
+  },
+  "required": [
+    "class_id",
+    "teacher_email",
+    "title",
+    "message"
+  ]
+}

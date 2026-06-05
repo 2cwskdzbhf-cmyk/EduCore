@@ -1,0 +1,46 @@
+{
+  "name": "QuestionFolder",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Folder name"
+    },
+    "description": {
+      "type": "string",
+      "description": "Folder description"
+    },
+    "parent_folder_id": {
+      "type": "string",
+      "description": "Parent folder for nested structure"
+    },
+    "owner_email": {
+      "type": "string",
+      "description": "Creator of the folder"
+    },
+    "collaborator_emails": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Teachers who can access this folder"
+    },
+    "is_shared": {
+      "type": "boolean",
+      "default": false,
+      "description": "Available to all teachers"
+    },
+    "color": {
+      "type": "string",
+      "description": "Folder color code"
+    },
+    "icon": {
+      "type": "string",
+      "description": "Folder icon name"
+    }
+  },
+  "required": [
+    "name",
+    "owner_email"
+  ]
+}

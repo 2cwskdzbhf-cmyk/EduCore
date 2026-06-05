@@ -1,0 +1,41 @@
+{
+  "name": "LessonReadProgress",
+  "type": "object",
+  "properties": {
+    "student_email": {
+      "type": "string"
+    },
+    "lesson_id": {
+      "type": "string",
+      "description": "Reference to Lesson"
+    },
+    "first_opened_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When student first opened the lesson"
+    },
+    "read_confirmed_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When student marked as read"
+    },
+    "percent_scrolled": {
+      "type": "number",
+      "default": 0,
+      "description": "Highest scroll percentage reached"
+    },
+    "time_spent_ms": {
+      "type": "number",
+      "default": 0,
+      "description": "Total time spent on lesson"
+    },
+    "last_seen_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "student_email",
+    "lesson_id"
+  ]
+}

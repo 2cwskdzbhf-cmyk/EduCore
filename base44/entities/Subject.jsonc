@@ -1,0 +1,46 @@
+{
+  "name": "Subject",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Subject name (e.g., Mathematics, English, Science)"
+    },
+    "description": {
+      "type": "string",
+      "description": "Brief description of the subject"
+    },
+    "icon": {
+      "type": "string",
+      "description": "Icon name from Lucide"
+    },
+    "color": {
+      "type": "string",
+      "description": "Theme color for the subject (e.g., blue, green)"
+    },
+    "key_stage": {
+      "type": "string",
+      "enum": [
+        "KS3",
+        "KS4",
+        "KS5"
+      ],
+      "description": "Key stage level"
+    },
+    "exam_board": {
+      "type": "string",
+      "description": "Exam board (e.g., AQA, Edexcel, OCR)"
+    },
+    "order": {
+      "type": "number",
+      "description": "Display order"
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true
+    }
+  },
+  "required": [
+    "name"
+  ]
+}

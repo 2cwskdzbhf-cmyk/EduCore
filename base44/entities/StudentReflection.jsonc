@@ -1,0 +1,58 @@
+{
+  "name": "StudentReflection",
+  "type": "object",
+  "properties": {
+    "student_email": {
+      "type": "string",
+      "description": "Student who wrote the reflection"
+    },
+    "title": {
+      "type": "string",
+      "description": "Reflection title"
+    },
+    "content": {
+      "type": "string",
+      "description": "Reflection content in markdown"
+    },
+    "topic_id": {
+      "type": "string",
+      "description": "Optional related topic"
+    },
+    "lesson_id": {
+      "type": "string",
+      "description": "Optional related lesson"
+    },
+    "assignment_id": {
+      "type": "string",
+      "description": "Optional related assignment"
+    },
+    "mood": {
+      "type": "string",
+      "enum": [
+        "confident",
+        "learning",
+        "challenged",
+        "confused",
+        "excited"
+      ],
+      "description": "Student's mood/feeling about the learning"
+    },
+    "learning_goals": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "What the student wants to improve"
+    },
+    "is_private": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether this reflection is private or shareable with teacher"
+    }
+  },
+  "required": [
+    "student_email",
+    "title",
+    "content"
+  ]
+}

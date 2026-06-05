@@ -1,0 +1,56 @@
+{
+  "name": "CustomAchievement",
+  "type": "object",
+  "properties": {
+    "student_email": {
+      "type": "string",
+      "description": "Student who earned this"
+    },
+    "title": {
+      "type": "string",
+      "description": "Achievement title"
+    },
+    "description": {
+      "type": "string",
+      "description": "What was achieved"
+    },
+    "category": {
+      "type": "string",
+      "enum": [
+        "competition",
+        "certification",
+        "extracurricular",
+        "community",
+        "leadership",
+        "other"
+      ],
+      "description": "Type of achievement"
+    },
+    "date_earned": {
+      "type": "string",
+      "format": "date"
+    },
+    "icon_name": {
+      "type": "string",
+      "description": "Lucide icon name"
+    },
+    "icon_color": {
+      "type": "string",
+      "description": "Hex color for icon"
+    },
+    "evidence_url": {
+      "type": "string",
+      "description": "Link to certificate or proof"
+    },
+    "issuing_organization": {
+      "type": "string",
+      "description": "Who awarded this achievement"
+    }
+  },
+  "required": [
+    "student_email",
+    "title",
+    "description",
+    "category"
+  ]
+}

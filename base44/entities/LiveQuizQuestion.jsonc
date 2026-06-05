@@ -1,0 +1,50 @@
+{
+  "name": "LiveQuizQuestion",
+  "type": "object",
+  "properties": {
+    "quiz_id": {
+      "type": "string",
+      "description": "Reference to LiveQuizSet or QuizSet"
+    },
+    "question_id": {
+      "type": "string",
+      "description": "Reference to Question"
+    },
+    "order": {
+      "type": "number",
+      "description": "Display order in the quiz"
+    },
+    "prompt": {
+      "type": "string",
+      "description": "Question text (copied from Question for snapshot)"
+    },
+    "options": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Answer options (copied from Question)"
+    },
+    "correct_answer": {
+      "type": "string",
+      "description": "Correct answer (copied from Question)"
+    },
+    "correct_index": {
+      "type": "number",
+      "description": "Correct answer index (copied from Question)"
+    },
+    "difficulty": {
+      "type": "string",
+      "description": "Question difficulty"
+    },
+    "year_group": {
+      "type": "number",
+      "description": "Year group"
+    }
+  },
+  "required": [
+    "quiz_id",
+    "question_id",
+    "order"
+  ]
+}

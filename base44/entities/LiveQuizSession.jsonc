@@ -1,0 +1,86 @@
+{
+  "name": "LiveQuizSession",
+  "type": "object",
+  "properties": {
+    "class_id": {
+      "type": "string",
+      "description": "Class this session belongs to"
+    },
+    "host_email": {
+      "type": "string",
+      "description": "Teacher hosting the session"
+    },
+    "live_quiz_set_id": {
+      "type": "string",
+      "description": "Live quiz set being played"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "lobby",
+        "live",
+        "intermission",
+        "ended"
+      ],
+      "default": "lobby",
+      "description": "Current session state"
+    },
+    "current_question_index": {
+      "type": "number",
+      "default": -1,
+      "description": "Current question being shown (-1 = not started)"
+    },
+    "question_started_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When current question started"
+    },
+    "player_count": {
+      "type": "number",
+      "default": 0,
+      "description": "Number of players joined"
+    },
+    "settings": {
+      "type": "object",
+      "properties": {
+        "time_per_question": {
+          "type": "number",
+          "default": 15000
+        },
+        "base_points": {
+          "type": "number",
+          "default": 500
+        },
+        "round_multiplier_increment": {
+          "type": "number",
+          "default": 0.25
+        }
+      }
+    },
+    "started_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "ended_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "questions_json": {
+      "type": "string",
+      "description": "All questions for this session (JSON string)"
+    },
+    "current_question": {
+      "type": "object",
+      "description": "Current question object (pushed to avoid race conditions)"
+    },
+    "current_question_id": {
+      "type": "string",
+      "description": "ID of current question if available"
+    }
+  },
+  "required": [
+    "class_id",
+    "host_email",
+    "live_quiz_set_id"
+  ]
+}

@@ -1,0 +1,57 @@
+{
+  "name": "RevisionFlashcard",
+  "type": "object",
+  "properties": {
+    "notebook_id": {
+      "type": "string"
+    },
+    "student_email": {
+      "type": "string"
+    },
+    "front": {
+      "type": "string"
+    },
+    "back": {
+      "type": "string"
+    },
+    "difficulty_rating": {
+      "type": "string",
+      "enum": [
+        "again",
+        "hard",
+        "medium",
+        "easy"
+      ],
+      "default": "medium"
+    },
+    "next_review": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "review_count": {
+      "type": "number",
+      "default": 0
+    },
+    "ease_factor": {
+      "type": "number",
+      "default": 2.5
+    },
+    "interval_days": {
+      "type": "number",
+      "default": 1
+    },
+    "is_ai_generated": {
+      "type": "boolean",
+      "default": true
+    },
+    "source_id": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "notebook_id",
+    "student_email",
+    "front",
+    "back"
+  ]
+}
