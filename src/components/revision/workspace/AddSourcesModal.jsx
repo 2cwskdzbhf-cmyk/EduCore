@@ -114,42 +114,93 @@ Format in clear markdown with headings and bullet points. Aim for ${isDeep ? '12
   };
 
   // ── Google Drive ─────────────────────────────────────────────────────────
+  const [driveError, setDriveError] = useState(null);
+
   const openGoogleDrive = async () => {
     setGdrivePicking(true);
+    setDriveError(null);
     try {
       const res = await base44.functions.invoke('getDriveAccessToken', {});
-      const token = res?.data?.accessToken || res?.accessToken;
-      if (!token) { alert('Could not get Google Drive access.'); setGdrivePicking(false); return; }
-      const loadPicker = () => {
+      const token = res?.data?.accessToken;
+      if (!token) {
+        setDriveError('Could not get Google Drive access. Please try again.');
+        setGdrivePicking(false);
+        return;
+      }
+
+      const launchPicker = () => {
         window.gapi.load('picker', () => {
-          new window.google.picker.PickerBuilder()
-            .addView(window.google.picker.ViewId.DOCS)
+          // Allow Docs, Slides, PDFs, and text files
+          const docsView = new window.google.picker.DocsView()
+            .setIncludeFolders(false)
+            .setMimeTypes([
+              'application/vnd.google-apps.document',
+              'application/vnd.google-apps.presentation',
+              'application/pdf',
+              'text/plain',
+            ].join(','));
+
+          const picker = new window.google.picker.PickerBuilder()
+            .addView(docsView)
             .setOAuthToken(token)
             .setCallback(async (data) => {
-              if (data.action !== window.google.picker.Action.PICKED) { setGdrivePicking(false); return; }
+              if (data.action === window.google.picker.Action.CANCEL) {
+                setGdrivePicking(false);
+                return;
+              }
+              if (data.action !== window.google.picker.Action.PICKED) return;
+
               const doc = data.docs[0];
               const mime = doc.mimeType || '';
-              const type = mime.includes('presentation') ? 'gslides' : mime.includes('pdf') ? 'pdf' : 'gdoc';
+              const isGoogleDoc = mime === 'application/vnd.google-apps.document';
+              const isGoogleSlides = mime === 'application/vnd.google-apps.presentation';
+              const type = isGoogleSlides ? 'gslides' : mime.includes('pdf') ? 'pdf' : 'gdoc';
+
               let content_text = '';
               try {
-                const r = await fetch(`https://www.googleapis.com/drive/v3/files/${doc.id}/export?mimeType=text/plain`, { headers: { Authorization: `Bearer ${token}` } });
-                if (r.ok) content_text = await r.text();
-              } catch {}
+                if (isGoogleDoc || isGoogleSlides) {
+                  // Google Workspace files: export as plain text
+                  const r = await fetch(
+                    `https://www.googleapis.com/drive/v3/files/${doc.id}/export?mimeType=text/plain`,
+                    { headers: { Authorization: `Bearer ${token}` } }
+                  );
+                  if (r.ok) content_text = await r.text();
+                } else {
+                  // Binary files (PDF etc): just store the link, no text export
+                  content_text = '';
+                }
+              } catch (_) {}
+
               await base44.entities.RevisionSource.create({
-                notebook_id: notebook.id, student_email: user.email,
-                name: doc.name || 'Google Drive file', type,
+                notebook_id: notebook.id,
+                student_email: user.email,
+                name: doc.name || 'Google Drive file',
+                type,
                 url: `https://drive.google.com/file/d/${doc.id}`,
                 content_text: content_text.slice(0, 50000),
               });
               await base44.entities.RevisionNotebook.update(notebook.id, { source_count: sources.length + 1 });
-              setGdrivePicking(false); onRefresh(); onClose();
-            }).build().setVisible(true);
+              setGdrivePicking(false);
+              onRefresh();
+              onClose();
+            })
+            .build();
+          picker.setVisible(true);
         });
       };
+
       if (!window.gapi) {
-        const s = document.createElement('script'); s.src = 'https://apis.google.com/js/api.js'; s.onload = loadPicker; document.body.appendChild(s);
-      } else { loadPicker(); }
-    } catch (e) { alert('Failed: ' + e.message); setGdrivePicking(false); }
+        const s = document.createElement('script');
+        s.src = 'https://apis.google.com/js/api.js';
+        s.onload = launchPicker;
+        document.body.appendChild(s);
+      } else {
+        launchPicker();
+      }
+    } catch (e) {
+      setDriveError('Google Drive access failed: ' + e.message);
+      setGdrivePicking(false);
+    }
   };
 
   const sourcesUsed = sources.length;
@@ -304,13 +355,13 @@ Format in clear markdown with headings and bullet points. Aim for ${isDeep ? '12
               disabled={gdrivePicking}
               className="group flex flex-col items-center gap-2 py-4 px-3 rounded-2xl transition-all hover:scale-[1.03] active:scale-[0.98]"
               style={{
-                background: 'rgba(59,130,246,0.06)',
-                border: '1px solid rgba(59,130,246,0.18)',
+                background: driveError ? 'rgba(239,68,68,0.1)' : 'rgba(59,130,246,0.06)',
+                border: `1px solid ${driveError ? 'rgba(239,68,68,0.35)' : 'rgba(59,130,246,0.18)'}`,
               }}
               onMouseEnter={e => e.currentTarget.style.boxShadow = '0 0 20px rgba(59,130,246,0.12)'}
               onMouseLeave={e => e.currentTarget.style.boxShadow = 'none'}
             >
-              {gdrivePicking ? <Loader2 className="w-5 h-5 text-blue-400 animate-spin" /> : <HardDrive className="w-5 h-5 text-blue-400" />}
+              {gdrivePicking ? <Loader2 className="w-5 h-5 text-blue-400 animate-spin" /> : <HardDrive className={`w-5 h-5 ${driveError ? 'text-red-400' : 'text-blue-400'}`} />}
               <span className="text-xs font-semibold text-white">Drive</span>
             </button>
 
@@ -385,6 +436,15 @@ Format in clear markdown with headings and bullet points. Aim for ${isDeep ? '12
               </motion.div>
             )}
           </AnimatePresence>
+
+          {/* Drive error */}
+          {driveError && (
+            <div className="mb-4 px-3 py-2.5 rounded-xl text-xs text-red-300 flex items-start gap-2"
+              style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)' }}>
+              <span className="mt-0.5">⚠️</span>
+              <span>{driveError}</span>
+            </div>
+          )}
 
           {/* ── Progress bar ── */}
           <div className="space-y-1.5">
