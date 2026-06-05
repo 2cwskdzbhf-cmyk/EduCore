@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { base44 } from '@/api/base44Client';
 import {
@@ -201,9 +202,9 @@ Format in clear markdown with headings and bullet points. Aim for ${isDeep ? '12
   const sourcesUsed = sources.length;
   const progressPct = Math.min((sourcesUsed / SOURCE_LIMIT) * 100, 100);
 
-  return (
+  return createPortal(
     <motion.div
-      className="fixed inset-0 z-[300] flex items-center justify-center p-4"
+      className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
       style={{ backgroundColor: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(8px)' }}
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
@@ -473,6 +474,7 @@ Format in clear markdown with headings and bullet points. Aim for ${isDeep ? '12
           className="hidden"
         />
       </motion.div>
-    </motion.div>
+    </motion.div>,
+    document.body
   );
 }
