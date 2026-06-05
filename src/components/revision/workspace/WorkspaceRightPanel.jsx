@@ -1,280 +1,263 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { base44 } from '@/api/base44Client';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation } from '@tanstack/react-query';
 import {
-  Layers, Zap, FileText, Map, BarChart2, Music, Video, Table,
-  Plus, Trash2, Pencil, Copy, X, Check, Loader2, BookOpen,
-  ExternalLink, Sparkles, StickyNote, ChevronDown, ChevronUp
+  Headphones, Video, Network, FileBarChart2, Layers, Zap, Table2,
+  Plus, Pencil, Copy, Trash2, ExternalLink, Share2, Loader2, X, Check,
+  FileText, ChevronDown, ChevronUp
 } from 'lucide-react';
-import ReactMarkdown from 'react-markdown';
 
 const STUDIO_ACTIONS = [
-  { type: 'audio_overview', icon: Music, label: 'Audio Overview', color: 'from-rose-500 to-pink-600', desc: 'AI podcast-style revision audio' },
-  { type: 'mind_map', icon: Map, label: 'Mind Map', color: 'from-green-500 to-emerald-600', desc: 'Interactive concept map' },
-  { type: 'flashcards', icon: Layers, label: 'Flashcards', color: 'from-violet-500 to-purple-600', desc: 'Study card pairs' },
-  { type: 'quiz', icon: Zap, label: 'Quiz', color: 'from-amber-500 to-orange-500', desc: 'Practice questions' },
-  { type: 'report', icon: BarChart2, label: 'Report', color: 'from-blue-500 to-cyan-600', desc: 'Detailed revision report' },
-  { type: 'study_guide', icon: BookOpen, label: 'Study Guide', color: 'from-teal-500 to-cyan-600', desc: 'Structured notes' },
-  { type: 'exam_questions', icon: FileText, label: 'Exam Questions', color: 'from-red-500 to-rose-600', desc: 'Past-style exam questions' },
-  { type: 'data_table', icon: Table, label: 'Data Table', color: 'from-slate-500 to-gray-600', desc: 'Structured data tables' },
+  { type: 'audio_overview', label: 'Audio Overview', icon: Headphones, color: 'from-violet-600 to-purple-700', desc: 'AI podcast-style audio' },
+  { type: 'video_overview', label: 'Video Overview', icon: Video, color: 'from-blue-600 to-cyan-600', desc: 'AI revision video' },
+  { type: 'mind_map', label: 'Mind Map', icon: Network, color: 'from-emerald-600 to-teal-600', desc: 'Interactive mind map' },
+  { type: 'report', label: 'Report', icon: FileBarChart2, color: 'from-rose-600 to-pink-600', desc: 'Detailed revision report' },
+  { type: 'flashcards', label: 'Flashcards', icon: Layers, color: 'from-amber-500 to-orange-500', desc: 'Spaced repetition cards' },
+  { type: 'quiz', label: 'Quiz', icon: Zap, color: 'from-indigo-600 to-blue-600', desc: 'Test your knowledge' },
+  { type: 'data_table', label: 'Data Table', icon: Table2, color: 'from-cyan-600 to-sky-600', desc: 'Structured data table' },
 ];
 
-const TYPE_ICONS = {
-  flashcards: Layers, quiz: Zap, mind_map: Map, study_guide: BookOpen,
-  report: BarChart2, formula_sheet: FileText, exam_questions: FileText,
-  summary: FileText, data_table: Table, audio_overview: Music,
-  video_overview: Video, notes: StickyNote,
+const RESOURCE_ICONS = {
+  flashcards: '🗂️', quiz: '⚡', mind_map: '🧠', study_guide: '📖', report: '📊',
+  formula_sheet: '🔢', exam_questions: '📝', summary: '📋', data_table: '📊',
+  audio_overview: '🎧', video_overview: '🎬', notes: '📌',
 };
 
-const GENERATE_PROMPTS = {
-  audio_overview: 'Create an engaging podcast-style script (2-3 minutes) covering the main topics from the sources. Format as a spoken conversation with clear transitions.',
-  mind_map: 'Create a detailed mind map in markdown. Use # for main topic, ## for subtopics, ### for details. Cover all key concepts from the sources.',
-  flashcards: 'Generate 15 flashcard Q&A pairs from the most important content. Format as:\nQ: [question]\nA: [answer]\n\nfor each card.',
-  quiz: 'Create a 10-question multiple choice quiz with 4 options each and answers. Format clearly with Q1:, Options A-D, and Answer:',
-  report: 'Write a comprehensive revision report covering: 1) Topic Overview, 2) Key Concepts, 3) Important Details, 4) Common Mistakes, 5) Exam Tips. Use clear headings.',
-  study_guide: 'Generate a structured study guide with: Introduction, Key Topics, Definitions, Important Points, Summary, and Exam Tips.',
-  exam_questions: 'Generate 8 exam-style questions of mixed difficulty (2 marks, 4 marks, 6 marks). Include mark scheme answers.',
-  data_table: 'Create a structured comparison table or data table from the key information in the sources. Use markdown table format.',
+const PROMPT_MAP = {
+  audio_overview: 'Create a detailed podcast-style audio script that covers all the key topics from my sources. Include an introduction, main content sections with explanations, and a conclusion. Make it engaging and educational.',
+  video_overview: 'Create a video script for a revision overview. Include scene descriptions, key points to cover, visual suggestions, and a clear narrative structure covering all main topics.',
+  mind_map: 'Create a detailed mind map outline in text format. Show the central topic, main branches, and sub-branches with key concepts, facts, and connections. Use indented formatting.',
+  report: 'Write a comprehensive revision report covering all key topics from my sources. Include an executive summary, detailed sections for each main topic, key findings, and exam preparation tips.',
+  flashcards: 'Generate 15 high-quality revision flashcards as Q&A pairs. Format each as "Q: [question]\nA: [answer]". Cover the most important concepts, definitions, and facts.',
+  quiz: 'Generate a 10-question multiple choice quiz. For each question provide: the question, 4 options (A-D), the correct answer, and a brief explanation.',
+  data_table: 'Organise all key information from my sources into well-structured tables. Include relevant columns and categorise the data clearly with headings.',
 };
 
-export default function WorkspaceRightPanel({ notebook, user, sources, selectedSourceIds, pendingSave, onPendingSaveComplete }) {
-  const qc = useQueryClient();
-  const [expandedId, setExpandedId] = useState(null);
-  const [generatingType, setGeneratingType] = useState(null);
+export default function WorkspaceRightPanel({ notebook, user, resources, selectedSources, allSources, onResourceCreated, onRefresh }) {
+  const [generating, setGenerating] = useState(null);
   const [renamingId, setRenamingId] = useState(null);
   const [renameValue, setRenameValue] = useState('');
+  const [openResourceId, setOpenResourceId] = useState(null);
+  const [showAllResources, setShowAllResources] = useState(false);
+  const [addNoteMode, setAddNoteMode] = useState(false);
   const [noteText, setNoteText] = useState('');
-  const [addingNote, setAddingNote] = useState(false);
-  const [showNotes, setShowNotes] = useState(true);
-
-  const { data: resources = [], refetch } = useQuery({
-    queryKey: ['notebookResources', notebook.id],
-    queryFn: () => base44.entities.NotebookResource.filter({ notebook_id: notebook.id }, '-created_date'),
-    enabled: !!notebook.id,
-  });
-
-  const { data: notes = [], refetch: refetchNotes } = useQuery({
-    queryKey: ['notebookNotes', notebook.id],
-    queryFn: () => base44.entities.NotebookResource.filter({ notebook_id: notebook.id, resource_type: 'notes' }, '-created_date'),
-    enabled: !!notebook.id,
-  });
-
-  // Handle pendingSave from chat
-  React.useEffect(() => {
-    if (pendingSave) {
-      base44.entities.NotebookResource.create({
-        notebook_id: notebook.id,
-        student_email: user.email,
-        title: pendingSave.title,
-        resource_type: pendingSave.resource_type,
-        content: pendingSave.content,
-        source_count: selectedSourceIds.length,
-        source_ids: selectedSourceIds,
-      }).then(() => { refetch(); onPendingSaveComplete(); });
-    }
-  }, [pendingSave]);
+  const [noteTitle, setNoteTitle] = useState('');
 
   const deleteMutation = useMutation({
     mutationFn: (id) => base44.entities.NotebookResource.delete(id),
-    onSuccess: refetch,
+    onSuccess: onRefresh,
   });
+
   const renameMutation = useMutation({
     mutationFn: ({ id, title }) => base44.entities.NotebookResource.update(id, { title }),
-    onSuccess: () => { setRenamingId(null); setRenameValue(''); refetch(); },
+    onSuccess: () => { setRenamingId(null); setRenameValue(''); onRefresh(); },
   });
 
-  const generate = async (action) => {
-    setGeneratingType(action.type);
+  const duplicateMutation = useMutation({
+    mutationFn: async (resource) => {
+      const { id, created_date, updated_date, created_by_id, ...rest } = resource;
+      await base44.entities.NotebookResource.create({ ...rest, title: `${resource.title} (Copy)` });
+    },
+    onSuccess: onRefresh,
+  });
+
+  const generateResource = async (type) => {
+    setGenerating(type);
     try {
-      const activeSources = sources.filter(s => selectedSourceIds.includes(s.id) && s.content_text);
-      const context = activeSources.map(s => `### ${s.name}\n${s.content_text.slice(0, 6000)}`).join('\n\n---\n\n');
-      const prompt = `${GENERATE_PROMPTS[action.type]}\n\n${context ? `SOURCE MATERIALS:\n\n${context}` : 'No sources selected — generate based on the notebook topic: ' + notebook.name}`;
-      const resp = await base44.integrations.Core.InvokeLLM({ prompt });
-      const content = typeof resp === 'string' ? resp : resp?.content || JSON.stringify(resp);
-      const created = await base44.entities.NotebookResource.create({
-        notebook_id: notebook.id,
-        student_email: user.email,
-        title: `${action.label} — ${new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}`,
-        resource_type: action.type,
-        content,
-        source_count: selectedSourceIds.length,
-        source_ids: selectedSourceIds,
+      const activeSources = selectedSources.length > 0 ? selectedSources : allSources;
+      const contextParts = activeSources
+        .filter(s => s.content_text)
+        .map(s => `### ${s.name}\n${s.content_text.slice(0, 8000)}`)
+        .join('\n\n---\n\n');
+
+      if (!contextParts) { alert('Please add sources with content first.'); setGenerating(null); return; }
+
+      const prompt = `${PROMPT_MAP[type]}\n\nSOURCE MATERIALS:\n${contextParts}`;
+      const content = await base44.integrations.Core.InvokeLLM({ prompt });
+      const action = STUDIO_ACTIONS.find(a => a.type === type);
+      const num = resources.filter(r => r.resource_type === type).length + 1;
+      const title = `${notebook.name} — ${action?.label} #${num}`;
+      const res = await base44.entities.NotebookResource.create({
+        notebook_id: notebook.id, student_email: user.email,
+        title, resource_type: type, content: typeof content === 'string' ? content : JSON.stringify(content),
+        source_ids: activeSources.map(s => s.id), source_count: activeSources.length,
       });
-      refetch();
-      setExpandedId(created.id);
-    } finally {
-      setGeneratingType(null);
+      onResourceCreated(res);
+    } catch (e) {
+      alert('Generation failed: ' + e.message);
     }
+    setGenerating(null);
   };
 
-  const addNote = async () => {
+  const saveNote = async () => {
     if (!noteText.trim()) return;
     await base44.entities.NotebookResource.create({
       notebook_id: notebook.id, student_email: user.email,
-      title: noteText.slice(0, 60),
-      resource_type: 'notes', content: noteText,
+      title: noteTitle || `Note — ${new Date().toLocaleDateString()}`,
+      resource_type: 'notes', content: noteText, source_count: 0,
     });
-    setNoteText(''); setAddingNote(false); refetch();
+    setNoteText(''); setNoteTitle(''); setAddNoteMode(false); onRefresh();
   };
 
-  const nonNoteResources = resources.filter(r => r.resource_type !== 'notes');
-  const noteResources = resources.filter(r => r.resource_type === 'notes');
+  const displayResources = showAllResources ? resources : resources.slice(0, 5);
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full overflow-y-auto">
       {/* Header */}
       <div className="flex-shrink-0 px-4 py-3.5 border-b border-white/10">
         <h2 className="text-white font-bold text-sm">Studio</h2>
-        <p className="text-slate-500 text-[11px]">Generate & manage study materials</p>
+        <p className="text-xs text-slate-500 mt-0.5">Generate & manage study materials</p>
       </div>
 
-      <div className="flex-1 overflow-y-auto">
-        {/* Studio action cards */}
-        <div className="p-3">
-          <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider mb-2">Generate</p>
-          <div className="grid grid-cols-2 gap-2">
-            {STUDIO_ACTIONS.map(action => {
-              const Icon = action.icon;
-              const isGenerating = generatingType === action.type;
-              return (
-                <button key={action.type} onClick={() => generate(action)} disabled={!!generatingType}
-                  className={`relative flex flex-col items-start gap-1 p-3 rounded-xl bg-gradient-to-br ${action.color} opacity-90 hover:opacity-100 hover:shadow-lg transition-all text-left disabled:opacity-50 overflow-hidden group`}>
-                  <div className="w-7 h-7 rounded-lg bg-white/20 flex items-center justify-center mb-0.5">
-                    {isGenerating ? <Loader2 className="w-3.5 h-3.5 text-white animate-spin" /> : <Icon className="w-3.5 h-3.5 text-white" />}
-                  </div>
-                  <span className="text-white font-bold text-[11px] leading-tight">{action.label}</span>
-                  <span className="text-white/70 text-[10px] leading-tight">{action.desc}</span>
-                  <div className="absolute inset-0 bg-white/0 group-hover:bg-white/5 transition-colors rounded-xl" />
-                </button>
-              );
-            })}
-          </div>
+      {/* Studio action cards */}
+      <div className="flex-shrink-0 p-3">
+        <p className="text-xs text-slate-500 font-semibold uppercase tracking-wider mb-2.5 px-1">Generate</p>
+        <div className="grid grid-cols-2 gap-2">
+          {STUDIO_ACTIONS.map(action => (
+            <motion.button key={action.type}
+              whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
+              onClick={() => generateResource(action.type)}
+              disabled={!!generating}
+              className={`relative overflow-hidden flex flex-col items-start p-3 rounded-2xl bg-gradient-to-br ${action.color} text-white text-left transition-all shadow-lg disabled:opacity-60 disabled:cursor-not-allowed`}>
+              {generating === action.type && (
+                <div className="absolute inset-0 bg-black/30 flex items-center justify-center rounded-2xl">
+                  <Loader2 className="w-5 h-5 animate-spin text-white" />
+                </div>
+              )}
+              <action.icon className="w-5 h-5 mb-2 opacity-90" />
+              <p className="font-bold text-xs leading-tight">{action.label}</p>
+              <p className="text-[10px] opacity-70 mt-0.5 leading-tight">{action.desc}</p>
+            </motion.button>
+          ))}
         </div>
+      </div>
 
-        {/* Created resources */}
-        {nonNoteResources.length > 0 && (
-          <div className="px-3 pb-3">
-            <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider mb-2">
-              Created Resources ({nonNoteResources.length})
-            </p>
-            <div className="space-y-1.5">
-              {nonNoteResources.map(r => {
-                const Icon = TYPE_ICONS[r.resource_type] || FileText;
-                const isExpanded = expandedId === r.id;
-                return (
-                  <div key={r.id} className="bg-white/[0.04] border border-white/10 rounded-xl overflow-hidden">
-                    <div className="flex items-center gap-2 p-2.5">
-                      <Icon className="w-4 h-4 text-violet-400 flex-shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        {renamingId === r.id ? (
-                          <div className="flex items-center gap-1">
-                            <input autoFocus value={renameValue} onChange={e => setRenameValue(e.target.value)}
-                              onKeyDown={e => { if (e.key === 'Enter') renameMutation.mutate({ id: r.id, title: renameValue }); if (e.key === 'Escape') setRenamingId(null); }}
-                              className="flex-1 px-1.5 py-0.5 bg-white/10 border border-violet-500/50 rounded text-white text-xs focus:outline-none" />
-                            <button onClick={() => renameMutation.mutate({ id: r.id, title: renameValue })}><Check className="w-3 h-3 text-emerald-400" /></button>
-                            <button onClick={() => setRenamingId(null)}><X className="w-3 h-3 text-slate-400" /></button>
-                          </div>
-                        ) : (
-                          <p className="text-white text-xs font-medium truncate">{r.title}</p>
-                        )}
-                        <div className="flex items-center gap-2 mt-0.5">
-                          <span className="text-slate-600 text-[10px] capitalize">{r.resource_type.replace('_', ' ')}</span>
-                          {r.created_date && <span className="text-slate-600 text-[10px]">{new Date(r.created_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</span>}
-                          {r.source_count > 0 && <span className="text-slate-600 text-[10px]">{r.source_count} src</span>}
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-0.5">
-                        <button onClick={() => setExpandedId(isExpanded ? null : r.id)}
-                          className="p-1 rounded text-slate-500 hover:text-white hover:bg-white/10 transition-all">
-                          {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-                        </button>
-                        <button onClick={() => { setRenamingId(r.id); setRenameValue(r.title); }}
-                          className="p-1 rounded text-slate-500 hover:text-violet-400 hover:bg-violet-500/10 transition-all">
-                          <Pencil className="w-3 h-3" />
-                        </button>
-                        <button onClick={() => navigator.clipboard.writeText(r.content || '')}
-                          className="p-1 rounded text-slate-500 hover:text-white hover:bg-white/10 transition-all">
-                          <Copy className="w-3 h-3" />
-                        </button>
-                        <button onClick={() => deleteMutation.mutate(r.id)}
-                          className="p-1 rounded text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-all">
-                          <Trash2 className="w-3 h-3" />
-                        </button>
-                      </div>
-                    </div>
-                    <AnimatePresence>
-                      {isExpanded && r.content && (
-                        <motion.div initial={{ height: 0 }} animate={{ height: 'auto' }} exit={{ height: 0 }}
-                          className="overflow-hidden border-t border-white/10">
-                          <div className="p-3 max-h-64 overflow-y-auto">
-                            <div className="prose prose-invert prose-xs max-w-none text-slate-300 [&>*:first-child]:mt-0 text-xs [&_p]:leading-relaxed">
-                              <ReactMarkdown>{r.content}</ReactMarkdown>
-                            </div>
-                          </div>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </div>
-                );
-              })}
-            </div>
+      {/* Created resources */}
+      <div className="flex-shrink-0 px-3 pb-2 border-t border-white/10 pt-3">
+        <div className="flex items-center justify-between mb-2.5 px-1">
+          <p className="text-xs text-slate-500 font-semibold uppercase tracking-wider">Created Resources</p>
+          <span className="text-xs text-slate-600 bg-white/5 px-2 py-0.5 rounded-full">{resources.length}</span>
+        </div>
+        {resources.length === 0 && (
+          <div className="text-center py-6 border border-dashed border-white/10 rounded-xl">
+            <p className="text-slate-600 text-xs">No resources generated yet</p>
+            <p className="text-slate-700 text-[10px] mt-1">Use the cards above to create study materials</p>
           </div>
         )}
-
-        {/* Notes */}
-        <div className="px-3 pb-4">
-          <div className="flex items-center justify-between mb-2">
-            <button onClick={() => setShowNotes(!showNotes)}
-              className="flex items-center gap-1 text-[10px] text-slate-500 font-semibold uppercase tracking-wider hover:text-white transition-colors">
-              <StickyNote className="w-3 h-3" /> Notes {noteResources.length > 0 && `(${noteResources.length})`}
-              {showNotes ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-            </button>
-            <button onClick={() => setAddingNote(!addingNote)}
-              className="flex items-center gap-1 text-[10px] text-violet-400 hover:text-violet-300 transition-colors font-medium">
-              <Plus className="w-3 h-3" /> Add Note
-            </button>
-          </div>
-
-          <AnimatePresence>
-            {addingNote && (
-              <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }}
-                className="overflow-hidden mb-2">
-                <div className="bg-white/[0.04] border border-white/10 rounded-xl p-2.5 space-y-2">
-                  <textarea value={noteText} onChange={e => setNoteText(e.target.value)} placeholder="Write a note..." rows={3}
-                    className="w-full bg-transparent text-white text-xs resize-none focus:outline-none placeholder:text-slate-500" />
-                  <div className="flex gap-1.5 justify-end">
-                    <button onClick={() => setAddingNote(false)} className="px-2.5 py-1 rounded-lg bg-white/5 text-slate-400 text-xs">Cancel</button>
-                    <button onClick={addNote} disabled={!noteText.trim()}
-                      className="px-2.5 py-1 rounded-lg bg-violet-500 text-white text-xs font-semibold disabled:opacity-40">Save</button>
+        <div className="space-y-1.5">
+          {displayResources.map((r, i) => (
+            <motion.div key={r.id} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }}>
+              <div className="group rounded-xl border border-white/8 bg-white/[0.03] hover:bg-white/[0.06] transition-all overflow-hidden">
+                <div className="flex items-center gap-2.5 p-2.5 cursor-pointer" onClick={() => setOpenResourceId(openResourceId === r.id ? null : r.id)}>
+                  <span className="text-base flex-shrink-0 leading-none">{RESOURCE_ICONS[r.resource_type] || '📄'}</span>
+                  <div className="flex-1 min-w-0">
+                    {renamingId === r.id ? (
+                      <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
+                        <input autoFocus value={renameValue} onChange={e => setRenameValue(e.target.value)}
+                          onKeyDown={e => { if (e.key === 'Enter') renameMutation.mutate({ id: r.id, title: renameValue }); if (e.key === 'Escape') setRenamingId(null); }}
+                          className="flex-1 px-1.5 py-0.5 bg-white/10 border border-violet-500/50 rounded text-white text-xs focus:outline-none" />
+                        <button onClick={() => renameMutation.mutate({ id: r.id, title: renameValue })} className="text-emerald-400"><Check className="w-3 h-3" /></button>
+                        <button onClick={() => setRenamingId(null)} className="text-slate-400"><X className="w-3 h-3" /></button>
+                      </div>
+                    ) : (
+                      <p className="text-white text-xs font-medium truncate">{r.title}</p>
+                    )}
+                    <p className="text-[10px] text-slate-600 mt-0.5">
+                      {r.resource_type?.replace(/_/g, ' ')} · {new Date(r.created_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+                      {r.source_count > 0 && ` · ${r.source_count} src`}
+                    </p>
                   </div>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          {showNotes && noteResources.length > 0 && (
-            <div className="space-y-1.5">
-              {noteResources.map(n => (
-                <div key={n.id} className="group bg-amber-500/5 border border-amber-500/15 rounded-xl p-2.5">
-                  <div className="flex items-start justify-between gap-2">
-                    <p className="text-amber-200/80 text-xs leading-relaxed flex-1">{n.content?.slice(0, 150)}{n.content?.length > 150 ? '...' : ''}</p>
-                    <button onClick={() => deleteMutation.mutate(n.id)}
-                      className="opacity-0 group-hover:opacity-100 p-0.5 rounded text-slate-600 hover:text-red-400 transition-all flex-shrink-0">
-                      <X className="w-3 h-3" />
+                  <div className="flex-shrink-0 flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity" onClick={e => e.stopPropagation()}>
+                    <button onClick={() => { setRenamingId(r.id); setRenameValue(r.title); }}
+                      className="p-1 rounded text-slate-500 hover:text-violet-400 hover:bg-violet-500/10 transition-all">
+                      <Pencil className="w-2.5 h-2.5" />
+                    </button>
+                    <button onClick={() => duplicateMutation.mutate(r)}
+                      className="p-1 rounded text-slate-500 hover:text-blue-400 hover:bg-blue-500/10 transition-all">
+                      <Copy className="w-2.5 h-2.5" />
+                    </button>
+                    <button onClick={() => deleteMutation.mutate(r.id)}
+                      className="p-1 rounded text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-all">
+                      <Trash2 className="w-2.5 h-2.5" />
                     </button>
                   </div>
-                  <p className="text-[10px] text-slate-600 mt-1">{new Date(n.created_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</p>
                 </div>
-              ))}
-            </div>
-          )}
+                <AnimatePresence>
+                  {openResourceId === r.id && (
+                    <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }}
+                      className="border-t border-white/10 overflow-hidden">
+                      <div className="p-3 bg-white/[0.02]">
+                        <pre className="text-slate-300 text-[11px] whitespace-pre-wrap leading-relaxed max-h-48 overflow-y-auto font-sans">
+                          {r.content?.slice(0, 2000)}{r.content?.length > 2000 ? '\n\n[Truncated — copy for full content]' : ''}
+                        </pre>
+                        <div className="flex gap-1.5 mt-2.5">
+                          <button onClick={() => navigator.clipboard.writeText(r.content || '')}
+                            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-white/5 text-slate-300 text-[11px] hover:bg-white/10 transition-all">
+                            <Copy className="w-3 h-3" /> Copy
+                          </button>
+                          <button onClick={() => { const w = window.open(); w.document.write(`<pre style="font-family:sans-serif;white-space:pre-wrap;padding:24px">${r.content}</pre>`); w.print(); }}
+                            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-white/5 text-slate-300 text-[11px] hover:bg-white/10 transition-all">
+                            <ExternalLink className="w-3 h-3" /> Export
+                          </button>
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            </motion.div>
+          ))}
+        </div>
+        {resources.length > 5 && (
+          <button onClick={() => setShowAllResources(v => !v)}
+            className="w-full mt-2 py-1.5 rounded-xl text-xs text-slate-500 hover:text-slate-300 hover:bg-white/5 transition-all flex items-center justify-center gap-1">
+            {showAllResources ? <><ChevronUp className="w-3 h-3" /> Show less</> : <><ChevronDown className="w-3 h-3" /> Show all {resources.length}</>}
+          </button>
+        )}
+      </div>
 
-          {showNotes && noteResources.length === 0 && !addingNote && (
-            <div className="text-center py-4 text-slate-600 text-xs">
-              <StickyNote className="w-6 h-6 mx-auto mb-1 opacity-30" />
-              No notes yet
+      {/* Notes section */}
+      <div className="px-3 pb-4 border-t border-white/10 pt-3 mt-1">
+        <div className="flex items-center justify-between mb-2.5 px-1">
+          <p className="text-xs text-slate-500 font-semibold uppercase tracking-wider">Notes</p>
+          <button onClick={() => setAddNoteMode(v => !v)}
+            className="flex items-center gap-1 text-xs text-violet-400 hover:text-violet-300 transition-colors">
+            <Plus className="w-3 h-3" /> Add Note
+          </button>
+        </div>
+        <AnimatePresence>
+          {addNoteMode && (
+            <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
+              className="space-y-2 mb-3 overflow-hidden">
+              <input value={noteTitle} onChange={e => setNoteTitle(e.target.value)} placeholder="Note title..."
+                className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-xl text-white text-xs focus:outline-none focus:border-violet-500/50 placeholder:text-slate-500" />
+              <textarea value={noteText} onChange={e => setNoteText(e.target.value)} placeholder="Write your note..." rows={4}
+                className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-xl text-white text-xs focus:outline-none focus:border-violet-500/50 placeholder:text-slate-500 resize-none" />
+              <div className="flex gap-2">
+                <button onClick={saveNote} disabled={!noteText.trim()}
+                  className="flex-1 py-1.5 rounded-xl bg-violet-500 text-white font-bold text-xs disabled:opacity-40">Save Note</button>
+                <button onClick={() => setAddNoteMode(false)} className="px-3 py-1.5 rounded-xl bg-white/5 text-slate-400 text-xs hover:bg-white/10 transition-all">Cancel</button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+        <div className="space-y-1.5">
+          {resources.filter(r => r.resource_type === 'notes').map(note => (
+            <div key={note.id} className="group flex items-start gap-2 p-2.5 rounded-xl border border-white/8 bg-white/[0.03] hover:bg-white/[0.06] transition-all">
+              <span className="text-base flex-shrink-0 leading-none mt-0.5">📌</span>
+              <div className="flex-1 min-w-0">
+                <p className="text-white text-xs font-medium truncate">{note.title}</p>
+                <p className="text-slate-600 text-[10px] mt-0.5">{new Date(note.created_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</p>
+              </div>
+              <button onClick={() => deleteMutation.mutate(note.id)}
+                className="opacity-0 group-hover:opacity-100 p-1 rounded text-slate-500 hover:text-red-400 transition-all flex-shrink-0">
+                <Trash2 className="w-2.5 h-2.5" />
+              </button>
             </div>
+          ))}
+          {resources.filter(r => r.resource_type === 'notes').length === 0 && !addNoteMode && (
+            <p className="text-center text-slate-700 text-xs py-3">No notes yet</p>
           )}
         </div>
       </div>
