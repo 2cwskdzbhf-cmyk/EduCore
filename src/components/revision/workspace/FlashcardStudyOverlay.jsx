@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, ChevronLeft, ChevronRight, X, Check } from 'lucide-react';
+import { ArrowLeft, ChevronLeft, ChevronRight, X, Check, RotateCcw } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { useMutation } from '@tanstack/react-query';
 
@@ -11,8 +11,11 @@ function getNextReview(rating, interval = 1, ease = 2.5) {
   else if (rating === 'hard')   { newInterval = Math.max(1, interval * 1.2); newEase = Math.max(1.3, ease - 0.15); }
   else if (rating === 'medium') { newInterval = interval * ease; }
   else if (rating === 'easy')   { newInterval = interval * ease * 1.3; newEase = ease + 0.15; }
-  newInterval = Math.round(newInterval);
-  return { next_review: new Date(now.getTime() + newInterval * 86400000).toISOString(), interval_days: newInterval, ease_factor: newEase };
+  return {
+    next_review: new Date(now.getTime() + Math.round(newInterval) * 86400000).toISOString(),
+    interval_days: Math.round(newInterval),
+    ease_factor: newEase,
+  };
 }
 
 export default function FlashcardStudyOverlay({ cards, title, onClose, onRefresh }) {
@@ -20,11 +23,13 @@ export default function FlashcardStudyOverlay({ cards, title, onClose, onRefresh
   const [flipped, setFlipped] = useState(false);
   const [correct, setCorrect] = useState(0);
   const [incorrect, setIncorrect] = useState(0);
+  const [done, setDone] = useState(false);
+  // Touch swipe
+  const touchStartX = useRef(null);
 
   const total = cards.length;
   const card = cards[index];
-  const done = index >= total || !card;
-  const progress = total > 0 ? ((correct + incorrect) / total) * 100 : 0;
+  const progress = total > 0 ? ((index) / total) * 100 : 0;
 
   const rateMutation = useMutation({
     mutationFn: async ({ card, rating }) => {
@@ -38,6 +43,7 @@ export default function FlashcardStudyOverlay({ cards, title, onClose, onRefresh
 
   const goNext = useCallback(() => {
     if (index < total - 1) { setIndex(i => i + 1); setFlipped(false); }
+    else { setDone(true); }
   }, [index, total]);
 
   const goBack = useCallback(() => {
@@ -49,7 +55,10 @@ export default function FlashcardStudyOverlay({ cards, title, onClose, onRefresh
     if (isCorrect) setCorrect(c => c + 1); else setIncorrect(c => c + 1);
     rateMutation.mutate({ card, rating: isCorrect ? 'easy' : 'again' });
     if (index < total - 1) { setIndex(i => i + 1); setFlipped(false); }
+    else { setDone(true); }
   }, [card, index, total]);
+
+  const restart = () => { setIndex(0); setFlipped(false); setCorrect(0); setIncorrect(0); setDone(false); };
 
   useEffect(() => {
     const handleKey = (e) => {
@@ -57,44 +66,64 @@ export default function FlashcardStudyOverlay({ cards, title, onClose, onRefresh
       if (e.code === 'Space' || e.code === 'Enter') { e.preventDefault(); setFlipped(f => !f); }
       if (e.code === 'ArrowLeft')  { e.preventDefault(); goBack(); }
       if (e.code === 'ArrowRight') { e.preventDefault(); goNext(); }
-      if (e.key === '1' && flipped) handleMark(false);
-      if (e.key === '2' && flipped) handleMark(true);
+      if (e.key === '1' && flipped) { e.preventDefault(); handleMark(false); }
+      if (e.key === '2' && flipped) { e.preventDefault(); handleMark(true); }
     };
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
-  }, [flipped, index, goBack, goNext, handleMark]);
+  }, [flipped, goBack, goNext, handleMark]);
+
+  const handleTouchStart = (e) => { touchStartX.current = e.touches[0].clientX; };
+  const handleTouchEnd = (e) => {
+    if (touchStartX.current === null) return;
+    const dx = e.changedTouches[0].clientX - touchStartX.current;
+    if (Math.abs(dx) > 50) { dx < 0 ? goNext() : goBack(); }
+    touchStartX.current = null;
+  };
 
   // Completion screen
   if (done) {
     const pct = total > 0 ? Math.round((correct / total) * 100) : 0;
+    const emoji = pct >= 80 ? '🏆' : pct >= 50 ? '⭐' : '📖';
     return (
-      <div className="fixed inset-0 bg-gradient-to-br from-slate-950 via-violet-950/30 to-slate-950 z-[100] flex items-center justify-center p-6">
-        <motion.div initial={{ scale: 0.85, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
-          className="bg-slate-900/90 border border-white/10 rounded-3xl p-10 max-w-md w-full text-center shadow-2xl">
-          <div className="text-6xl mb-4">{pct >= 80 ? '🏆' : pct >= 50 ? '⭐' : '📖'}</div>
-          <h2 className="text-white font-black text-3xl mb-2">Session Complete!</h2>
-          <p className="text-slate-400 mb-8">You reviewed all {total} cards</p>
-          <div className="grid grid-cols-3 gap-4 mb-8">
-            <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-2xl p-4">
+      <div className="fixed inset-0 z-[200] flex items-center justify-center"
+        style={{ background: 'radial-gradient(ellipse at 50% 40%, #1e1b4b 0%, #0f0f1a 100%)' }}>
+        <motion.div
+          initial={{ scale: 0.88, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
+          transition={{ type: 'spring', stiffness: 260, damping: 22 }}
+          className="w-full max-w-md mx-4 rounded-3xl p-10 text-center"
+          style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', backdropFilter: 'blur(24px)', boxShadow: '0 32px 64px rgba(0,0,0,0.6)' }}
+        >
+          <div className="text-6xl mb-4">{emoji}</div>
+          <h2 className="text-white font-black text-3xl mb-1">Session Complete!</h2>
+          <p className="text-slate-400 text-sm mb-8">You reviewed all {total} cards</p>
+
+          <div className="grid grid-cols-3 gap-3 mb-8">
+            <div className="rounded-2xl py-5" style={{ background: 'rgba(52,211,153,0.08)', border: '1px solid rgba(52,211,153,0.2)' }}>
               <p className="text-emerald-400 font-black text-3xl">{correct}</p>
-              <p className="text-emerald-400/70 text-xs mt-1">Correct</p>
+              <p className="text-emerald-400/60 text-xs mt-1 font-medium">Correct</p>
             </div>
-            <div className="bg-red-500/10 border border-red-500/20 rounded-2xl p-4">
+            <div className="rounded-2xl py-5" style={{ background: 'rgba(248,113,113,0.08)', border: '1px solid rgba(248,113,113,0.2)' }}>
               <p className="text-red-400 font-black text-3xl">{incorrect}</p>
-              <p className="text-red-400/70 text-xs mt-1">Incorrect</p>
+              <p className="text-red-400/60 text-xs mt-1 font-medium">Incorrect</p>
             </div>
-            <div className="bg-violet-500/10 border border-violet-500/20 rounded-2xl p-4">
-              <p className="text-violet-400 font-black text-3xl">{pct}%</p>
-              <p className="text-violet-400/70 text-xs mt-1">Score</p>
+            <div className="rounded-2xl py-5" style={{ background: 'rgba(167,139,250,0.1)', border: '1px solid rgba(167,139,250,0.2)' }}>
+              <p className="text-violet-300 font-black text-3xl">{pct}%</p>
+              <p className="text-violet-300/60 text-xs mt-1 font-medium">Score</p>
             </div>
           </div>
+
           <div className="flex gap-3">
-            <button onClick={onClose} className="flex-1 py-3 rounded-2xl border border-white/10 text-slate-300 hover:bg-white/5 font-semibold transition-all">
-              Back to Studio
+            <button onClick={onClose}
+              className="flex-1 py-3.5 rounded-2xl text-slate-300 text-sm font-semibold transition-all hover:text-white"
+              style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }}>
+              ← Back to Studio
             </button>
-            <button onClick={() => { setIndex(0); setFlipped(false); setCorrect(0); setIncorrect(0); }}
-              className="flex-1 py-3 rounded-2xl bg-gradient-to-r from-violet-500 to-purple-600 text-white font-bold hover:brightness-110 transition-all">
-              Study Again
+            <button onClick={restart}
+              className="flex-1 py-3.5 rounded-2xl text-white text-sm font-bold transition-all hover:brightness-110"
+              style={{ background: 'linear-gradient(135deg, #7c3aed, #6d28d9)' }}>
+              <RotateCcw className="w-4 h-4 inline mr-1.5 -mt-0.5" />
+              Restart
             </button>
           </div>
         </motion.div>
@@ -103,40 +132,67 @@ export default function FlashcardStudyOverlay({ cards, title, onClose, onRefresh
   }
 
   return (
-    <div className="fixed inset-0 bg-gradient-to-br from-slate-950 via-violet-950/20 to-slate-950 z-[100] flex flex-col">
-      {/* Header */}
-      <div className="flex-shrink-0 flex items-center justify-between px-6 py-4 border-b border-white/10">
-        <button onClick={onClose} className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors text-sm font-medium">
-          <ArrowLeft className="w-4 h-4" /> Back to Studio
+    <div
+      className="fixed inset-0 z-[200] flex flex-col"
+      style={{ background: 'radial-gradient(ellipse at 50% 30%, #1e1b4b 0%, #0f0f1a 70%, #0a0a12 100%)' }}
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+    >
+      {/* ── Header ── */}
+      <div className="flex-shrink-0 flex items-center justify-between px-5 sm:px-8 py-4"
+        style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+        {/* Left: back */}
+        <button onClick={onClose}
+          className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors text-sm font-medium group">
+          <ArrowLeft className="w-4 h-4 group-hover:-translate-x-0.5 transition-transform" />
+          <span className="hidden sm:inline">Studio</span>
         </button>
-        <div className="flex items-center gap-4 text-sm">
-          <span className="text-slate-500 font-medium">
-            Card <span className="text-white font-bold">{index + 1}</span> of <span className="text-white font-bold">{total}</span>
-          </span>
-          <div className="flex items-center gap-3 text-xs">
-            <span className="flex items-center gap-1 text-emerald-400 font-semibold"><Check className="w-3.5 h-3.5" />{correct}</span>
-            <span className="flex items-center gap-1 text-red-400 font-semibold"><X className="w-3.5 h-3.5" />{incorrect}</span>
-          </div>
+
+        {/* Centre: title + counter */}
+        <div className="flex flex-col items-center gap-0.5">
+          <p className="text-white/90 text-sm font-semibold truncate max-w-[200px] sm:max-w-xs">{title}</p>
+          <p className="text-slate-500 text-xs font-medium">
+            Card <span className="text-white/70 font-bold">{index + 1}</span> of <span className="text-white/70 font-bold">{total}</span>
+          </p>
         </div>
-        <p className="text-xs text-slate-600 hidden sm:block">{title}</p>
+
+        {/* Right: correct/incorrect */}
+        <div className="flex items-center gap-3 text-sm font-bold">
+          <span className="flex items-center gap-1 text-emerald-400">
+            <Check className="w-3.5 h-3.5" />{correct}
+          </span>
+          <span className="flex items-center gap-1 text-red-400">
+            <X className="w-3.5 h-3.5" />{incorrect}
+          </span>
+        </div>
       </div>
 
       {/* Progress bar */}
-      <div className="flex-shrink-0 h-1 bg-white/5">
-        <motion.div className="h-full bg-gradient-to-r from-violet-500 to-purple-400"
-          animate={{ width: `${progress}%` }} transition={{ duration: 0.4 }} />
+      <div className="flex-shrink-0 h-0.5 w-full" style={{ background: 'rgba(255,255,255,0.05)' }}>
+        <motion.div
+          className="h-full"
+          style={{ background: 'linear-gradient(90deg, #7c3aed, #a78bfa)' }}
+          animate={{ width: `${progress}%` }}
+          transition={{ duration: 0.5, ease: 'easeOut' }}
+        />
       </div>
 
-      {/* Card area */}
-      <div className="flex-1 flex flex-col items-center justify-center px-4 py-8 overflow-hidden">
-        <p className="text-slate-600 text-xs mb-6 tracking-wider uppercase font-medium">
-          {flipped ? 'Answer revealed' : 'Click card to reveal answer'}
-        </p>
+      {/* ── Card area ── */}
+      <div className="flex-1 flex flex-col items-center justify-center px-4 sm:px-8 py-6 overflow-hidden">
 
-        {/* Card */}
+        {/* Hint text */}
+        <motion.p
+          key={flipped ? 'answer' : 'question'}
+          initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3 }}
+          className="text-slate-500 text-xs tracking-widest uppercase font-medium mb-6 select-none"
+        >
+          {flipped ? 'Answer' : 'Click · Tap · Space to reveal'}
+        </motion.p>
+
+        {/* Card with 3D flip */}
         <div
           className="w-full cursor-pointer select-none"
-          style={{ maxWidth: '800px', perspective: '1200px' }}
+          style={{ maxWidth: '820px', perspective: '1400px' }}
           onClick={() => setFlipped(f => !f)}
         >
           <motion.div
@@ -144,79 +200,106 @@ export default function FlashcardStudyOverlay({ cards, title, onClose, onRefresh
             transition={{ duration: 0.6, ease: [0.4, 0, 0.2, 1] }}
             style={{ transformStyle: 'preserve-3d', position: 'relative' }}
           >
-            {/* Front */}
+            {/* Front face */}
             <div
-              className="bg-gradient-to-br from-slate-800/80 to-slate-900/80 border border-white/10 rounded-3xl shadow-2xl flex flex-col items-center justify-center text-center p-10 sm:p-14"
-              style={{ backfaceVisibility: 'hidden', minHeight: '300px' }}
+              className="rounded-3xl flex flex-col items-center justify-center text-center px-10 sm:px-16 py-14 sm:py-20"
+              style={{
+                backfaceVisibility: 'hidden',
+                minHeight: '320px',
+                background: 'linear-gradient(145deg, rgba(30,27,75,0.9) 0%, rgba(15,15,26,0.95) 100%)',
+                border: '1px solid rgba(124,58,237,0.25)',
+                boxShadow: '0 0 80px rgba(124,58,237,0.12), 0 32px 64px rgba(0,0,0,0.5)',
+              }}
             >
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-violet-500/10 border border-violet-500/20 mb-6">
-                <span className="text-violet-400 text-xs font-semibold uppercase tracking-widest">Question</span>
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full mb-7"
+                style={{ background: 'rgba(124,58,237,0.12)', border: '1px solid rgba(124,58,237,0.25)' }}>
+                <span className="text-violet-400 text-[10px] font-bold uppercase tracking-[0.15em]">Question</span>
               </div>
-              <p className="text-white font-bold text-2xl sm:text-3xl leading-relaxed max-w-xl">{card.front}</p>
-              <p className="text-slate-600 text-sm mt-8">Tap · Click · Press Space</p>
+              <p className="text-white font-semibold text-xl sm:text-2xl md:text-3xl leading-relaxed" style={{ maxWidth: '600px' }}>
+                {card?.front}
+              </p>
             </div>
 
-            {/* Back */}
+            {/* Back face */}
             <div
-              className="absolute inset-0 bg-gradient-to-br from-violet-900/50 to-purple-900/50 border border-violet-400/20 rounded-3xl shadow-2xl flex flex-col items-center justify-center text-center p-10 sm:p-14"
-              style={{ backfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}
+              className="absolute inset-0 rounded-3xl flex flex-col items-center justify-center text-center px-10 sm:px-16 py-14 sm:py-20"
+              style={{
+                backfaceVisibility: 'hidden',
+                transform: 'rotateY(180deg)',
+                background: 'linear-gradient(145deg, rgba(20,40,60,0.95) 0%, rgba(10,30,50,0.98) 100%)',
+                border: '1px solid rgba(52,211,153,0.2)',
+                boxShadow: '0 0 80px rgba(52,211,153,0.08), 0 32px 64px rgba(0,0,0,0.5)',
+              }}
             >
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 mb-6">
-                <span className="text-emerald-400 text-xs font-semibold uppercase tracking-widest">Answer</span>
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full mb-7"
+                style={{ background: 'rgba(52,211,153,0.1)', border: '1px solid rgba(52,211,153,0.25)' }}>
+                <span className="text-emerald-400 text-[10px] font-bold uppercase tracking-[0.15em]">Answer</span>
               </div>
-              <p className="text-white font-bold text-2xl sm:text-3xl leading-relaxed max-w-xl">{card.back}</p>
+              <p className="text-white font-semibold text-xl sm:text-2xl md:text-3xl leading-relaxed" style={{ maxWidth: '600px' }}>
+                {card?.back}
+              </p>
             </div>
           </motion.div>
         </div>
 
-        {/* Controls */}
-        <div className="mt-10 flex items-center gap-4 w-full max-w-[800px]">
+        {/* ── Navigation buttons ── */}
+        <div className="mt-8 sm:mt-10 flex items-center gap-3 w-full" style={{ maxWidth: '820px' }}>
+          {/* Prev */}
           <button onClick={goBack} disabled={index === 0}
-            className="flex items-center gap-2 px-5 py-3 rounded-2xl bg-white/5 border border-white/10 text-slate-300 hover:bg-white/10 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-all font-medium text-sm flex-shrink-0">
-            <ChevronLeft className="w-4 h-4" /> Prev
+            className="flex items-center gap-1.5 px-4 sm:px-5 py-3 rounded-2xl text-sm font-medium transition-all disabled:opacity-25 disabled:cursor-not-allowed hover:scale-105 active:scale-95 flex-shrink-0"
+            style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#cbd5e1' }}>
+            <ChevronLeft className="w-4 h-4" />
+            <span className="hidden sm:inline">Prev</span>
           </button>
 
-          <div className="flex gap-3 flex-1 justify-center">
-            <AnimatePresence>
+          {/* Centre: mark buttons or reveal */}
+          <div className="flex-1 flex items-center justify-center gap-3">
+            <AnimatePresence mode="wait">
               {flipped ? (
-                <>
-                  <motion.button key="incorrect"
-                    initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }}
-                    transition={{ delay: 0.1 }}
-                    onClick={() => handleMark(false)}
-                    className="flex items-center gap-2 px-6 py-3.5 rounded-2xl bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/20 font-bold text-sm transition-all">
-                    <X className="w-4 h-4" /> Incorrect <span className="text-xs opacity-50 ml-1">[1]</span>
-                  </motion.button>
-                  <motion.button key="correct"
-                    initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }}
-                    transition={{ delay: 0.15 }}
-                    onClick={() => handleMark(true)}
-                    className="flex items-center gap-2 px-6 py-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20 font-bold text-sm transition-all">
-                    <Check className="w-4 h-4" /> Correct <span className="text-xs opacity-50 ml-1">[2]</span>
-                  </motion.button>
-                </>
+                <motion.div key="mark" className="flex gap-3 w-full justify-center"
+                  initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}
+                  transition={{ duration: 0.2 }}>
+                  <button onClick={() => handleMark(false)}
+                    className="flex items-center gap-2 px-5 sm:px-7 py-3.5 rounded-2xl text-sm font-bold transition-all hover:scale-105 active:scale-95"
+                    style={{ background: 'rgba(248,113,113,0.1)', border: '1px solid rgba(248,113,113,0.3)', color: '#f87171' }}>
+                    <X className="w-4 h-4" />
+                    <span>Incorrect</span>
+                    <span className="text-xs opacity-40 hidden sm:inline">[1]</span>
+                  </button>
+                  <button onClick={() => handleMark(true)}
+                    className="flex items-center gap-2 px-5 sm:px-7 py-3.5 rounded-2xl text-sm font-bold transition-all hover:scale-105 active:scale-95"
+                    style={{ background: 'rgba(52,211,153,0.1)', border: '1px solid rgba(52,211,153,0.3)', color: '#34d399' }}>
+                    <Check className="w-4 h-4" />
+                    <span>Correct</span>
+                    <span className="text-xs opacity-40 hidden sm:inline">[2]</span>
+                  </button>
+                </motion.div>
               ) : (
                 <motion.button key="reveal"
-                  initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                  initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}
+                  transition={{ duration: 0.2 }}
                   onClick={() => setFlipped(true)}
-                  className="px-8 py-3.5 rounded-2xl bg-violet-500/10 border border-violet-500/30 text-violet-300 hover:bg-violet-500/20 font-bold text-sm transition-all">
-                  Reveal Answer
+                  className="px-8 sm:px-12 py-3.5 rounded-2xl text-sm font-bold transition-all hover:scale-105 active:scale-95"
+                  style={{ background: 'rgba(124,58,237,0.15)', border: '1px solid rgba(124,58,237,0.35)', color: '#c4b5fd' }}>
+                  See Answer
                 </motion.button>
               )}
             </AnimatePresence>
           </div>
 
-          <button onClick={goNext} disabled={index >= total - 1}
-            className="flex items-center gap-2 px-5 py-3 rounded-2xl bg-white/5 border border-white/10 text-slate-300 hover:bg-white/10 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-all font-medium text-sm flex-shrink-0">
-            Next <ChevronRight className="w-4 h-4" />
+          {/* Next */}
+          <button onClick={goNext}
+            className="flex items-center gap-1.5 px-4 sm:px-5 py-3 rounded-2xl text-sm font-medium transition-all hover:scale-105 active:scale-95 flex-shrink-0"
+            style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#cbd5e1' }}>
+            <span className="hidden sm:inline">Next</span>
+            <ChevronRight className="w-4 h-4" />
           </button>
         </div>
 
-        <div className="mt-6 flex items-center gap-6 text-xs text-slate-700">
-          <span>← → navigate</span>
-          <span>Space / Enter to flip</span>
-          <span>1 = incorrect · 2 = correct</span>
-        </div>
+        {/* Keyboard hints */}
+        <p className="mt-5 text-slate-700 text-xs font-medium select-none">
+          ← → navigate &nbsp;·&nbsp; Space / Enter flip &nbsp;·&nbsp; 1 incorrect · 2 correct
+        </p>
       </div>
     </div>
   );
