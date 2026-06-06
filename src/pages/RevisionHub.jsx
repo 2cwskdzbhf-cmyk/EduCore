@@ -6,7 +6,7 @@ import {
   BookOpen, LayoutDashboard, Zap, Brain, Search, Radio, Layers, Sparkles, ClipboardList, CalendarDays
 } from 'lucide-react';
 import QuizToolsHub from '@/components/revision/quiztools/QuizToolsHub';
-import RevisionPlanner from '@/components/revision/planner/RevisionPlanner';
+import RevisionPlannerHub from '@/components/revision/planner/RevisionPlannerHub';
 import RevisionDashboard from '@/components/revision/RevisionDashboard';
 import NotebooksView from '@/components/revision/NotebooksView';
 import NotebookWorkspace from '@/components/revision/workspace/NotebookWorkspace';
@@ -171,7 +171,7 @@ export default function RevisionHub() {
             )}
             {activeSection === 'planner' && (
               <motion.div key="planner" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }}>
-                <RevisionPlanner user={user} notebooks={notebooks} />
+                <RevisionPlannerHub user={user} />
               </motion.div>
             )}
           </AnimatePresence>
