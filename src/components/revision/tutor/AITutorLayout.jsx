@@ -425,7 +425,9 @@ ${batch.chunk}`,
           <p className="text-slate-600 text-[10px] leading-tight">{notebook.subject || ''}{notebook.exam_board ? ` · ${notebook.exam_board}` : ''}</p>
         </div>
         <div className="hidden md:flex items-center gap-3 text-xs text-slate-500">
-          <span className="flex items-center gap-1"><BookOpen className="w-3 h-3" /> {sources.length} sources</span>
+          <span className={`flex items-center gap-1 ${hasContent ? 'text-emerald-500' : ''}`}>
+            <BookOpen className="w-3 h-3" /> {sourcesWithText.length}/{sources.length} sources
+          </span>
           <span className="flex items-center gap-1"><Layers className="w-3 h-3" /> {flashcards.length} cards</span>
         </div>
         {/* Mode selector */}
@@ -524,7 +526,11 @@ ${batch.chunk}`,
                   <Brain className="w-7 h-7 text-white" />
                 </div>
                 <p className="text-white font-bold text-base mb-1">AI Tutor</p>
-                <p className="text-slate-400 text-sm mb-1">Fully connected to your sources.</p>
+                {hasContent ? (
+                  <p className="text-emerald-400 text-sm mb-1 font-medium">✓ {sourcesWithText.length} source{sourcesWithText.length !== 1 ? 's' : ''} loaded — ready to help</p>
+                ) : (
+                  <p className="text-amber-400 text-sm mb-1 font-medium">Add sources to get started</p>
+                )}
                 <p className="text-slate-600 text-xs mb-7">Everything generated saves instantly to your notebook.</p>
                 <div className="space-y-2 max-w-sm mx-auto">
                   {SUGGESTED.map(q => (
