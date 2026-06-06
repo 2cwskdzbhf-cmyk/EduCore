@@ -4,8 +4,9 @@ import { base44 } from '@/api/base44Client';
 import {
   Send, Loader2, RefreshCw, Copy, BookmarkPlus, ThumbsUp, ThumbsDown,
   RotateCcw, ChevronRight, AlertTriangle, GraduationCap, BookOpen,
-  ChevronDown, ChevronUp, X, BrainCircuit
+  ChevronDown, ChevronUp, X, BrainCircuit, ClipboardList
 } from 'lucide-react';
+import QuizTestHub from '../quiztools/QuizTestHub';
 
 // ─── Quick chips ──────────────────────────────────────────────────────────────
 const QUICK_CHIPS = [
@@ -126,6 +127,7 @@ function SourcesBadge({ sources }) {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 export default function WorkspaceCenterPanel({ notebook, user, selectedSources, allSources, onResourceCreated }) {
+  const [panelTab, setPanelTab] = useState('chat'); // 'chat' | 'quiz'
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -369,6 +371,28 @@ ${batch.chunk}`,
 
   return (
     <div className="flex flex-col h-full">
+      {/* Tab switcher */}
+      <div className="flex-shrink-0 flex border-b border-white/10">
+        <button onClick={() => setPanelTab('chat')}
+          className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-bold transition-all border-b-2 ${panelTab === 'chat' ? 'border-violet-400 text-violet-300' : 'border-transparent text-slate-500 hover:text-slate-300'}`}>
+          <BrainCircuit className="w-3.5 h-3.5" /> AI Tutor
+        </button>
+        <button onClick={() => setPanelTab('quiz')}
+          className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-bold transition-all border-b-2 ${panelTab === 'quiz' ? 'border-violet-400 text-violet-300' : 'border-transparent text-slate-500 hover:text-slate-300'}`}>
+          <ClipboardList className="w-3.5 h-3.5" /> Quiz & Test
+        </button>
+      </div>
+
+      {/* Quiz & Test Tools panel */}
+      {panelTab === 'quiz' && (
+        <div className="flex-1 overflow-y-auto p-4">
+          <QuizTestHub notebook={notebook} user={user} sources={allSources} />
+        </div>
+      )}
+
+      {/* Chat panel — only rendered when tab is 'chat' */}
+      {panelTab === 'chat' && <>
+
       {/* Header */}
       <div className="flex-shrink-0 px-4 py-3 border-b border-white/10 flex items-center gap-2">
         <div className="w-7 h-7 rounded-xl bg-gradient-to-br from-violet-600 to-purple-700 flex items-center justify-center flex-shrink-0">
@@ -556,6 +580,7 @@ ${batch.chunk}`,
         </div>
         <p className="text-[10px] text-slate-600 mt-1.5 px-1">Enter to send · Shift+Enter for new line · Generated content auto-saves to Studio</p>
       </div>
+      </>}
     </div>
   );
 }
