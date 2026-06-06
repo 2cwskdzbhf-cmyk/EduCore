@@ -156,27 +156,57 @@ export default function AITutorLayout({ notebook, user, onBack }) {
 
   // ── System prompt ─────────────────────────────────────────────────────────
   const buildSystemPrompt = useCallback(() => {
-    const active = sources.filter(s => s.content_text);
-    const contextParts = active.map(s => `### Source: ${s.name}\n${s.content_text.slice(0, 8000)}`).join('\n\n---\n\n');
+    const sourcesWithText = sources.filter(s => s.content_text);
+    const allSourceNames = sources.map(s => `- ${s.name} (${s.type})`).join('\n');
+    const contextParts = sourcesWithText
+      .map(s => `### SOURCE: "${s.name}"\n${s.content_text.slice(0, 10000)}`)
+      .join('\n\n---\n\n');
+
     const modeInstr = mode === 'alevel'
       ? 'The student is at A-Level. Use precise academic language, encourage deeper analysis and evaluation.'
       : mode === 'simple'
       ? 'Use very simple language. Short sentences. No jargon. Use analogies and everyday examples.'
       : 'The student is studying at GCSE level. Be encouraging, clear, and supportive.';
 
-    return `You are an expert AI tutor helping a student revise "${notebook.name}"${notebook.subject ? ` (${notebook.subject})` : ''}${notebook.exam_board ? ` for ${notebook.exam_board}` : ''}.
+    const noSourcesTotally = sources.length === 0;
+    const noTextExtracted = sources.length > 0 && sourcesWithText.length === 0;
+
+    let sourceSection;
+    if (noSourcesTotally) {
+      sourceSection = `SOURCES: None. This notebook has no sources yet.
+If the student asks you to summarise, create flashcards, quizzes, or any content from sources, respond with:
+"This notebook does not have any sources yet. Please add some PDFs, notes, or links in the Sources tab, and I will be able to help you straight away."`;
+    } else if (noTextExtracted) {
+      sourceSection = `SOURCES IN THIS NOTEBOOK (text not yet extracted):
+${allSourceNames}
+
+The sources exist but their text has not been extracted yet. Tell the student their sources are attached but may still be processing. Answer general questions about the subject as best you can.`;
+    } else {
+      sourceSection = `SOURCES IN THIS NOTEBOOK:
+${allSourceNames}
+
+FULL SOURCE CONTENT BELOW — use this to answer ALL questions, summaries, flashcards, and quizzes:
+
+${contextParts}`;
+    }
+
+    return `You are the AI Tutor for the notebook "${notebook.name}"${notebook.subject ? ` (${notebook.subject})` : ''}${notebook.exam_board ? ` for ${notebook.exam_board}` : ''}.
+
+CRITICAL RULES — follow these without exception:
+1. You ALWAYS have access to this notebook's sources. NEVER ask the student to "provide", "paste", "upload", or "share" any sources. They are already loaded below.
+2. When asked to summarise, explain, create flashcards, quizzes, study guides, timelines, or any other content — use ONLY the source content provided below. Start immediately without asking for anything.
+3. If there are no sources, say clearly: "This notebook does not have any sources yet. Add some in the Sources tab and I can help straight away." Do NOT say anything else about missing sources.
+4. Never say "please provide the text", "paste your notes here", "share the content", or any similar phrase.
 
 ${modeInstr}
 
 When generating flashcards:
 - Output as valid JSON array: [{"front":"...","back":"..."},...]
-- Front: clear exam-style question, no asterisks, no markdown bold
-- Back: accurate, plain text answer, no asterisks, no bold, no markdown
-- Example front: "Define an atom" — NOT "Define **an atom**"
+- Front: clear exam-style question, no asterisks, no markdown
+- Back: accurate plain text answer, no asterisks, no bold, no markdown
+- Example: {"front":"Define osmosis","back":"The movement of water molecules from an area of high water potential to low water potential through a semi-permeable membrane."}
 
-Always ground your answers in the source materials below. Cite sources when relevant.
-
-${contextParts ? `STUDENT SOURCES:\n\n${contextParts}` : 'No sources uploaded yet. Encourage the student to add materials.'}`;
+${sourceSection}`;
   }, [sources, mode, notebook]);
 
   // ── Voice input ───────────────────────────────────────────────────────────
@@ -299,9 +329,16 @@ ${batch.chunk}`,
     setLoading(true);
     const history = newMessages.slice(-14).map(m => ({ role: m.role, content: m.content }));
 
+    // For source-based prompts, append a hard reminder so the LLM never asks for sources
+    const sourcesWithText = sources.filter(s => s.content_text);
+    const isSourceBased = /summar|flashcard|quiz|explain|study guide|timeline|mind map|formula|exam question|key topic|revision/i.test(text);
+    const effectivePrompt = (isSourceBased && sourcesWithText.length > 0)
+      ? `${text}\n\n[INSTRUCTION: Use ONLY the notebook sources already provided in the system prompt. Do not ask for any sources. Begin immediately.]`
+      : text;
+
     try {
       const resp = await base44.integrations.Core.InvokeLLM({
-        prompt: text,
+        prompt: effectivePrompt,
         system_prompt: buildSystemPrompt(),
         conversation_history: history.slice(0, -1),
       });
