@@ -1,219 +1,247 @@
-import React, { useMemo, useState } from 'react';
+import React, { useState, useMemo } from 'react';
+import { motion } from 'framer-motion';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, Radar, PieChart, Pie, Cell } from 'recharts';
-import { BarChart2, Target, Brain, TrendingUp, TrendingDown } from 'lucide-react';
-
-const COLORS = ['#8b5cf6','#3b82f6','#10b981','#f59e0b','#ef4444','#ec4899'];
-
-const DIFFICULTY_SCORE = { easy: 100, medium: 60, hard: 30, again: 0 };
-
-function StatCard({ label, value, icon: Icon, color, sub }) {
-  return (
-    <div className="bg-white/5 border border-white/10 rounded-2xl p-4">
-      <Icon className={`w-4 h-4 mb-2 ${color}`} />
-      <p className="text-2xl font-black text-white">{value}</p>
-      <p className="text-xs text-slate-400 mt-0.5">{label}</p>
-      {sub && <p className="text-xs text-slate-600 mt-1">{sub}</p>}
-    </div>
-  );
-}
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, Radar, LineChart, Line } from 'recharts';
+import { BarChart2, Target, TrendingUp, TrendingDown, BookOpen, Brain } from 'lucide-react';
 
 const CustomTooltip = ({ active, payload, label }) => {
   if (!active || !payload?.length) return null;
   return (
-    <div className="bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-xs">
-      <p className="text-slate-300 font-semibold mb-1">{label}</p>
+    <div className="bg-slate-800 border border-white/10 rounded-lg px-3 py-2 text-xs text-white shadow-xl">
+      <p className="font-medium mb-1">{label}</p>
       {payload.map((p, i) => (
-        <p key={i} style={{ color: p.color }}>{p.name}: {typeof p.value === 'number' ? p.value.toFixed(0) : p.value}</p>
+        <p key={i} style={{ color: p.color }}>{p.name}: {typeof p.value === 'number' && p.value % 1 !== 0 ? p.value.toFixed(1) : p.value}{p.name.includes('%') || p.name.includes('Acc') ? '%' : ''}</p>
       ))}
     </div>
   );
 };
 
 export default function NotebookInsights({ user }) {
-  const [selectedNotebook, setSelectedNotebook] = useState('');
+  const [selectedNotebook, setSelectedNotebook] = useState('all');
 
   const { data: notebooks = [] } = useQuery({
-    queryKey: ['insightsNotebooks', user?.email],
+    queryKey: ['revisionNotebooks', user?.email],
     queryFn: () => base44.entities.RevisionNotebook.filter({ student_email: user.email }),
     enabled: !!user?.email,
   });
 
-  const { data: flashcards = [] } = useQuery({
-    queryKey: ['insightsFlashcards', user?.email],
+  const { data: allFlashcards = [] } = useQuery({
+    queryKey: ['allFlashcards', user?.email],
     queryFn: () => base44.entities.RevisionFlashcard.filter({ student_email: user.email }),
     enabled: !!user?.email,
   });
 
   const { data: resources = [] } = useQuery({
-    queryKey: ['insightsResources', user?.email],
+    queryKey: ['allResources', user?.email],
     queryFn: () => base44.entities.NotebookResource.filter({ student_email: user.email }),
     enabled: !!user?.email,
   });
 
-  const filteredCards = useMemo(() =>
-    selectedNotebook ? flashcards.filter(f => f.notebook_id === selectedNotebook) : flashcards,
-    [flashcards, selectedNotebook]
-  );
+  const flashcards = useMemo(() => {
+    if (selectedNotebook === 'all') return allFlashcards;
+    return allFlashcards.filter(f => f.notebook_id === selectedNotebook);
+  }, [allFlashcards, selectedNotebook]);
 
-  const filteredResources = useMemo(() =>
-    selectedNotebook ? resources.filter(r => r.notebook_id === selectedNotebook) : resources,
-    [resources, selectedNotebook]
-  );
+  // Per-notebook stats for bar charts
+  const notebookStats = useMemo(() => {
+    return notebooks.map(nb => {
+      const cards = allFlashcards.filter(f => f.notebook_id === nb.id);
+      const reviewed = cards.filter(f => f.review_count > 0);
+      const easy = cards.filter(f => f.difficulty_rating === 'easy').length;
+      const hard = cards.filter(f => f.difficulty_rating === 'hard' || f.difficulty_rating === 'again').length;
+      const acc = reviewed.length > 0 ? Math.round((easy / reviewed.length) * 100) : 0;
+      const nbResources = resources.filter(r => r.notebook_id === nb.id);
+      const quizResources = nbResources.filter(r => r.resource_type === 'quiz');
+      return {
+        name: nb.name.length > 14 ? nb.name.slice(0, 14) + '…' : nb.name,
+        fullName: nb.name,
+        totalCards: cards.length,
+        reviewed: reviewed.length,
+        accuracy: acc,
+        resources: nbResources.length,
+        quizzes: quizResources.length,
+        hard,
+        easy,
+      };
+    });
+  }, [notebooks, allFlashcards, resources]);
 
-  // Accuracy per notebook
-  const notebookAccuracy = useMemo(() =>
-    notebooks.map(nb => {
-      const cards = flashcards.filter(f => f.notebook_id === nb.id && f.review_count > 0);
-      const avg = cards.length
-        ? Math.round(cards.reduce((s, c) => s + (DIFFICULTY_SCORE[c.difficulty_rating] ?? 50), 0) / cards.length)
-        : 0;
-      return { name: nb.name.slice(0, 16), accuracy: avg, cards: cards.length };
-    }).filter(n => n.cards > 0),
-    [notebooks, flashcards]
-  );
+  // Difficulty breakdown for selected notebook
+  const diffStats = useMemo(() => {
+    const counts = { again: 0, hard: 0, medium: 0, easy: 0 };
+    flashcards.forEach(f => { if (f.difficulty_rating) counts[f.difficulty_rating]++; });
+    return [
+      { name: 'Easy', value: counts.easy, fill: '#22c55e' },
+      { name: 'Medium', value: counts.medium, fill: '#f59e0b' },
+      { name: 'Hard', value: counts.hard, fill: '#f97316' },
+      { name: 'Again', value: counts.again, fill: '#ef4444' },
+    ];
+  }, [flashcards]);
 
-  // Difficulty distribution pie
-  const diffPie = useMemo(() => {
-    const counts = { easy: 0, medium: 0, hard: 0, again: 0 };
-    filteredCards.forEach(fc => { if (fc.difficulty_rating) counts[fc.difficulty_rating]++; });
-    return Object.entries(counts).filter(([, v]) => v > 0).map(([name, value]) => ({ name, value }));
-  }, [filteredCards]);
+  // Radar data — notebook performance
+  const radarData = useMemo(() => {
+    return notebookStats.slice(0, 6).map(nb => ({
+      subject: nb.name,
+      Accuracy: nb.accuracy,
+      Coverage: nb.totalCards > 0 ? Math.min(100, Math.round((nb.reviewed / nb.totalCards) * 100)) : 0,
+    }));
+  }, [notebookStats]);
 
-  // Resource types bar
-  const resourceBar = useMemo(() => {
-    const counts = {};
-    filteredResources.forEach(r => { counts[r.resource_type] = (counts[r.resource_type] || 0) + 1; });
-    return Object.entries(counts).map(([name, value]) => ({ name: name.replace('_', ' '), value }));
-  }, [filteredResources]);
+  // Strongest / weakest
+  const sorted = [...notebookStats].sort((a, b) => b.accuracy - a.accuracy);
+  const strongest = sorted.slice(0, 3);
+  const weakest = [...sorted].reverse().slice(0, 3);
+  const mostRevised = [...notebookStats].sort((a, b) => b.reviewed - a.reviewed).slice(0, 3);
+  const leastRevised = [...notebookStats].sort((a, b) => a.reviewed - b.reviewed).slice(0, 3);
 
-  // Most / least reviewed
-  const sorted = [...filteredCards].filter(f => f.review_count > 0).sort((a, b) => b.review_count - a.review_count);
-  const mostReviewed = sorted.slice(0, 5);
-  const leastReviewed = [...filteredCards].filter(f => f.review_count > 0).sort((a, b) => a.review_count - b.review_count).slice(0, 5);
-
-  // Overall stats
-  const reviewedCards = filteredCards.filter(f => f.review_count > 0);
-  const avgAccuracy = reviewedCards.length
-    ? Math.round(reviewedCards.reduce((s, c) => s + (DIFFICULTY_SCORE[c.difficulty_rating] ?? 50), 0) / reviewedCards.length)
+  const overallAccuracy = flashcards.length > 0
+    ? Math.round((flashcards.filter(f => f.difficulty_rating === 'easy').length / flashcards.filter(f => f.review_count > 0).length) * 100) || 0
     : 0;
 
-  const easyCount = filteredCards.filter(f => f.difficulty_rating === 'easy').length;
-  const hardCount = filteredCards.filter(f => f.difficulty_rating === 'hard' || f.difficulty_rating === 'again').length;
+  const totalReviewed = flashcards.filter(f => f.review_count > 0).length;
 
   return (
     <div className="space-y-6">
-      {/* Notebook filter */}
-      <select
-        value={selectedNotebook}
-        onChange={e => setSelectedNotebook(e.target.value)}
-        className="bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-violet-500/50"
-      >
-        <option value="">All notebooks</option>
-        {notebooks.map(nb => <option key={nb.id} value={nb.id}>{nb.icon || '📚'} {nb.name}</option>)}
-      </select>
-
-      {/* Stats row */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <StatCard label="Total Flashcards" value={filteredCards.length} icon={Brain} color="text-violet-400" />
-        <StatCard label="Avg Accuracy" value={`${avgAccuracy}%`} icon={Target} color="text-blue-400" />
-        <StatCard label="Strongest" value={easyCount} icon={TrendingUp} color="text-emerald-400" sub="marked easy" />
-        <StatCard label="Weakest" value={hardCount} icon={TrendingDown} color="text-red-400" sub="hard or again" />
+      <div className="flex items-center gap-3">
+        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center">
+          <BarChart2 className="w-5 h-5 text-white" />
+        </div>
+        <div>
+          <h2 className="text-xl font-bold text-white">Notebook Insights</h2>
+          <p className="text-slate-400 text-sm">Visualise your strengths, weaknesses, and progress</p>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        {/* Accuracy by notebook */}
-        {notebookAccuracy.length > 0 && (
+      {/* Notebook filter */}
+      <div className="flex gap-2 flex-wrap">
+        <button
+          onClick={() => setSelectedNotebook('all')}
+          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${selectedNotebook === 'all' ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30' : 'text-slate-400 hover:text-white bg-white/5 border border-white/10'}`}
+        >
+          All Notebooks
+        </button>
+        {notebooks.map(nb => (
+          <button key={nb.id} onClick={() => setSelectedNotebook(nb.id)}
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${selectedNotebook === nb.id ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30' : 'text-slate-400 hover:text-white bg-white/5 border border-white/10'}`}
+          >
+            {nb.icon} {nb.name}
+          </button>
+        ))}
+      </div>
+
+      {/* Summary stats */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {[
+          { label: 'Total Flashcards', value: flashcards.length, icon: BookOpen, color: 'from-violet-500 to-purple-600' },
+          { label: 'Cards Reviewed', value: totalReviewed, icon: Brain, color: 'from-blue-500 to-cyan-500' },
+          { label: 'Flashcard Accuracy', value: `${overallAccuracy}%`, icon: Target, color: 'from-green-500 to-emerald-500' },
+          { label: 'Notebooks', value: notebooks.length, icon: BarChart2, color: 'from-orange-500 to-amber-500' },
+        ].map((stat, i) => (
+          <motion.div key={i} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.08 }}
+            className="bg-white/5 border border-white/10 rounded-2xl p-4">
+            <div className={`w-8 h-8 rounded-lg bg-gradient-to-br ${stat.color} flex items-center justify-center mb-2`}>
+              <stat.icon className="w-4 h-4 text-white" />
+            </div>
+            <p className="text-2xl font-bold text-white">{stat.value}</p>
+            <p className="text-slate-400 text-xs">{stat.label}</p>
+          </motion.div>
+        ))}
+      </div>
+
+      {/* Charts row 1 */}
+      <div className="grid md:grid-cols-2 gap-4">
+        {/* Accuracy per notebook */}
+        <div className="bg-white/5 border border-white/10 rounded-2xl p-5">
+          <h3 className="text-white font-semibold mb-4 text-sm">Flashcard Accuracy by Notebook</h3>
+          <ResponsiveContainer width="100%" height={200}>
+            <BarChart data={notebookStats} margin={{ left: -20, right: 8 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+              <XAxis dataKey="name" tick={{ fill: '#94a3b8', fontSize: 10 }} />
+              <YAxis tick={{ fill: '#94a3b8', fontSize: 10 }} domain={[0, 100]} />
+              <Tooltip content={<CustomTooltip />} />
+              <Bar dataKey="accuracy" name="Acc %" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+
+        {/* Difficulty breakdown */}
+        <div className="bg-white/5 border border-white/10 rounded-2xl p-5">
+          <h3 className="text-white font-semibold mb-4 text-sm">Difficulty Breakdown</h3>
+          <ResponsiveContainer width="100%" height={200}>
+            <BarChart data={diffStats} margin={{ left: -20, right: 8 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+              <XAxis dataKey="name" tick={{ fill: '#94a3b8', fontSize: 10 }} />
+              <YAxis tick={{ fill: '#94a3b8', fontSize: 10 }} />
+              <Tooltip content={<CustomTooltip />} />
+              <Bar dataKey="value" name="Cards" radius={[4, 4, 0, 0]}>
+                {diffStats.map((entry, index) => (
+                  <rect key={index} fill={entry.fill} />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      {/* Charts row 2 */}
+      <div className="grid md:grid-cols-2 gap-4">
+        {/* Radar */}
+        {radarData.length >= 3 && (
           <div className="bg-white/5 border border-white/10 rounded-2xl p-5">
-            <p className="text-sm font-bold text-white mb-4 flex items-center gap-2">
-              <BarChart2 className="w-4 h-4 text-violet-400" />Accuracy by Notebook
-            </p>
-            <ResponsiveContainer width="100%" height={180}>
-              <BarChart data={notebookAccuracy} barSize={20}>
-                <XAxis dataKey="name" tick={{ fill: '#64748b', fontSize: 10 }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fill: '#64748b', fontSize: 10 }} axisLine={false} tickLine={false} domain={[0, 100]} />
+            <h3 className="text-white font-semibold mb-4 text-sm">Accuracy vs Coverage (Radar)</h3>
+            <ResponsiveContainer width="100%" height={220}>
+              <RadarChart data={radarData}>
+                <PolarGrid stroke="rgba(255,255,255,0.1)" />
+                <PolarAngleAxis dataKey="subject" tick={{ fill: '#94a3b8', fontSize: 10 }} />
+                <Radar name="Accuracy" dataKey="Accuracy" stroke="#8b5cf6" fill="#8b5cf6" fillOpacity={0.3} />
+                <Radar name="Coverage" dataKey="Coverage" stroke="#06b6d4" fill="#06b6d4" fillOpacity={0.2} />
                 <Tooltip content={<CustomTooltip />} />
-                <Bar dataKey="accuracy" fill="#8b5cf6" radius={[4, 4, 0, 0]} name="Accuracy %" />
-              </BarChart>
+              </RadarChart>
             </ResponsiveContainer>
           </div>
         )}
 
-        {/* Difficulty distribution pie */}
-        {diffPie.length > 0 && (
-          <div className="bg-white/5 border border-white/10 rounded-2xl p-5">
-            <p className="text-sm font-bold text-white mb-4 flex items-center gap-2">
-              <Target className="w-4 h-4 text-blue-400" />Difficulty Distribution
-            </p>
-            <div className="flex items-center gap-4">
-              <ResponsiveContainer width="60%" height={160}>
-                <PieChart>
-                  <Pie data={diffPie} cx="50%" cy="50%" innerRadius={40} outerRadius={70} paddingAngle={3} dataKey="value">
-                    {diffPie.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
-                  </Pie>
-                  <Tooltip content={<CustomTooltip />} />
-                </PieChart>
-              </ResponsiveContainer>
-              <div className="space-y-2">
-                {diffPie.map((d, i) => (
-                  <div key={d.name} className="flex items-center gap-2 text-xs">
-                    <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: COLORS[i % COLORS.length] }} />
-                    <span className="text-slate-400 capitalize">{d.name}</span>
-                    <span className="text-white font-semibold ml-auto">{d.value}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
+        {/* Reviews per notebook */}
+        <div className="bg-white/5 border border-white/10 rounded-2xl p-5">
+          <h3 className="text-white font-semibold mb-4 text-sm">Cards Reviewed by Notebook</h3>
+          <ResponsiveContainer width="100%" height={220}>
+            <BarChart data={notebookStats} layout="vertical" margin={{ left: 8, right: 16 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+              <XAxis type="number" tick={{ fill: '#94a3b8', fontSize: 10 }} />
+              <YAxis type="category" dataKey="name" tick={{ fill: '#94a3b8', fontSize: 10 }} width={90} />
+              <Tooltip content={<CustomTooltip />} />
+              <Bar dataKey="reviewed" name="Reviewed" fill="#06b6d4" radius={[0, 4, 4, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
 
-        {/* Most reviewed */}
-        {mostReviewed.length > 0 && (
-          <div className="bg-white/5 border border-white/10 rounded-2xl p-5">
-            <p className="text-sm font-bold text-white mb-3 flex items-center gap-2">
-              <TrendingUp className="w-4 h-4 text-emerald-400" />Most Revised Cards
-            </p>
+      {/* Strongest / Weakest / Most / Least */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {[
+          { title: 'Strongest Topics', icon: TrendingUp, color: 'text-green-400', data: strongest, key: 'accuracy', suffix: '%' },
+          { title: 'Weakest Topics', icon: TrendingDown, color: 'text-red-400', data: weakest, key: 'accuracy', suffix: '%' },
+          { title: 'Most Revised', icon: BookOpen, color: 'text-blue-400', data: mostRevised, key: 'reviewed', suffix: ' cards' },
+          { title: 'Least Revised', icon: BookOpen, color: 'text-orange-400', data: leastRevised, key: 'reviewed', suffix: ' cards' },
+        ].map((section, i) => (
+          <div key={i} className="bg-white/5 border border-white/10 rounded-2xl p-4">
+            <h3 className={`text-sm font-semibold mb-3 flex items-center gap-1.5 ${section.color}`}>
+              <section.icon className="w-4 h-4" /> {section.title}
+            </h3>
             <div className="space-y-2">
-              {mostReviewed.map(fc => (
-                <div key={fc.id} className="flex items-center gap-3">
-                  <span className="text-xs text-slate-400 truncate flex-1">{fc.front}</span>
-                  <div className="flex items-center gap-1.5 flex-shrink-0">
-                    <div className="h-1.5 w-20 bg-white/5 rounded-full overflow-hidden">
-                      <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${Math.min(100, fc.review_count * 10)}%` }} />
-                    </div>
-                    <span className="text-xs text-slate-500 w-8 text-right">{fc.review_count}×</span>
-                  </div>
+              {section.data.length === 0 ? (
+                <p className="text-slate-500 text-xs">No data yet</p>
+              ) : section.data.map((nb, j) => (
+                <div key={j} className="flex items-center justify-between gap-2">
+                  <span className="text-slate-300 text-xs truncate">{nb.name}</span>
+                  <span className={`text-xs font-bold flex-shrink-0 ${section.color}`}>{nb[section.key]}{section.suffix}</span>
                 </div>
               ))}
             </div>
           </div>
-        )}
-
-        {/* Resource types */}
-        {resourceBar.length > 0 && (
-          <div className="bg-white/5 border border-white/10 rounded-2xl p-5">
-            <p className="text-sm font-bold text-white mb-4 flex items-center gap-2">
-              <BarChart2 className="w-4 h-4 text-amber-400" />Resources Generated
-            </p>
-            <ResponsiveContainer width="100%" height={160}>
-              <BarChart data={resourceBar} barSize={16} layout="vertical">
-                <XAxis type="number" tick={{ fill: '#64748b', fontSize: 10 }} axisLine={false} tickLine={false} />
-                <YAxis type="category" dataKey="name" tick={{ fill: '#64748b', fontSize: 10 }} axisLine={false} tickLine={false} width={80} />
-                <Tooltip content={<CustomTooltip />} />
-                <Bar dataKey="value" fill="#f59e0b" radius={[0, 4, 4, 0]} name="Count" />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        )}
+        ))}
       </div>
-
-      {filteredCards.length === 0 && (
-        <div className="text-center py-12 text-slate-500">
-          <Brain className="w-10 h-10 mx-auto mb-3 opacity-30" />
-          <p className="text-sm">No flashcard data yet. Start studying to see insights!</p>
-        </div>
-      )}
     </div>
   );
 }

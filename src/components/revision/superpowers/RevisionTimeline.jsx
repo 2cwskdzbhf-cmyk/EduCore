@@ -1,211 +1,234 @@
-import React, { useMemo, useState } from 'react';
+import React, { useState, useMemo } from 'react';
+import { motion } from 'framer-motion';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
-import { Calendar, Flame, Clock, AlertTriangle, CheckCircle2 } from 'lucide-react';
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isToday, isPast, parseISO, subDays } from 'date-fns';
-
-function getActivityLevel(count) {
-  if (count === 0) return 'bg-white/5';
-  if (count <= 2) return 'bg-violet-900/60';
-  if (count <= 5) return 'bg-violet-600/70';
-  if (count <= 10) return 'bg-violet-500';
-  return 'bg-violet-400';
-}
+import { Calendar, Flame, Clock, CheckCircle, AlertTriangle, ChevronLeft, ChevronRight } from 'lucide-react';
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, addMonths, subMonths, isToday, isBefore, startOfDay } from 'date-fns';
 
 export default function RevisionTimeline({ user }) {
-  const [viewMonth, setViewMonth] = useState(new Date());
+  const [currentMonth, setCurrentMonth] = useState(new Date());
 
   const { data: flashcards = [] } = useQuery({
-    queryKey: ['timelineFlashcards', user?.email],
+    queryKey: ['allFlashcards', user?.email],
     queryFn: () => base44.entities.RevisionFlashcard.filter({ student_email: user.email }),
     enabled: !!user?.email,
   });
 
   const { data: notebooks = [] } = useQuery({
-    queryKey: ['timelineNotebooks', user?.email],
+    queryKey: ['revisionNotebooks', user?.email],
     queryFn: () => base44.entities.RevisionNotebook.filter({ student_email: user.email }),
     enabled: !!user?.email,
   });
 
-  // Build activity map from flashcard review dates
+  // Build activity map: date -> { reviewed: number, correct: number }
   const activityMap = useMemo(() => {
     const map = {};
     flashcards.forEach(fc => {
-      if (fc.updated_date) {
-        const d = format(parseISO(fc.updated_date), 'yyyy-MM-dd');
-        map[d] = (map[d] || 0) + 1;
+      if (fc.updated_date && fc.review_count > 0) {
+        const dateKey = format(new Date(fc.updated_date), 'yyyy-MM-dd');
+        if (!map[dateKey]) map[dateKey] = { reviewed: 0, correct: 0 };
+        map[dateKey].reviewed += 1;
+        if (fc.difficulty_rating === 'easy') map[dateKey].correct += 1;
       }
     });
     return map;
   }, [flashcards]);
 
-  // Streak calculation
-  const { currentStreak, longestStreak } = useMemo(() => {
-    const today = new Date();
-    let current = 0;
-    let longest = 0;
-    let temp = 0;
-    for (let i = 0; i < 365; i++) {
-      const d = format(subDays(today, i), 'yyyy-MM-dd');
-      if (activityMap[d]) {
-        temp++;
-        if (i === 0 || current > 0) current = temp;
-      } else {
-        if (temp > longest) longest = temp;
-        temp = 0;
-        if (i === 0) current = 0;
-      }
-    }
-    if (temp > longest) longest = temp;
-    return { currentStreak: current, longestStreak: longest };
-  }, [activityMap]);
-
   // Overdue flashcards
-  const overdueCards = useMemo(() =>
-    flashcards.filter(fc => fc.next_review && isPast(parseISO(fc.next_review)) && !isToday(parseISO(fc.next_review))),
-    [flashcards]
-  );
+  const overdueCards = useMemo(() => {
+    const now = new Date();
+    return flashcards.filter(fc => fc.next_review && isBefore(new Date(fc.next_review), now));
+  }, [flashcards]);
 
   // Due today
-  const dueToday = useMemo(() =>
-    flashcards.filter(fc => fc.next_review && isToday(parseISO(fc.next_review))),
-    [flashcards]
-  );
+  const dueToday = useMemo(() => {
+    const now = new Date();
+    const todayEnd = new Date(now);
+    todayEnd.setHours(23, 59, 59);
+    return flashcards.filter(fc => {
+      if (!fc.next_review) return false;
+      const d = new Date(fc.next_review);
+      return isToday(d);
+    });
+  }, [flashcards]);
 
-  // Calendar days for current month
-  const calendarDays = useMemo(() => {
-    const start = startOfMonth(viewMonth);
-    const end = endOfMonth(viewMonth);
-    return eachDayOfInterval({ start, end });
-  }, [viewMonth]);
+  // Streak calculation
+  const streak = useMemo(() => {
+    let count = 0;
+    const today = startOfDay(new Date());
+    let check = today;
+    while (true) {
+      const key = format(check, 'yyyy-MM-dd');
+      if (activityMap[key]) {
+        count++;
+        check = new Date(check.getTime() - 86400000);
+      } else {
+        break;
+      }
+    }
+    return count;
+  }, [activityMap]);
 
-  const firstDayOfWeek = calendarDays[0].getDay();
+  // Calendar days
+  const days = eachDayOfInterval({ start: startOfMonth(currentMonth), end: endOfMonth(currentMonth) });
+  const firstDayOfWeek = startOfMonth(currentMonth).getDay();
+  const blanks = Array(firstDayOfWeek === 0 ? 6 : firstDayOfWeek - 1).fill(null);
+
+  const getIntensity = (dateKey) => {
+    const a = activityMap[dateKey];
+    if (!a) return 0;
+    if (a.reviewed >= 20) return 4;
+    if (a.reviewed >= 10) return 3;
+    if (a.reviewed >= 5) return 2;
+    return 1;
+  };
+
+  const intensityClasses = [
+    'bg-white/5',
+    'bg-violet-900/60',
+    'bg-violet-700/70',
+    'bg-violet-500/80',
+    'bg-violet-400',
+  ];
 
   // Recent activity list
   const recentActivity = useMemo(() => {
-    const days = [];
-    for (let i = 0; i < 14; i++) {
-      const d = subDays(new Date(), i);
-      const key = format(d, 'yyyy-MM-dd');
-      const count = activityMap[key] || 0;
-      if (count > 0) {
-        days.push({ date: d, count, label: format(d, 'EEE, MMM d') });
-      }
-    }
-    return days;
+    return Object.entries(activityMap)
+      .sort((a, b) => b[0].localeCompare(a[0]))
+      .slice(0, 10);
   }, [activityMap]);
-
-  const prevMonth = () => setViewMonth(d => new Date(d.getFullYear(), d.getMonth() - 1, 1));
-  const nextMonth = () => setViewMonth(d => new Date(d.getFullYear(), d.getMonth() + 1, 1));
 
   return (
     <div className="space-y-6">
+      <div className="flex items-center gap-3">
+        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-orange-500 to-red-500 flex items-center justify-center">
+          <Calendar className="w-5 h-5 text-white" />
+        </div>
+        <div>
+          <h2 className="text-xl font-bold text-white">Revision Timeline</h2>
+          <p className="text-slate-400 text-sm">Track what you revised, when, and what's overdue</p>
+        </div>
+      </div>
+
       {/* Stats row */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
-          { label: 'Current Streak', value: `${currentStreak}d`, icon: Flame, color: 'text-orange-400', bg: 'bg-orange-500/10 border-orange-500/20' },
-          { label: 'Longest Streak', value: `${longestStreak}d`, icon: Flame, color: 'text-amber-400', bg: 'bg-amber-500/10 border-amber-500/20' },
-          { label: 'Due Today', value: dueToday.length, icon: Clock, color: 'text-blue-400', bg: 'bg-blue-500/10 border-blue-500/20' },
-          { label: 'Overdue', value: overdueCards.length, icon: AlertTriangle, color: 'text-red-400', bg: 'bg-red-500/10 border-red-500/20' },
-        ].map(stat => (
-          <div key={stat.label} className={`rounded-2xl border p-4 ${stat.bg}`}>
-            <stat.icon className={`w-4 h-4 mb-2 ${stat.color}`} />
-            <p className="text-2xl font-black text-white">{stat.value}</p>
-            <p className="text-xs text-slate-500 mt-0.5">{stat.label}</p>
-          </div>
+          { label: 'Current Streak', value: `${streak}d`, icon: Flame, color: 'from-orange-500 to-red-500' },
+          { label: 'Total Cards', value: flashcards.length, icon: CheckCircle, color: 'from-green-500 to-emerald-500' },
+          { label: 'Due Today', value: dueToday.length, icon: Clock, color: 'from-blue-500 to-cyan-500' },
+          { label: 'Overdue', value: overdueCards.length, icon: AlertTriangle, color: overdueCards.length > 0 ? 'from-red-500 to-pink-500' : 'from-slate-600 to-slate-700' },
+        ].map((stat, i) => (
+          <motion.div key={i} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.08 }}
+            className="bg-white/5 border border-white/10 rounded-2xl p-4">
+            <div className={`w-8 h-8 rounded-lg bg-gradient-to-br ${stat.color} flex items-center justify-center mb-2`}>
+              <stat.icon className="w-4 h-4 text-white" />
+            </div>
+            <p className="text-2xl font-bold text-white">{stat.value}</p>
+            <p className="text-slate-400 text-xs">{stat.label}</p>
+          </motion.div>
         ))}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        {/* Calendar */}
-        <div className="bg-white/5 border border-white/10 rounded-2xl p-5">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <Calendar className="w-4 h-4 text-violet-400" />
-              <span className="text-sm font-bold text-white">{format(viewMonth, 'MMMM yyyy')}</span>
-            </div>
-            <div className="flex gap-1">
-              <button onClick={prevMonth} className="px-2 py-1 rounded-lg hover:bg-white/10 text-slate-400 text-xs">‹</button>
-              <button onClick={nextMonth} className="px-2 py-1 rounded-lg hover:bg-white/10 text-slate-400 text-xs">›</button>
-            </div>
-          </div>
-
-          {/* Day labels */}
-          <div className="grid grid-cols-7 mb-1">
-            {['Su','Mo','Tu','We','Th','Fr','Sa'].map(d => (
-              <div key={d} className="text-center text-xs text-slate-600 font-semibold py-1">{d}</div>
-            ))}
-          </div>
-
-          {/* Days */}
-          <div className="grid grid-cols-7 gap-1">
-            {Array.from({ length: firstDayOfWeek }).map((_, i) => <div key={`empty-${i}`} />)}
-            {calendarDays.map(day => {
-              const key = format(day, 'yyyy-MM-dd');
-              const count = activityMap[key] || 0;
-              const today = isToday(day);
-              return (
-                <div key={key} title={count ? `${count} cards reviewed` : ''}
-                  className={`aspect-square rounded-lg flex items-center justify-center text-xs font-medium transition-all cursor-default
-                    ${today ? 'ring-2 ring-violet-400' : ''}
-                    ${count > 0 ? getActivityLevel(count) + ' text-white' : 'text-slate-600'}
-                  `}>
-                  {format(day, 'd')}
-                </div>
-              );
-            })}
-          </div>
-
-          <div className="flex items-center gap-2 mt-3 justify-end">
-            <span className="text-xs text-slate-600">Less</span>
-            {['bg-white/5','bg-violet-900/60','bg-violet-600/70','bg-violet-500','bg-violet-400'].map(c => (
-              <div key={c} className={`w-3 h-3 rounded-sm ${c}`} />
-            ))}
-            <span className="text-xs text-slate-600">More</span>
-          </div>
+      {/* Calendar */}
+      <div className="bg-white/5 border border-white/10 rounded-2xl p-5">
+        <div className="flex items-center justify-between mb-5">
+          <button onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
+            className="p-1.5 rounded-lg hover:bg-white/10 text-slate-400 hover:text-white transition-all">
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+          <h3 className="text-white font-semibold">{format(currentMonth, 'MMMM yyyy')}</h3>
+          <button onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
+            className="p-1.5 rounded-lg hover:bg-white/10 text-slate-400 hover:text-white transition-all">
+            <ChevronRight className="w-4 h-4" />
+          </button>
         </div>
 
-        {/* Recent activity + overdue */}
-        <div className="space-y-4">
-          <div className="bg-white/5 border border-white/10 rounded-2xl p-5">
-            <p className="text-sm font-bold text-white mb-3 flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 text-emerald-400" />Recent Activity
-            </p>
-            {recentActivity.length === 0 ? (
-              <p className="text-slate-500 text-xs">No flashcard activity in the last 2 weeks.</p>
-            ) : (
-              <div className="space-y-2">
-                {recentActivity.map(a => (
-                  <div key={a.label} className="flex items-center justify-between">
-                    <span className="text-xs text-slate-400">{a.label}</span>
-                    <div className="flex items-center gap-2">
-                      <div className="h-1.5 rounded-full bg-violet-500/30 w-24 overflow-hidden">
-                        <div className="h-full bg-violet-500 rounded-full" style={{ width: `${Math.min(100, a.count * 10)}%` }} />
-                      </div>
-                      <span className="text-xs text-slate-500 w-12 text-right">{a.count} cards</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+        <div className="grid grid-cols-7 gap-1 mb-1">
+          {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((d, i) => (
+            <div key={i} className="text-center text-xs text-slate-500 py-1">{d}</div>
+          ))}
+        </div>
 
-          {overdueCards.length > 0 && (
-            <div className="bg-red-500/10 border border-red-500/20 rounded-2xl p-5">
-              <p className="text-sm font-bold text-red-300 mb-3 flex items-center gap-2">
-                <AlertTriangle className="w-4 h-4" />Overdue Cards ({overdueCards.length})
-              </p>
-              <div className="space-y-1.5 max-h-40 overflow-y-auto">
-                {overdueCards.slice(0, 10).map(fc => (
-                  <div key={fc.id} className="text-xs text-slate-300 flex gap-2">
-                    <span className="text-red-500 flex-shrink-0">•</span>
-                    <span className="truncate">{fc.front}</span>
-                  </div>
-                ))}
-                {overdueCards.length > 10 && (
-                  <p className="text-xs text-slate-500">…and {overdueCards.length - 10} more</p>
-                )}
+        <div className="grid grid-cols-7 gap-1">
+          {blanks.map((_, i) => <div key={`b${i}`} />)}
+          {days.map(day => {
+            const dateKey = format(day, 'yyyy-MM-dd');
+            const intensity = getIntensity(dateKey);
+            const activity = activityMap[dateKey];
+            const today = isToday(day);
+            return (
+              <div key={dateKey}
+                title={activity ? `${activity.reviewed} reviewed, ${activity.correct} correct` : 'No activity'}
+                className={`aspect-square rounded-md flex items-center justify-center text-xs transition-all cursor-default
+                  ${intensityClasses[intensity]}
+                  ${today ? 'ring-2 ring-violet-400 ring-offset-1 ring-offset-slate-900' : ''}
+                `}
+              >
+                <span className={intensity > 0 ? 'text-white font-medium' : 'text-slate-500'}>{day.getDate()}</span>
               </div>
+            );
+          })}
+        </div>
+
+        <div className="flex items-center gap-2 mt-4 justify-end">
+          <span className="text-xs text-slate-500">Less</span>
+          {intensityClasses.map((cls, i) => (
+            <div key={i} className={`w-4 h-4 rounded-sm ${cls} border border-white/5`} />
+          ))}
+          <span className="text-xs text-slate-500">More</span>
+        </div>
+      </div>
+
+      {/* Overdue & Recent */}
+      <div className="grid md:grid-cols-2 gap-4">
+        {/* Overdue */}
+        <div className="bg-white/5 border border-white/10 rounded-2xl p-5">
+          <h3 className="text-white font-semibold mb-3 flex items-center gap-2">
+            <AlertTriangle className="w-4 h-4 text-red-400" /> Overdue Cards ({overdueCards.length})
+          </h3>
+          {overdueCards.length === 0 ? (
+            <p className="text-slate-500 text-sm text-center py-4">All cards are up to date!</p>
+          ) : (
+            <div className="space-y-2 max-h-48 overflow-y-auto">
+              {overdueCards.slice(0, 12).map(fc => (
+                <div key={fc.id} className="flex items-center gap-3 p-2 bg-red-500/10 border border-red-500/20 rounded-lg">
+                  <div className="w-2 h-2 rounded-full bg-red-400 flex-shrink-0" />
+                  <p className="text-slate-300 text-xs truncate">{fc.front}</p>
+                  <span className="text-red-400 text-xs ml-auto flex-shrink-0">
+                    {fc.next_review ? format(new Date(fc.next_review), 'MMM d') : '—'}
+                  </span>
+                </div>
+              ))}
+              {overdueCards.length > 12 && (
+                <p className="text-slate-500 text-xs text-center">+{overdueCards.length - 12} more</p>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Recent activity */}
+        <div className="bg-white/5 border border-white/10 rounded-2xl p-5">
+          <h3 className="text-white font-semibold mb-3 flex items-center gap-2">
+            <Clock className="w-4 h-4 text-blue-400" /> Recent Activity
+          </h3>
+          {recentActivity.length === 0 ? (
+            <p className="text-slate-500 text-sm text-center py-4">No revision activity yet. Start studying!</p>
+          ) : (
+            <div className="space-y-2">
+              {recentActivity.map(([date, data]) => (
+                <div key={date} className="flex items-center gap-3 p-2 bg-white/5 rounded-lg">
+                  <div className="w-8 h-8 rounded-lg bg-violet-500/20 flex items-center justify-center flex-shrink-0">
+                    <CheckCircle className="w-4 h-4 text-violet-400" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-slate-300 text-xs">{format(new Date(date), 'EEE, d MMM')}</p>
+                    <p className="text-slate-500 text-xs">{data.reviewed} reviewed · {data.correct} correct</p>
+                  </div>
+                  <div className="text-xs text-green-400 font-medium">
+                    {data.reviewed > 0 ? Math.round((data.correct / data.reviewed) * 100) : 0}%
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </div>

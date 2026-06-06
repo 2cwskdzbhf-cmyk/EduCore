@@ -19,7 +19,7 @@ const NAV = [
   { id: 'smart', label: 'Smart Study', icon: Zap },
   { id: 'audio', label: 'AI Audio & Video', icon: Radio },
   { id: 'deep', label: 'Deep Source Tools', icon: Layers },
-  { id: 'superpowers', label: 'Superpowers', icon: Sparkles },
+  { id: 'superpowers', label: 'Superpowers ⚡', icon: Sparkles },
 ];
 
 export default function RevisionHub() {

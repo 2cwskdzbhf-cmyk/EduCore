@@ -1,91 +1,64 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useQuery } from '@tanstack/react-query';
-import { base44 } from '@/api/base44Client';
-import { Cpu, CalendarDays, BarChart2, Zap } from 'lucide-react';
+import { Sparkles, Calendar, BarChart2 } from 'lucide-react';
 import TopicAutoDetection from './TopicAutoDetection';
 import RevisionTimeline from './RevisionTimeline';
 import NotebookInsights from './NotebookInsights';
 
 const TABS = [
-  {
-    id: 'topics',
-    label: 'Topic Auto-Detection',
-    icon: Cpu,
-    color: 'text-violet-400',
-    desc: 'AI scans sources and creates topic folders, subtopics, flashcards & quiz sets',
-  },
-  {
-    id: 'timeline',
-    label: 'Revision Timeline',
-    icon: CalendarDays,
-    color: 'text-blue-400',
-    desc: 'Calendar view of what you revised, streaks, and overdue cards',
-  },
-  {
-    id: 'insights',
-    label: 'Notebook Insights',
-    icon: BarChart2,
-    color: 'text-emerald-400',
-    desc: 'Graphs of strongest/weakest topics, flashcard & quiz accuracy',
-  },
+  { id: 'topics', label: 'Topic Auto-Detection', icon: Sparkles, color: 'from-violet-500 to-purple-600', desc: 'AI builds topics, flashcards & quizzes from your sources' },
+  { id: 'timeline', label: 'Revision Timeline', icon: Calendar, color: 'from-orange-500 to-red-500', desc: 'Track what you revised, when, and what\'s overdue' },
+  { id: 'insights', label: 'Notebook Insights', icon: BarChart2, color: 'from-blue-500 to-cyan-500', desc: 'Graphs showing strengths, weaknesses and accuracy' },
 ];
 
 export default function NotebookSuperpowers({ user, notebooks }) {
-  const [activeTab, setActiveTab] = useState('topics');
-
-  const { data: sources = [] } = useQuery({
-    queryKey: ['superpowerSources', user?.email],
-    queryFn: () => base44.entities.RevisionSource.filter({ student_email: user.email }),
-    enabled: !!user?.email,
-  });
+  const [activeTab, setActiveTab] = useState(null);
 
   return (
-    <div className="space-y-6 max-w-4xl">
-      {/* Header */}
+    <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-black text-white mb-1 flex items-center gap-3">
-          <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-violet-500 to-blue-600 flex items-center justify-center shadow-lg shadow-violet-500/30">
-            <Zap className="w-5 h-5 text-white" />
-          </div>
-          Notebook Superpowers
-        </h1>
-        <p className="text-slate-400 text-sm">AI-powered tools to turbocharge your revision notebooks</p>
+        <h2 className="text-2xl font-black text-white mb-1">Notebook Superpowers ⚡</h2>
+        <p className="text-slate-400 text-sm">AI-powered tools to supercharge your revision</p>
       </div>
 
       {/* Tab cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <div className="grid md:grid-cols-3 gap-4">
         {TABS.map(tab => (
-          <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-            className={`text-left rounded-2xl p-4 border transition-all ${
+          <motion.button
+            key={tab.id}
+            onClick={() => setActiveTab(activeTab === tab.id ? null : tab.id)}
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            className={`p-5 rounded-2xl border text-left transition-all ${
               activeTab === tab.id
-                ? 'bg-violet-500/15 border-violet-500/40'
-                : 'bg-white/5 border-white/10 hover:border-white/20 hover:bg-white/8'
-            }`}>
-            <tab.icon className={`w-5 h-5 mb-2 ${activeTab === tab.id ? tab.color : 'text-slate-500'}`} />
-            <p className={`text-sm font-bold ${activeTab === tab.id ? 'text-white' : 'text-slate-400'}`}>{tab.label}</p>
-            <p className="text-xs text-slate-600 mt-0.5 leading-snug">{tab.desc}</p>
-          </button>
+                ? 'border-violet-500/50 bg-violet-500/10'
+                : 'border-white/10 bg-white/5 hover:border-white/20 hover:bg-white/8'
+            }`}
+          >
+            <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${tab.color} flex items-center justify-center mb-3`}>
+              <tab.icon className="w-5 h-5 text-white" />
+            </div>
+            <h3 className="text-white font-bold text-sm mb-1">{tab.label}</h3>
+            <p className="text-slate-400 text-xs leading-relaxed">{tab.desc}</p>
+          </motion.button>
         ))}
       </div>
 
-      <div className="border-t border-white/10" />
-
-      {/* Content */}
+      {/* Content panel */}
       <AnimatePresence mode="wait">
-        <motion.div key={activeTab}
-          initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}
-          transition={{ duration: 0.18 }}>
-          {activeTab === 'topics' && (
-            <TopicAutoDetection notebooks={notebooks} sources={sources} user={user} />
-          )}
-          {activeTab === 'timeline' && (
-            <RevisionTimeline user={user} />
-          )}
-          {activeTab === 'insights' && (
-            <NotebookInsights user={user} />
-          )}
-        </motion.div>
+        {activeTab && (
+          <motion.div
+            key={activeTab}
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -16 }}
+            className="bg-white/5 border border-white/10 rounded-2xl p-6"
+          >
+            {activeTab === 'topics' && <TopicAutoDetection user={user} notebooks={notebooks} />}
+            {activeTab === 'timeline' && <RevisionTimeline user={user} notebooks={notebooks} />}
+            {activeTab === 'insights' && <NotebookInsights user={user} notebooks={notebooks} />}
+          </motion.div>
+        )}
       </AnimatePresence>
     </div>
   );
