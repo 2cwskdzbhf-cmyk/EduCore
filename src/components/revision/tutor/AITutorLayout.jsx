@@ -107,10 +107,11 @@ export default function AITutorLayout({ notebook, user, onBack }) {
   const recognitionRef = useRef(null);
 
   // ── Data ──────────────────────────────────────────────────────────────────
-  const { data: sources = [], refetch: refetchSources } = useQuery({
+  const { data: sources = [], refetch: refetchSources, isFetched: sourcesFetched } = useQuery({
     queryKey: ['revisionSources', notebook.id],
     queryFn: () => base44.entities.RevisionSource.filter({ notebook_id: notebook.id }, '-created_date'),
     enabled: !!notebook.id,
+    staleTime: 0, // always fresh
   });
 
   const { data: flashcards = [], refetch: refetchFlashcards } = useQuery({
@@ -124,6 +125,10 @@ export default function AITutorLayout({ notebook, user, onBack }) {
     queryFn: () => base44.entities.NotebookResource.filter({ notebook_id: notebook.id }, '-created_date'),
     enabled: !!notebook.id,
   });
+
+  // Derive source stats for display and prompt building
+  const sourcesWithText = sources.filter(s => s.content_text && s.content_text.length > 0);
+  const totalSourceChars = sourcesWithText.reduce((acc, s) => acc + s.content_text.length, 0);
 
   const handleResourceCreated = useCallback(() => {
     refetchResources();
@@ -155,12 +160,17 @@ export default function AITutorLayout({ notebook, user, onBack }) {
   };
 
   // ── System prompt ─────────────────────────────────────────────────────────
-  const buildSystemPrompt = useCallback(() => {
-    const sourcesWithText = sources.filter(s => s.content_text);
-    const allSourceNames = sources.map(s => `- ${s.name} (${s.type})`).join('\n');
-    const contextParts = sourcesWithText
-      .map(s => `### SOURCE: "${s.name}"\n${s.content_text.slice(0, 10000)}`)
-      .join('\n\n---\n\n');
+  // NOTE: uses sourcesWithText from component scope (derived above), not a stale closure
+  const buildSystemPrompt = useCallback((currentSources) => {
+    const sw = (currentSources || sources).filter(s => s.content_text && s.content_text.length > 0);
+    const allSourceNames = (currentSources || sources).map(s => `- ${s.name} (${s.type})`).join('\n') || 'None';
+
+    // Distribute character budget across sources evenly (max 60k total)
+    const TOTAL_BUDGET = 60000;
+    const perSourceBudget = sw.length > 0 ? Math.floor(TOTAL_BUDGET / sw.length) : TOTAL_BUDGET;
+    const contextParts = sw
+      .map(s => `=== SOURCE: "${s.name}" (${s.type}) ===\n${s.content_text.slice(0, perSourceBudget)}`)
+      .join('\n\n');
 
     const modeInstr = mode === 'alevel'
       ? 'The student is at A-Level. Use precise academic language, encourage deeper analysis and evaluation.'
@@ -168,43 +178,41 @@ export default function AITutorLayout({ notebook, user, onBack }) {
       ? 'Use very simple language. Short sentences. No jargon. Use analogies and everyday examples.'
       : 'The student is studying at GCSE level. Be encouraging, clear, and supportive.';
 
-    const noSourcesTotally = sources.length === 0;
-    const noTextExtracted = sources.length > 0 && sourcesWithText.length === 0;
+    const noSourcesTotally = (currentSources || sources).length === 0;
+    const noTextExtracted = (currentSources || sources).length > 0 && sw.length === 0;
 
     let sourceSection;
     if (noSourcesTotally) {
-      sourceSection = `SOURCES: None. This notebook has no sources yet.
-If the student asks you to summarise, create flashcards, quizzes, or any content from sources, respond with:
-"This notebook does not have any sources yet. Please add some PDFs, notes, or links in the Sources tab, and I will be able to help you straight away."`;
+      sourceSection = `NO SOURCES: This notebook has no sources attached yet. If the student asks you to summarise, create flashcards, quizzes, or any content, respond with exactly: "This notebook doesn't have any sources yet. Add sources first in the Sources tab, then I can summarise, create flashcards, or help with any topic."`;
     } else if (noTextExtracted) {
-      sourceSection = `SOURCES IN THIS NOTEBOOK (text not yet extracted):
+      sourceSection = `SOURCES ATTACHED (${(currentSources || sources).length} files) — text extraction still processing:
 ${allSourceNames}
 
-The sources exist but their text has not been extracted yet. Tell the student their sources are attached but may still be processing. Answer general questions about the subject as best you can.`;
+The files are attached but text is still being extracted. Tell the student their sources are processing and to try again in a moment. For now, answer general subject questions.`;
     } else {
-      sourceSection = `SOURCES IN THIS NOTEBOOK:
+      sourceSection = `YOU HAVE ${sw.length} SOURCE(S) FULLY LOADED (${Math.round((sw.reduce((a,s)=>a+s.content_text.length,0))/1000)}k chars total):
 ${allSourceNames}
 
-FULL SOURCE CONTENT BELOW — use this to answer ALL questions, summaries, flashcards, and quizzes:
+THE COMPLETE SOURCE CONTENT IS BELOW. USE IT TO ANSWER EVERYTHING:
 
-${contextParts}`;
+${contextParts}
+
+END OF SOURCES. Always cite the source name when answering (e.g. "According to your Chemistry Notes...").`;
     }
 
-    return `You are the AI Tutor for the notebook "${notebook.name}"${notebook.subject ? ` (${notebook.subject})` : ''}${notebook.exam_board ? ` for ${notebook.exam_board}` : ''}.
+    return `You are the AI Tutor for notebook "${notebook.name}"${notebook.subject ? ` — ${notebook.subject}` : ''}${notebook.exam_board ? ` (${notebook.exam_board})` : ''}.
 
-CRITICAL RULES — follow these without exception:
-1. You ALWAYS have access to this notebook's sources. NEVER ask the student to "provide", "paste", "upload", or "share" any sources. They are already loaded below.
-2. When asked to summarise, explain, create flashcards, quizzes, study guides, timelines, or any other content — use ONLY the source content provided below. Start immediately without asking for anything.
-3. If there are no sources, say clearly: "This notebook does not have any sources yet. Add some in the Sources tab and I can help straight away." Do NOT say anything else about missing sources.
-4. Never say "please provide the text", "paste your notes here", "share the content", or any similar phrase.
+ABSOLUTE RULES (never break these):
+1. The student's notebook sources are provided below in full. You have them. NEVER ask for sources.
+2. NEVER say "provide", "paste", "upload", "share", or "send" sources/notes/text. They are already here.
+3. NEVER say "I don't have access to your notes" — you do, they are below.
+4. For ANY task (summarise, flashcards, quiz, explain, timeline, exam questions) — start immediately using the sources below.
+5. If there truly are no sources, say only: "This notebook doesn't have any sources yet. Add sources in the Sources tab and I can help immediately."
+6. Always reference which source you're drawing from. E.g. "Based on your ${notebook.name} notes..."
 
 ${modeInstr}
 
-When generating flashcards:
-- Output as valid JSON array: [{"front":"...","back":"..."},...]
-- Front: clear exam-style question, no asterisks, no markdown
-- Back: accurate plain text answer, no asterisks, no bold, no markdown
-- Example: {"front":"Define osmosis","back":"The movement of water molecules from an area of high water potential to low water potential through a semi-permeable membrane."}
+Flashcard format: JSON array [{"front":"question","back":"plain text answer"}]. No asterisks, no markdown in flashcard text.
 
 ${sourceSection}`;
   }, [sources, mode, notebook]);
@@ -329,17 +337,18 @@ ${batch.chunk}`,
     setLoading(true);
     const history = newMessages.slice(-14).map(m => ({ role: m.role, content: m.content }));
 
-    // For source-based prompts, append a hard reminder so the LLM never asks for sources
-    const sourcesWithText = sources.filter(s => s.content_text);
+    // Always pass current sources snapshot to avoid stale closure
+    const currentSources = sources;
+    const sw = currentSources.filter(s => s.content_text && s.content_text.length > 0);
     const isSourceBased = /summar|flashcard|quiz|explain|study guide|timeline|mind map|formula|exam question|key topic|revision/i.test(text);
-    const effectivePrompt = (isSourceBased && sourcesWithText.length > 0)
-      ? `${text}\n\n[INSTRUCTION: Use ONLY the notebook sources already provided in the system prompt. Do not ask for any sources. Begin immediately.]`
+    const effectivePrompt = (isSourceBased && sw.length > 0)
+      ? `${text}\n\n[SYSTEM NOTE: The notebook sources are fully loaded in the system prompt. Do NOT ask for any sources. Begin your response immediately using the source content above.]`
       : text;
 
     try {
       const resp = await base44.integrations.Core.InvokeLLM({
         prompt: effectivePrompt,
-        system_prompt: buildSystemPrompt(),
+        system_prompt: buildSystemPrompt(currentSources),
         conversation_history: history.slice(0, -1),
       });
       const assistantMsg = { role: 'assistant', content: resp, timestamp: new Date().toISOString() };
@@ -397,7 +406,7 @@ ${batch.chunk}`,
     handleResourceCreated();
   };
 
-  const hasContent = sources.some(s => s.content_text);
+  const hasContent = sourcesWithText.length > 0;
 
   return (
     <div className="fixed inset-0 bg-[#0d0d14] flex flex-col z-50">
@@ -448,14 +457,36 @@ ${batch.chunk}`,
             ))}
           </div>
 
-          {/* No sources warning */}
-          {!hasContent && sources.length === 0 && (
-            <div className="mx-4 mb-2 p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl flex items-start gap-2">
-              <AlertTriangle className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
-              <div>
-                <p className="text-amber-300 text-xs font-semibold">No sources added yet</p>
-                <p className="text-slate-400 text-[11px] mt-0.5">Add PDFs, notes, or websites in the Sources tab on the right.</p>
-              </div>
+          {/* Source status bar */}
+          {sourcesFetched && (
+            <div className={`mx-4 mb-2 px-3 py-2 rounded-xl flex items-center gap-2 text-[11px] ${
+              hasContent
+                ? 'bg-emerald-500/8 border border-emerald-500/15'
+                : sources.length > 0
+                ? 'bg-amber-500/8 border border-amber-500/20'
+                : 'bg-amber-500/10 border border-amber-500/20'
+            }`}>
+              {hasContent ? (
+                <>
+                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 flex-shrink-0" />
+                  <span className="text-emerald-400 font-semibold">
+                    {sourcesWithText.length} source{sourcesWithText.length !== 1 ? 's' : ''} loaded
+                    {totalSourceChars > 0 && ` · ${Math.round(totalSourceChars / 1000)}k chars`}
+                  </span>
+                  <span className="text-slate-600 truncate">— {sourcesWithText.map(s => s.name).join(', ')}</span>
+                </>
+              ) : sources.length > 0 ? (
+                <>
+                  <Loader2 className="w-3 h-3 text-amber-400 animate-spin flex-shrink-0" />
+                  <span className="text-amber-300 font-semibold">{sources.length} source{sources.length !== 1 ? 's' : ''} attached — text still processing</span>
+                </>
+              ) : (
+                <>
+                  <AlertTriangle className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
+                  <span className="text-amber-300 font-semibold">No sources yet</span>
+                  <span className="text-slate-500">— add PDFs, notes, or websites in the Sources tab</span>
+                </>
+              )}
             </div>
           )}
 
