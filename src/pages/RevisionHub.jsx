@@ -3,17 +3,19 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  BookOpen, LayoutDashboard, Zap, Brain, Search, Target
+  BookOpen, LayoutDashboard, Zap, Brain, Search, Headphones
 } from 'lucide-react';
 import RevisionDashboard from '@/components/revision/RevisionDashboard';
 import NotebooksView from '@/components/revision/NotebooksView';
 import NotebookWorkspace from '@/components/revision/workspace/NotebookWorkspace';
 import SmartStudyHub from '@/components/revision/smartstudy/SmartStudyHub';
+import AudioLearningHub from '@/components/revision/audio/AudioLearningHub';
 
 const NAV = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { id: 'notebooks', label: 'Notebooks', icon: BookOpen },
   { id: 'smart', label: 'Smart Study', icon: Zap },
+  { id: 'audio', label: 'AI Audio', icon: Headphones },
 ];
 
 export default function RevisionHub() {
@@ -137,6 +139,11 @@ export default function RevisionHub() {
             {activeSection === 'smart' && (
               <motion.div key="smart" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }}>
                 <SmartStudyHub user={user} notebooks={notebooks} />
+              </motion.div>
+            )}
+            {activeSection === 'audio' && (
+              <motion.div key="audio" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }}>
+                <AudioLearningHub user={user} notebooks={notebooks} />
               </motion.div>
             )}
           </AnimatePresence>
