@@ -1,0 +1,70 @@
+{
+  "name": "RevisionPlan",
+  "type": "object",
+  "properties": {
+    "student_email": {
+      "type": "string"
+    },
+    "subjects": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "exam_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "weak_topics": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "priority": {
+            "type": "string",
+            "enum": [
+              "low",
+              "medium",
+              "high"
+            ],
+            "default": "medium"
+          }
+        }
+      }
+    },
+    "available_hours_per_day": {
+      "type": "number",
+      "default": 2
+    },
+    "plan_start_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "generated_schedule": {
+      "type": "string",
+      "description": "JSON string of generated timetable"
+    },
+    "total_xp": {
+      "type": "number",
+      "default": 0
+    },
+    "current_streak": {
+      "type": "number",
+      "default": 0
+    },
+    "longest_streak": {
+      "type": "number",
+      "default": 0
+    },
+    "last_activity_date": {
+      "type": "string",
+      "format": "date"
+    }
+  },
+  "required": [
+    "student_email"
+  ]
+}

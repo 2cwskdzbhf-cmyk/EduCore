@@ -1,0 +1,71 @@
+{
+  "name": "RevisionTask",
+  "type": "object",
+  "properties": {
+    "plan_id": {
+      "type": "string"
+    },
+    "student_email": {
+      "type": "string"
+    },
+    "date": {
+      "type": "string",
+      "format": "date"
+    },
+    "title": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string"
+    },
+    "task_type": {
+      "type": "string",
+      "enum": [
+        "flashcards",
+        "quiz",
+        "summarise",
+        "read",
+        "practice",
+        "review"
+      ],
+      "default": "practice"
+    },
+    "subject": {
+      "type": "string"
+    },
+    "topic": {
+      "type": "string"
+    },
+    "duration_minutes": {
+      "type": "number",
+      "default": 20
+    },
+    "xp_reward": {
+      "type": "number",
+      "default": 50
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "upcoming",
+        "due",
+        "completed",
+        "missed"
+      ],
+      "default": "upcoming"
+    },
+    "completed_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "notebook_id": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "student_email",
+    "date",
+    "title",
+    "task_type"
+  ]
+}

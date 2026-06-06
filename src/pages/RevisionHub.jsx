@@ -3,9 +3,10 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  BookOpen, LayoutDashboard, Zap, Brain, Search, Radio, Layers, Sparkles, ClipboardList
+  BookOpen, LayoutDashboard, Zap, Brain, Search, Radio, Layers, Sparkles, ClipboardList, CalendarDays
 } from 'lucide-react';
 import QuizToolsHub from '@/components/revision/quiztools/QuizToolsHub';
+import RevisionPlanner from '@/components/revision/planner/RevisionPlanner';
 import RevisionDashboard from '@/components/revision/RevisionDashboard';
 import NotebooksView from '@/components/revision/NotebooksView';
 import NotebookWorkspace from '@/components/revision/workspace/NotebookWorkspace';
@@ -22,6 +23,7 @@ const NAV = [
   { id: 'deep', label: 'Deep Source Tools', icon: Layers },
   { id: 'superpowers', label: 'Superpowers ⚡', icon: Sparkles },
   { id: 'quiztools', label: 'Quiz & Test Tools', icon: ClipboardList },
+  { id: 'planner', label: 'Revision Planner', icon: CalendarDays },
 ];
 
 export default function RevisionHub() {
@@ -165,6 +167,11 @@ export default function RevisionHub() {
             {activeSection === 'quiztools' && (
               <motion.div key="quiztools" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }}>
                 <QuizToolsHub user={user} notebooks={notebooks} />
+              </motion.div>
+            )}
+            {activeSection === 'planner' && (
+              <motion.div key="planner" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }}>
+                <RevisionPlanner user={user} notebooks={notebooks} />
               </motion.div>
             )}
           </AnimatePresence>
