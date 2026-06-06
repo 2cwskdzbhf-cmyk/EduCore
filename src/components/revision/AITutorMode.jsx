@@ -1,19 +1,15 @@
 /**
- * AITutorMode — Studio-powered AI chat, fully source-linked.
- * Re-uses WorkspaceCenterPanel so both the Workspace and any legacy
- * notebook views share identical AI capabilities, source context,
- * batched flashcard generation, and Studio save behaviour.
+ * AITutorMode — renders the full new AI Tutor layout.
+ * Pass notebook + user + onBack to launch.
  */
-import WorkspaceCenterPanel from './workspace/WorkspaceCenterPanel';
+import AITutorLayout from './tutor/AITutorLayout';
 
-export default function AITutorMode({ notebook, user, sources, onResourceCreated }) {
+export default function AITutorMode({ notebook, user, onBack, onResourceCreated }) {
   return (
-    <WorkspaceCenterPanel
+    <AITutorLayout
       notebook={notebook}
       user={user}
-      selectedSources={[]}
-      allSources={sources || []}
-      onResourceCreated={onResourceCreated || (() => {})}
+      onBack={onBack || (() => {})}
     />
   );
 }

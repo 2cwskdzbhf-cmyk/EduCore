@@ -42,6 +42,15 @@ const TUTOR_MODES = [
 ];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+function cleanText(str) {
+  return str
+    .replace(/\*\*([^*]+)\*\*/g, '$1')
+    .replace(/\*([^*]+)\*/g, '$1')
+    .replace(/__([^_]+)__/g, '$1')
+    .replace(/_([^_]+)_/g, '$1')
+    .trim();
+}
+
 function detectResourceType(text) {
   const t = text.toLowerCase();
   if (t.includes('flashcard')) return 'flashcards';
@@ -208,16 +217,15 @@ ${contextParts ? `STUDENT'S SOURCE MATERIALS:\n\n${contextParts}` : 'NOTE: No so
         setGenProgress({ generated: totalCreated, batchLabel: `Batch ${i + 1}/${batches.length} — ${batch.sourceName}` });
 
         const result = await base44.integrations.Core.InvokeLLM({
-          prompt: `Create comprehensive revision flashcards for a student studying "${notebook.subject || notebook.name}".
-
-Extract EVERY distinct concept, definition, formula, fact, and example. Generate as many cards as the content supports — maximum coverage.
+          prompt: `Generate comprehensive revision flashcards for "${notebook.subject || notebook.name}".
 
 Rules:
-- Front: concise question/prompt (e.g. "Define X", "What is the formula for Y?")
-- Back: accurate, complete answer with **bold** key terms
-- No duplicates or vague questions
+- Front: clear exam-style question. No asterisks, no markdown. Example: "Define osmosis"
+- Back: accurate plain text answer. No asterisks, no bold, no markdown formatting.
+- Cover every concept, definition, formula, fact from the text.
+- Maximum coverage, no duplicates.
 
-TEXT (source: "${batch.sourceName}"):
+TEXT (${batch.sourceName}):
 ${batch.chunk}`,
           response_json_schema: {
             type: 'object',
@@ -236,7 +244,7 @@ ${batch.chunk}`,
           if (!card.front?.trim() || !card.back?.trim()) continue;
           await base44.entities.RevisionFlashcard.create({
             notebook_id: notebook.id, student_email: user.email,
-            front: card.front, back: card.back, is_ai_generated: true,
+            front: cleanText(card.front), back: cleanText(card.back), is_ai_generated: true,
             source_id: batch.sourceId || null,
           });
           totalCreated++;
@@ -309,7 +317,7 @@ ${batch.chunk}`,
           for (const pair of pairs) {
             await base44.entities.RevisionFlashcard.create({
               notebook_id: notebook.id, student_email: user.email,
-              front: pair.front, back: pair.back, is_ai_generated: true,
+              front: cleanText(pair.front), back: cleanText(pair.back), is_ai_generated: true,
             });
           }
           const res = await base44.entities.NotebookResource.create({
