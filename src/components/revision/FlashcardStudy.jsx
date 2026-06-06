@@ -7,6 +7,19 @@ import {
   Timer, Shuffle, BarChart2, ArrowLeft
 } from 'lucide-react';
 
+// ─── Strip markdown formatting from flashcard text ───────────────────────────
+function cleanText(text = '') {
+  return text
+    .replace(/\*\*(.*?)\*\*/g, '$1')   // **bold**
+    .replace(/\*(.*?)\*/g, '$1')       // *italic*
+    .replace(/__(.*?)__/g, '$1')       // __bold__
+    .replace(/_(.*?)_/g, '$1')         // _italic_
+    .replace(/`([^`]+)`/g, '$1')       // `code`
+    .replace(/```[\s\S]*?```/g, '')    // ```code blocks```
+    .replace(/#{1,6}\s/g, '')          // ## headings
+    .trim();
+}
+
 // ─── Spaced Repetition ────────────────────────────────────────────────────────
 function getNextReview(rating, interval = 1, ease = 2.5) {
   const now = new Date();
@@ -103,7 +116,7 @@ Extract EVERY distinct concept, definition, formula, fact, and example from this
 
 Rules:
 - Front: concise question/prompt (e.g. "Define X", "What is the formula for Y?")
-- Back: accurate, complete answer with **bold** key terms
+- Back: accurate, complete answer in plain text only. No bold, no asterisks, no markdown.
 - No duplicates, no vague questions
 
 Return a JSON object with a "flashcards" array.
@@ -127,7 +140,7 @@ ${batch.chunk}`,
           if (!card.front?.trim() || !card.back?.trim()) continue;
           await base44.entities.RevisionFlashcard.create({
             notebook_id: notebook.id, student_email: user.email,
-            front: card.front, back: card.back, is_ai_generated: true,
+            front: cleanText(card.front), back: cleanText(card.back), is_ai_generated: true,
             source_id: batch.sourceId || null,
           });
           totalCreated++;
@@ -157,8 +170,8 @@ ${batch.chunk}`,
     const shuffled = [...cards].sort(() => Math.random() - 0.5);
     const pairs = shuffled.slice(0, 6);
     const items = [
-      ...pairs.map((c, i) => ({ id: `f${i}`, cardId: c.id, text: c.front, type: 'front' })),
-      ...pairs.map((c, i) => ({ id: `b${i}`, cardId: c.id, text: c.back, type: 'back' })),
+      ...pairs.map((c, i) => ({ id: `f${i}`, cardId: c.id, text: cleanText(c.front), type: 'front' })),
+      ...pairs.map((c, i) => ({ id: `b${i}`, cardId: c.id, text: cleanText(c.back), type: 'back' })),
     ];
     setMatchPairs(items.sort(() => Math.random() - 0.5));
     setMatchSelected(null); setMatchMatched([]); setMatchWrong([]);
@@ -350,8 +363,8 @@ ${batch.chunk}`,
                 className={`group bg-white/[0.04] border rounded-2xl p-4 transition-all ${isDue ? 'border-amber-500/30' : 'border-white/10'}`}>
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex-1 min-w-0">
-                    <p className="text-white text-sm font-medium line-clamp-2">{card.front}</p>
-                    <p className="text-slate-500 text-xs mt-1 line-clamp-2">{card.back}</p>
+                    <p className="text-white text-sm font-medium line-clamp-2">{cleanText(card.front)}</p>
+                    <p className="text-slate-500 text-xs mt-1 line-clamp-2">{cleanText(card.back)}</p>
                   </div>
                   <button onClick={() => deleteMutation.mutate(card.id)}
                     className="opacity-0 group-hover:opacity-100 p-1 rounded-lg text-slate-500 hover:text-red-400 transition-all flex-shrink-0">
@@ -498,7 +511,7 @@ function StudyMode({ queue, index, setIndex, flipped, setFlipped, correct, setCo
               <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-violet-500/10 border border-violet-500/20 mb-6">
                 <span className="text-violet-400 text-xs font-semibold uppercase tracking-widest">Question</span>
               </div>
-              <p className="text-white font-bold text-2xl sm:text-3xl leading-relaxed max-w-xl">{card.front}</p>
+              <p className="text-white font-bold text-2xl sm:text-3xl leading-relaxed max-w-xl">{cleanText(card.front)}</p>
               <p className="text-slate-600 text-sm mt-8">Tap · Click · Press Space</p>
             </div>
 
@@ -510,7 +523,7 @@ function StudyMode({ queue, index, setIndex, flipped, setFlipped, correct, setCo
               <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 mb-6">
                 <span className="text-emerald-400 text-xs font-semibold uppercase tracking-widest">Answer</span>
               </div>
-              <p className="text-white font-bold text-2xl sm:text-3xl leading-relaxed max-w-xl">{card.back}</p>
+              <p className="text-white font-bold text-2xl sm:text-3xl leading-relaxed max-w-xl">{cleanText(card.back)}</p>
             </div>
           </motion.div>
         </div>

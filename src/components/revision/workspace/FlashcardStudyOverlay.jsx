@@ -1,4 +1,16 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+
+function cleanText(text = '') {
+  return text
+    .replace(/\*\*(.*?)\*\*/g, '$1')
+    .replace(/\*(.*?)\*/g, '$1')
+    .replace(/__(.*?)__/g, '$1')
+    .replace(/_(.*?)_/g, '$1')
+    .replace(/`([^`]+)`/g, '$1')
+    .replace(/```[\s\S]*?```/g, '')
+    .replace(/#{1,6}\s/g, '')
+    .trim();
+}
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ArrowLeft, ChevronLeft, ChevronRight, X, Check,
@@ -282,7 +294,7 @@ export default function FlashcardStudyOverlay({
                 <span className="text-violet-400 text-[10px] font-bold uppercase tracking-[0.15em]">Question</span>
               </div>
               <p className="text-white font-semibold text-lg sm:text-xl md:text-2xl leading-relaxed" style={{ maxWidth: '600px' }}>
-                {card?.front}
+                {cleanText(card?.front)}
               </p>
             </div>
 
@@ -304,7 +316,7 @@ export default function FlashcardStudyOverlay({
                 <span className="text-emerald-400 text-[10px] font-bold uppercase tracking-[0.15em]">Answer</span>
               </div>
               <p className="text-white font-semibold text-lg sm:text-xl md:text-2xl leading-relaxed" style={{ maxWidth: '600px' }}>
-                {card?.back}
+                {cleanText(card?.back)}
               </p>
             </div>
           </motion.div>
