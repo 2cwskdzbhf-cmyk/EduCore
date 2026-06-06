@@ -126,6 +126,7 @@ export default function Layout({ children, currentPageName }) {
     { name: 'Test Scores', icon: ClipboardList, page: 'TestScores' },
     { name: 'AI Tutor', icon: MessageSquare, page: 'AITutor' },
     { name: 'Revision Hub', icon: Brain, page: 'RevisionHub' },
+    { name: 'AI Lab Tools', icon: Wrench, page: 'AILabTools' },
     { name: 'Useful Tools', icon: Wrench, page: 'UsefulTools' },
   ];
 
