@@ -10,7 +10,7 @@ import NotebooksView from '@/components/revision/NotebooksView';
 import NotebookWorkspace from '@/components/revision/workspace/NotebookWorkspace';
 import SmartStudyHub from '@/components/revision/smartstudy/SmartStudyHub';
 import AudioLearningHub from '@/components/revision/audiolearning/AudioLearningHub';
-import DeepSourceTools from '@/components/revision/deeptools/DeepSourceTools';
+import DeepSourceHub from '@/components/revision/deepsource/DeepSourceHub';
 
 const NAV = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -150,7 +150,7 @@ export default function RevisionHub() {
             )}
             {activeSection === 'deep' && (
               <motion.div key="deep" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }}>
-                <DeepSourceTools user={user} notebooks={notebooks} />
+                <DeepSourceHub user={user} notebooks={notebooks} />
               </motion.div>
             )}
           </AnimatePresence>
