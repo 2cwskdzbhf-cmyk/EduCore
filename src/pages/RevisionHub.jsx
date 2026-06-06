@@ -3,15 +3,17 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  BookOpen, LayoutDashboard, Layers, Zap, Brain, Search, Plus, ChevronLeft
+  BookOpen, LayoutDashboard, Zap, Brain, Search, Target
 } from 'lucide-react';
 import RevisionDashboard from '@/components/revision/RevisionDashboard';
 import NotebooksView from '@/components/revision/NotebooksView';
 import NotebookWorkspace from '@/components/revision/workspace/NotebookWorkspace';
+import SmartStudyHub from '@/components/revision/smartstudy/SmartStudyHub';
 
 const NAV = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { id: 'notebooks', label: 'Notebooks', icon: BookOpen },
+  { id: 'smart', label: 'Smart Study', icon: Zap },
 ];
 
 export default function RevisionHub() {
@@ -130,6 +132,11 @@ export default function RevisionHub() {
                   onOpenNotebook={setOpenNotebook}
                   onRefresh={refetchNotebooks}
                 />
+              </motion.div>
+            )}
+            {activeSection === 'smart' && (
+              <motion.div key="smart" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }}>
+                <SmartStudyHub user={user} notebooks={notebooks} />
               </motion.div>
             )}
           </AnimatePresence>
