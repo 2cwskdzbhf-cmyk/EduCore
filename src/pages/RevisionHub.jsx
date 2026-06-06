@@ -3,19 +3,19 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  BookOpen, LayoutDashboard, Zap, Brain, Search, Headphones
+  BookOpen, LayoutDashboard, Zap, Brain, Search, Radio
 } from 'lucide-react';
 import RevisionDashboard from '@/components/revision/RevisionDashboard';
 import NotebooksView from '@/components/revision/NotebooksView';
 import NotebookWorkspace from '@/components/revision/workspace/NotebookWorkspace';
 import SmartStudyHub from '@/components/revision/smartstudy/SmartStudyHub';
-import AudioLearningHub from '@/components/revision/audio/AudioLearningHub';
+import AudioLearningHub from '@/components/revision/audiolearning/AudioLearningHub';
 
 const NAV = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { id: 'notebooks', label: 'Notebooks', icon: BookOpen },
   { id: 'smart', label: 'Smart Study', icon: Zap },
-  { id: 'audio', label: 'AI Audio', icon: Headphones },
+  { id: 'audio', label: 'AI Audio & Video', icon: Radio },
 ];
 
 export default function RevisionHub() {
