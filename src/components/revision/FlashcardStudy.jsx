@@ -4,64 +4,33 @@ import { base44 } from '@/api/base44Client';
 import { useMutation } from '@tanstack/react-query';
 import {
   Plus, Loader2, RotateCcw, Zap, X, Check, ChevronLeft, ChevronRight,
-  Shuffle, ArrowLeft, Layers, Pencil, LayoutGrid
+  Shuffle, ArrowLeft, Edit3, Layers, Star
 } from 'lucide-react';
-import FlashcardEditor from './FlashcardEditor';
-import FlashcardPacks from './FlashcardPacks';
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-function cleanText(text = '') {
-  return text
-    .replace(/\*\*(.*?)\*\*/g, '$1')
-    .replace(/\*(.*?)\*/g, '$1')
-    .replace(/__(.*?)__/g, '$1')
-    .replace(/_(.*?)_/g, '$1')
-    .replace(/`([^`]+)`/g, '$1')
-    .replace(/```[\s\S]*?```/g, '')
-    .replace(/#{1,6}\s/g, '')
-    .trim();
-}
-
-function getNextReview(rating, interval = 1, ease = 2.5) {
-  const now = new Date();
-  let newInterval = interval;
-  let newEase = ease;
-  if (rating === 'again')  { newInterval = 1; newEase = Math.max(1.3, ease - 0.2); }
-  else if (rating === 'hard')   { newInterval = Math.max(1, interval * 1.2); newEase = Math.max(1.3, ease - 0.15); }
-  else if (rating === 'medium') { newInterval = interval * ease; }
-  else if (rating === 'easy')   { newInterval = interval * ease * 1.3; newEase = ease + 0.15; }
-  newInterval = Math.round(newInterval);
-  const next = new Date(now.getTime() + newInterval * 24 * 60 * 60 * 1000);
-  return { next_review: next.toISOString(), interval_days: newInterval, ease_factor: newEase };
-}
-
-const DIFF_BADGE = {
-  easy: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30',
-  medium: 'text-amber-400 bg-amber-500/10 border-amber-500/30',
-  hard: 'text-red-400 bg-red-500/10 border-red-500/30',
-};
-
-const TYPE_LABELS = {
-  definition: 'Definition', example: 'Example', formula: 'Formula',
-  diagram: 'Diagram', comparison: 'Comparison', process: 'Process',
-  cause_effect: 'Cause/Effect', general: 'General',
-};
+import { cleanText, getNextReview, CARD_TYPES, DIFFICULTY_CONFIG, getCardTypeConfig } from './flashcards/FlashcardUtils';
+import FlashcardEditor from './flashcards/FlashcardEditor';
+import FlashcardPacksView from './flashcards/FlashcardPacksView';
+import FlashcardGeneratePanel from './flashcards/FlashcardGeneratePanel';
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function FlashcardStudy({ notebook, user, flashcards, sources, onRefresh }) {
-  const [tab, setTab] = useState('browse'); // 'browse' | 'packs' | 'editor'
-  const [mode, setMode] = useState('idle'); // 'idle' | 'study' | 'match'
+  const [mode, setMode] = useState('browse'); // 'browse' | 'study' | 'match' | 'packs'
+  const [browseTab, setBrowseTab] = useState('all'); // 'all' | 'generate'
   const [studyQueue, setStudyQueue] = useState([]);
   const [studyIndex, setStudyIndex] = useState(0);
   const [flipped, setFlipped] = useState(false);
   const [correct, setCorrect] = useState(0);
   const [incorrect, setIncorrect] = useState(0);
-  const [generating, setGenerating] = useState(false);
-  const [genProgress, setGenProgress] = useState(null);
-  const [cancelGen] = useState({ cancelled: false });
+  const [showCreate, setShowCreate] = useState(false);
   const [newFront, setNewFront] = useState('');
   const [newBack, setNewBack] = useState('');
-  const [showCreate, setShowCreate] = useState(false);
+  const [newType, setNewType] = useState('general');
+  const [newDifficulty, setNewDifficulty] = useState('medium');
+  const [editingCard, setEditingCard] = useState(null);
+  const [filterDifficulty, setFilterDifficulty] = useState('all');
+  const [filterType, setFilterType] = useState('all');
+  const [filterFav, setFilterFav] = useState(false);
+
+  // Match game
   const [matchPairs, setMatchPairs] = useState([]);
   const [matchSelected, setMatchSelected] = useState(null);
   const [matchMatched, setMatchMatched] = useState([]);
@@ -70,7 +39,15 @@ export default function FlashcardStudy({ notebook, user, flashcards, sources, on
   const now = new Date();
   const dueCards = flashcards.filter(f => !f.next_review || new Date(f.next_review) <= now);
 
-  // ─── Mutations ──────────────────────────────────────────────────────────────
+  // ─── Filtered browse list ─────────────────────────────────────────────────
+  const filteredCards = flashcards.filter(fc => {
+    if (filterFav && !fc.is_favourite) return false;
+    if (filterDifficulty !== 'all' && fc.difficulty_rating !== filterDifficulty) return false;
+    if (filterType !== 'all' && fc.card_type !== filterType) return false;
+    return true;
+  });
+
+  // ─── Mutations ───────────────────────────────────────────────────────────────
   const rateMutation = useMutation({
     mutationFn: async ({ card, rating }) => {
       const { next_review, interval_days, ease_factor } = getNextReview(rating, card.interval_days, card.ease_factor);
@@ -90,100 +67,18 @@ export default function FlashcardStudy({ notebook, user, flashcards, sources, on
   const createCardMutation = useMutation({
     mutationFn: () => base44.entities.RevisionFlashcard.create({
       notebook_id: notebook.id, student_email: user.email,
-      front: newFront, back: newBack, is_ai_generated: false,
-      difficulty_rating: 'medium', card_type: 'general',
+      front: cleanText(newFront), back: cleanText(newBack),
+      card_type: newType, difficulty_rating: newDifficulty, is_ai_generated: false,
     }),
     onSuccess: () => { setNewFront(''); setNewBack(''); setShowCreate(false); onRefresh(); },
   });
 
-  // ─── AI Generation (upgraded) ───────────────────────────────────────────────
-  const generateFromAI = async () => {
-    if (generating) return;
-    setGenerating(true);
-    cancelGen.cancelled = false;
-    const sourceParts = sources.filter(s => s.content_text);
-    if (!sourceParts.length) { setGenerating(false); return; }
+  const toggleFavMutation = useMutation({
+    mutationFn: ({ id, val }) => base44.entities.RevisionFlashcard.update(id, { is_favourite: val }),
+    onSuccess: onRefresh,
+  });
 
-    const CHUNK = 5000;
-    const batches = [];
-    for (const src of sourceParts) {
-      for (let offset = 0; offset < src.content_text.length; offset += CHUNK) {
-        batches.push({ sourceName: src.name, sourceId: src.id, chunk: src.content_text.slice(offset, offset + CHUNK) });
-      }
-    }
-
-    setGenProgress({ generated: 0, batchLabel: 'Starting…' });
-    let totalCreated = 0;
-
-    try {
-      for (let i = 0; i < batches.length; i++) {
-        if (cancelGen.cancelled) break;
-        const batch = batches[i];
-        setGenProgress({ generated: totalCreated, batchLabel: `Batch ${i + 1}/${batches.length} — ${batch.sourceName}` });
-
-        const result = await base44.integrations.Core.InvokeLLM({
-          prompt: `You are an expert GCSE/A-Level revision card creator. Generate high-quality, exam-ready flashcards from this study material.
-
-SOURCE: "${batch.sourceName}"
-SUBJECT: "${notebook.subject || notebook.name}"
-
-For each distinct concept, generate a flashcard with these fields:
-- front: Clear, direct question (e.g. "Define photosynthesis", "What is Newton's Second Law?", "Compare mitosis and meiosis")
-- back: Accurate, complete answer in clean plain text. NO asterisks, NO markdown, NO bullet symbols with *, NO bold/italic formatting. Use plain sentences.
-- card_type: One of: definition, example, formula, diagram, comparison, process, cause_effect, general
-- difficulty: One of: easy, medium, hard
-
-Generate as many cards as the content supports. Cover definitions, formulas, examples, processes, and comparisons.
-
-TEXT:
-${batch.chunk}`,
-          response_json_schema: {
-            type: 'object',
-            properties: {
-              flashcards: {
-                type: 'array',
-                items: {
-                  type: 'object',
-                  properties: {
-                    front: { type: 'string' },
-                    back: { type: 'string' },
-                    card_type: { type: 'string' },
-                    difficulty: { type: 'string' },
-                  },
-                  required: ['front', 'back']
-                }
-              }
-            }
-          }
-        });
-
-        const cards = result?.flashcards || [];
-        for (const card of cards) {
-          if (cancelGen.cancelled) break;
-          if (!card.front?.trim() || !card.back?.trim()) continue;
-          await base44.entities.RevisionFlashcard.create({
-            notebook_id: notebook.id,
-            student_email: user.email,
-            front: cleanText(card.front),
-            back: cleanText(card.back),
-            is_ai_generated: true,
-            source_id: batch.sourceId || null,
-            card_type: card.card_type || 'general',
-            difficulty_rating: card.difficulty || 'medium',
-          });
-          totalCreated++;
-        }
-        setGenProgress(p => ({ ...p, generated: totalCreated }));
-        onRefresh();
-      }
-    } catch (e) { console.error(e); }
-
-    setGenerating(false);
-    setGenProgress(null);
-    onRefresh();
-  };
-
-  // ─── Study / Match ───────────────────────────────────────────────────────────
+  // ─── Study mode ───────────────────────────────────────────────────────────
   const startStudy = (cards) => {
     const shuffled = [...cards].sort(() => Math.random() - 0.5);
     setStudyQueue(shuffled);
@@ -195,17 +90,18 @@ ${batch.chunk}`,
   };
 
   const startMatch = (cards) => {
-    const shuffled = [...cards].sort(() => Math.random() - 0.5).slice(0, 6);
+    const shuffled = [...cards].sort(() => Math.random() - 0.5);
+    const pairs = shuffled.slice(0, 6);
     const items = [
-      ...shuffled.map((c, i) => ({ id: `f${i}`, cardId: c.id, text: cleanText(c.front), type: 'front' })),
-      ...shuffled.map((c, i) => ({ id: `b${i}`, cardId: c.id, text: cleanText(c.back), type: 'back' })),
+      ...pairs.map((c, i) => ({ id: `f${i}`, cardId: c.id, text: cleanText(c.front), type: 'front' })),
+      ...pairs.map((c, i) => ({ id: `b${i}`, cardId: c.id, text: cleanText(c.back), type: 'back' })),
     ];
     setMatchPairs(items.sort(() => Math.random() - 0.5));
     setMatchSelected(null); setMatchMatched([]); setMatchWrong([]);
     setMode('match');
   };
 
-  // ─── Study Mode ─────────────────────────────────────────────────────────────
+  // ─── Study render ─────────────────────────────────────────────────────────
   if (mode === 'study') {
     return (
       <StudyMode
@@ -219,12 +115,12 @@ ${batch.chunk}`,
         incorrect={incorrect}
         setIncorrect={setIncorrect}
         rateMutation={rateMutation}
-        onExit={() => setMode('idle')}
+        onExit={() => setMode('browse')}
       />
     );
   }
 
-  // ─── Match Mode ─────────────────────────────────────────────────────────────
+  // ─── Match render ─────────────────────────────────────────────────────────
   if (mode === 'match') {
     const handleMatchSelect = (item) => {
       if (matchMatched.includes(item.id) || matchWrong.includes(item.id)) return;
@@ -242,13 +138,13 @@ ${batch.chunk}`,
     return (
       <div className="space-y-5 max-w-xl mx-auto">
         <div className="flex items-center justify-between">
-          <button onClick={() => setMode('idle')} className="text-slate-400 hover:text-white text-sm flex items-center gap-1"><X className="w-4 h-4" /> Exit Match</button>
+          <button onClick={() => setMode('browse')} className="text-slate-400 hover:text-white text-sm flex items-center gap-1"><X className="w-4 h-4" /> Exit</button>
           <p className="text-slate-400 text-sm">{matchMatched.length / 2} / {matchPairs.length / 2} matched</p>
         </div>
         {allMatched ? (
           <div className="text-center py-12">
             <div className="text-5xl mb-3">🎉</div>
-            <p className="text-white font-black text-2xl mb-2">All matched!</p>
+            <p className="text-white font-black text-2xl mb-4">All matched!</p>
             <button onClick={() => startMatch(flashcards)} className="px-5 py-2.5 rounded-xl bg-violet-500 text-white font-bold">Play Again</button>
           </div>
         ) : (
@@ -276,11 +172,11 @@ ${batch.chunk}`,
     );
   }
 
-  // ─── Browse / Packs / Editor ─────────────────────────────────────────────────
+  // ─── Browse render ────────────────────────────────────────────────────────
   return (
     <div className="space-y-5">
       {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
+      <div className="flex items-center justify-between">
         <div>
           <h2 className="text-white font-black text-xl">Flashcards</h2>
           <div className="flex items-center gap-3 text-sm mt-0.5">
@@ -288,209 +184,248 @@ ${batch.chunk}`,
             {dueCards.length > 0 && <span className="text-amber-400 font-medium">· {dueCards.length} due now</span>}
           </div>
         </div>
-        <div className="flex gap-2 flex-wrap">
+        <div className="flex gap-2">
+          <button onClick={() => setMode(mode === 'packs' ? 'browse' : 'packs')}
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border text-sm font-medium transition-all ${mode === 'packs' ? 'bg-violet-500/20 border-violet-500/30 text-violet-300' : 'bg-white/5 border-white/10 text-slate-300 hover:text-white'}`}>
+            <Layers className="w-4 h-4" /> Packs
+          </button>
           <button onClick={() => setShowCreate(v => !v)}
             className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-slate-300 hover:text-white text-sm font-medium transition-all">
-            <Plus className="w-4 h-4" /> Manual
+            <Plus className="w-4 h-4" /> Create
           </button>
-          {generating ? (
-            <button onClick={() => { cancelGen.cancelled = true; }}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm font-medium">
-              <Loader2 className="w-4 h-4 animate-spin" /> Cancel
-            </button>
-          ) : (
-            <button onClick={generateFromAI}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-violet-500/20 border border-violet-500/30 text-violet-300 hover:text-violet-200 text-sm font-medium transition-all">
-              ✨ AI Generate
-            </button>
-          )}
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className="flex gap-1 bg-white/5 rounded-xl p-1">
-        {[
-          { id: 'browse', label: 'Browse', icon: LayoutGrid },
-          { id: 'packs', label: 'Packs', icon: Layers },
-          { id: 'editor', label: 'Editor', icon: Pencil },
-        ].map(t => (
-          <button key={t.id} onClick={() => setTab(t.id)}
-            className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold transition-all ${
-              tab === t.id ? 'bg-white/10 text-white' : 'text-slate-500 hover:text-slate-300'
-            }`}>
-            <t.icon className="w-3.5 h-3.5" /> {t.label}
-          </button>
-        ))}
-      </div>
+      {/* Packs view */}
+      {mode === 'packs' && (
+        <FlashcardPacksView flashcards={flashcards} sources={sources} onStudyPack={startStudy} />
+      )}
 
-      {/* Generation progress */}
-      <AnimatePresence>
-        {genProgress && (
-          <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
-            className="rounded-2xl p-4 border border-amber-500/25 bg-amber-500/5 overflow-hidden">
-            <div className="flex items-center gap-2 mb-1.5">
-              <Loader2 className="w-3.5 h-3.5 text-amber-400 animate-spin" />
-              <p className="text-amber-300 text-sm font-bold">Generating high-quality flashcards…</p>
-            </div>
-            <p className="text-slate-400 text-xs mb-2 truncate">{genProgress.batchLabel}</p>
-            <div className="h-1.5 w-full rounded-full bg-white/10 overflow-hidden">
-              <motion.div className="h-full rounded-full bg-gradient-to-r from-amber-500 to-orange-400"
-                animate={{ width: '60%' }} transition={{ duration: 1, repeat: Infinity, repeatType: 'reverse' }} />
-            </div>
-            <p className="text-slate-500 text-xs mt-1.5">{genProgress.generated} cards created (with types & difficulty labels)</p>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Create form */}
-      <AnimatePresence>
-        {showCreate && (
-          <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
-            className="bg-white/5 border border-white/10 rounded-2xl p-5 space-y-3 overflow-hidden">
-            <div className="flex items-center justify-between">
-              <p className="text-white font-semibold">Create Flashcard</p>
-              <button onClick={() => setShowCreate(false)}><X className="w-4 h-4 text-slate-400" /></button>
-            </div>
-            <textarea value={newFront} onChange={e => setNewFront(e.target.value)} placeholder="Front (Question)…" rows={2}
-              className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-xl text-white text-sm focus:outline-none focus:border-violet-500/50 placeholder:text-slate-500 resize-none" />
-            <textarea value={newBack} onChange={e => setNewBack(e.target.value)} placeholder="Back (Answer — plain text only)…" rows={3}
-              className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-xl text-white text-sm focus:outline-none focus:border-violet-500/50 placeholder:text-slate-500 resize-none" />
-            <button onClick={() => createCardMutation.mutate()} disabled={!newFront || !newBack || createCardMutation.isPending}
-              className="px-4 py-2 rounded-xl bg-violet-500 text-white font-bold text-sm disabled:opacity-40">
-              {createCardMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin inline mr-2" /> : null} Add Card
-            </button>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* TAB: Browse */}
-      {tab === 'browse' && (
-        <div className="space-y-4">
-          {flashcards.length > 0 && (
-            <div className="grid grid-cols-2 gap-3">
-              <button onClick={() => startStudy(dueCards.length > 0 ? dueCards : flashcards)}
-                className="flex items-center justify-center gap-2 py-4 rounded-2xl bg-gradient-to-r from-violet-500 to-purple-600 text-white font-bold text-sm hover:brightness-110 transition-all">
-                <Zap className="w-4 h-4" /> Study Due ({dueCards.length || flashcards.length})
+      {/* Browse view */}
+      {mode === 'browse' && (
+        <>
+          {/* Tabs: All cards vs Generate */}
+          <div className="flex gap-1 border-b border-white/10">
+            {['all', 'generate'].map(tab => (
+              <button key={tab} onClick={() => setBrowseTab(tab)}
+                className={`px-4 py-2 text-sm font-medium capitalize transition-all border-b-2 -mb-px ${
+                  browseTab === tab ? 'border-violet-400 text-white' : 'border-transparent text-slate-500 hover:text-slate-300'
+                }`}>
+                {tab === 'generate' ? '✨ AI Generate' : 'All Cards'}
               </button>
-              <button onClick={() => startStudy(flashcards)}
-                className="flex items-center justify-center gap-2 py-4 rounded-2xl bg-white/5 border border-white/10 text-white font-bold text-sm hover:bg-white/10 transition-all">
-                <RotateCcw className="w-4 h-4" /> Review All ({flashcards.length})
-              </button>
-            </div>
+            ))}
+          </div>
+
+          {browseTab === 'generate' && (
+            <FlashcardGeneratePanel notebook={notebook} sources={sources} user={user} onGenerated={onRefresh} />
           )}
 
-          {flashcards.length >= 4 && (
-            <button onClick={() => startMatch(flashcards)}
-              className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl bg-white/5 border border-white/10 text-teal-300 hover:bg-white/10 text-sm font-medium transition-all">
-              <Shuffle className="w-4 h-4" /> Match Game
-            </button>
-          )}
+          {browseTab === 'all' && (
+            <>
+              {/* Study actions */}
+              {flashcards.length > 0 && (
+                <div className="grid grid-cols-2 gap-3">
+                  <button onClick={() => startStudy(dueCards.length > 0 ? dueCards : flashcards)}
+                    className="flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-gradient-to-r from-violet-500 to-purple-600 text-white font-bold text-sm hover:brightness-110 transition-all">
+                    <Zap className="w-4 h-4" /> Study Due ({dueCards.length || flashcards.length})
+                  </button>
+                  <button onClick={() => startStudy(flashcards)}
+                    className="flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-white/5 border border-white/10 text-white font-bold text-sm hover:bg-white/10 transition-all">
+                    <RotateCcw className="w-4 h-4" /> Review All
+                  </button>
+                </div>
+              )}
+              {flashcards.length >= 4 && (
+                <button onClick={() => startMatch(flashcards)}
+                  className="w-full flex items-center justify-center gap-2 py-2.5 rounded-2xl bg-white/5 border border-white/10 text-teal-300 hover:bg-white/10 text-sm font-medium transition-all">
+                  <Shuffle className="w-4 h-4" /> Match Game
+                </button>
+              )}
 
-          {flashcards.length === 0 ? (
-            <div className="text-center py-16 border border-dashed border-white/10 rounded-2xl">
-              <div className="text-4xl mb-3">🗂️</div>
-              <p className="text-white font-bold mb-1">No flashcards yet</p>
-              <p className="text-slate-400 text-sm">Upload sources then use AI Generate, or create cards manually</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {flashcards.map((card, i) => {
-                const isDue = !card.next_review || new Date(card.next_review) <= now;
-                return (
-                  <motion.div key={card.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.02 }}
-                    className={`group bg-white/[0.04] border rounded-2xl p-4 transition-all ${isDue ? 'border-amber-500/30' : 'border-white/10'}`}>
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-1.5 flex-wrap mb-1.5">
-                          {card.card_type && card.card_type !== 'general' && (
-                            <span className="text-xs px-2 py-0.5 rounded-full bg-white/10 text-slate-400">{TYPE_LABELS[card.card_type] || card.card_type}</span>
-                          )}
-                          {card.difficulty_rating && (
-                            <span className={`text-xs px-2 py-0.5 rounded-full border ${DIFF_BADGE[card.difficulty_rating] || ''}`}>
-                              {card.difficulty_rating}
+              {/* Filters */}
+              {flashcards.length > 0 && (
+                <div className="flex flex-wrap gap-2 items-center">
+                  <span className="text-xs text-slate-600 uppercase tracking-wider">Filter:</span>
+                  <button onClick={() => setFilterFav(f => !f)}
+                    className={`flex items-center gap-1 px-2.5 py-1 rounded-lg border text-xs font-medium transition-all ${filterFav ? 'bg-amber-500/10 border-amber-500/30 text-amber-400' : 'border-white/10 text-slate-500 hover:text-white'}`}>
+                    <Star className="w-3 h-3" /> Favourites
+                  </button>
+                  {['easy', 'medium', 'hard'].map(d => (
+                    <button key={d} onClick={() => setFilterDifficulty(filterDifficulty === d ? 'all' : d)}
+                      className={`px-2.5 py-1 rounded-lg border text-xs font-medium capitalize transition-all ${
+                        filterDifficulty === d ? DIFFICULTY_CONFIG[d].bg + ' ' + DIFFICULTY_CONFIG[d].color : 'border-white/10 text-slate-500 hover:text-white'
+                      }`}>
+                      {d}
+                    </button>
+                  ))}
+                  {CARD_TYPES.map(t => (
+                    <button key={t.id} onClick={() => setFilterType(filterType === t.id ? 'all' : t.id)}
+                      className={`px-2.5 py-1 rounded-lg border text-xs font-medium transition-all ${
+                        filterType === t.id ? t.bg + ' ' + t.color : 'border-white/10 text-slate-500 hover:text-white'
+                      }`}>
+                      {t.emoji}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* Create form */}
+              <AnimatePresence>
+                {showCreate && (
+                  <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
+                    className="bg-white/5 border border-white/10 rounded-2xl p-5 space-y-3 overflow-hidden">
+                    <div className="flex items-center justify-between">
+                      <p className="text-white font-semibold text-sm">Create Card</p>
+                      <button onClick={() => setShowCreate(false)}><X className="w-4 h-4 text-slate-400" /></button>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {CARD_TYPES.map(t => (
+                        <button key={t.id} onClick={() => setNewType(t.id)}
+                          className={`px-2.5 py-1 rounded-lg border text-xs font-medium transition-all ${newType === t.id ? t.bg + ' ' + t.color : 'border-white/10 text-slate-500 hover:text-white'}`}>
+                          {t.emoji} {t.label}
+                        </button>
+                      ))}
+                    </div>
+                    <div className="flex gap-2">
+                      {['easy','medium','hard'].map(d => (
+                        <button key={d} onClick={() => setNewDifficulty(d)}
+                          className={`flex-1 py-1.5 rounded-xl text-xs font-bold capitalize border transition-all ${newDifficulty === d ? DIFFICULTY_CONFIG[d].bg + ' ' + DIFFICULTY_CONFIG[d].color : 'border-white/10 text-slate-500'}`}>
+                          {d}
+                        </button>
+                      ))}
+                    </div>
+                    <textarea value={newFront} onChange={e => setNewFront(e.target.value)} placeholder="Front — question or prompt…" rows={2}
+                      className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-xl text-white text-sm focus:outline-none focus:border-violet-500/50 placeholder:text-slate-500 resize-none" />
+                    <textarea value={newBack} onChange={e => setNewBack(e.target.value)} placeholder="Back — answer in plain text, no markdown…" rows={3}
+                      className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-xl text-white text-sm focus:outline-none focus:border-violet-500/50 placeholder:text-slate-500 resize-none" />
+                    <button onClick={() => createCardMutation.mutate()} disabled={!newFront || !newBack || createCardMutation.isPending}
+                      className="px-4 py-2 rounded-xl bg-violet-500 text-white font-bold text-sm disabled:opacity-40">
+                      {createCardMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin inline mr-2" /> : null} Add Card
+                    </button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {/* Empty state */}
+              {filteredCards.length === 0 && (
+                <div className="text-center py-14 border border-dashed border-white/10 rounded-2xl">
+                  <div className="text-4xl mb-3">🗂️</div>
+                  <p className="text-white font-bold mb-1">No cards here</p>
+                  <p className="text-slate-400 text-sm">Use the AI Generate tab or create cards manually</p>
+                </div>
+              )}
+
+              {/* Cards grid */}
+              {filteredCards.length > 0 && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {filteredCards.map((card, i) => {
+                    const isDue = !card.next_review || new Date(card.next_review) <= now;
+                    const typeConfig = getCardTypeConfig(card.card_type);
+                    const diffConfig = DIFFICULTY_CONFIG[card.difficulty_rating];
+                    return (
+                      <motion.div key={card.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.02 }}
+                        className={`group bg-white/[0.04] border rounded-2xl p-4 transition-all hover:bg-white/[0.06] ${isDue ? 'border-amber-500/25' : 'border-white/10'}`}>
+                        {/* Type + difficulty badges */}
+                        <div className="flex items-center gap-1.5 mb-2 flex-wrap">
+                          {typeConfig && (
+                            <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${typeConfig.bg} ${typeConfig.color}`}>
+                              {typeConfig.emoji} {typeConfig.label}
                             </span>
                           )}
+                          {diffConfig && (
+                            <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${diffConfig.bg} ${diffConfig.color}`}>
+                              {diffConfig.label}
+                            </span>
+                          )}
+                          {card.is_favourite && <Star className="w-3 h-3 text-amber-400 fill-current" />}
                         </div>
-                        <p className="text-white text-sm font-medium line-clamp-2">{cleanText(card.front)}</p>
-                        <p className="text-slate-500 text-xs mt-1 line-clamp-2">{cleanText(card.back)}</p>
-                      </div>
-                      <button onClick={() => deleteMutation.mutate(card.id)}
-                        className="opacity-0 group-hover:opacity-100 p-1 rounded-lg text-slate-500 hover:text-red-400 transition-all flex-shrink-0">
-                        <X className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                    <div className="flex items-center gap-2 mt-2 text-xs">
-                      {isDue && <span className="text-amber-400 font-medium">Due now</span>}
-                      {!isDue && card.next_review && <span className="text-slate-500">Due {new Date(card.next_review).toLocaleDateString()}</span>}
-                      {card.review_count > 0 && <span className="text-slate-600">· {card.review_count}×</span>}
-                      {card.is_ai_generated && <span className="text-violet-500">· AI</span>}
-                    </div>
-                  </motion.div>
-                );
-              })}
-            </div>
+
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-white text-sm font-medium line-clamp-2">{cleanText(card.front)}</p>
+                            <p className="text-slate-500 text-xs mt-1 line-clamp-2">{cleanText(card.back)}</p>
+                          </div>
+                        </div>
+
+                        {/* Tags */}
+                        {card.tags?.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-2">
+                            {card.tags.map(tag => (
+                              <span key={tag} className="text-xs text-violet-400 bg-violet-500/10 px-1.5 py-0.5 rounded-full">#{tag}</span>
+                            ))}
+                          </div>
+                        )}
+
+                        <div className="flex items-center gap-2 mt-3">
+                          {isDue && <span className="text-amber-400 text-xs font-medium">Due now</span>}
+                          {!isDue && card.next_review && <span className="text-slate-600 text-xs">Due {new Date(card.next_review).toLocaleDateString()}</span>}
+                          {card.review_count > 0 && <span className="text-slate-600 text-xs">· {card.review_count}×</span>}
+                          <div className="flex-1" />
+                          <button onClick={() => toggleFavMutation.mutate({ id: card.id, val: !card.is_favourite })}
+                            className={`opacity-0 group-hover:opacity-100 p-1 rounded-lg transition-all ${card.is_favourite ? 'text-amber-400 opacity-100' : 'text-slate-600 hover:text-amber-400'}`}>
+                            <Star className={`w-3.5 h-3.5 ${card.is_favourite ? 'fill-current' : ''}`} />
+                          </button>
+                          <button onClick={() => setEditingCard(card)}
+                            className="opacity-0 group-hover:opacity-100 p-1 rounded-lg text-slate-600 hover:text-violet-400 transition-all">
+                            <Edit3 className="w-3.5 h-3.5" />
+                          </button>
+                          <button onClick={() => deleteMutation.mutate(card.id)}
+                            className="opacity-0 group-hover:opacity-100 p-1 rounded-lg text-slate-600 hover:text-red-400 transition-all">
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </motion.div>
+                    );
+                  })}
+                </div>
+              )}
+            </>
           )}
-        </div>
+        </>
       )}
 
-      {/* TAB: Packs */}
-      {tab === 'packs' && (
-        <FlashcardPacks
-          flashcards={flashcards}
-          sources={sources}
-          onStartStudy={startStudy}
-        />
-      )}
-
-      {/* TAB: Editor */}
-      {tab === 'editor' && (
-        <FlashcardEditor
-          flashcards={flashcards}
-          notebook={notebook}
-          user={user}
-          onRefresh={onRefresh}
-        />
-      )}
+      {/* Edit modal */}
+      <AnimatePresence>
+        {editingCard && (
+          <FlashcardEditor
+            card={editingCard}
+            onClose={() => setEditingCard(null)}
+            onSave={() => { setEditingCard(null); onRefresh(); }}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }
 
-// ─── Study Mode Component ─────────────────────────────────────────────────────
+// ─── Study Mode ───────────────────────────────────────────────────────────────
 function StudyMode({ queue, index, setIndex, flipped, setFlipped, correct, setCorrect, incorrect, setIncorrect, rateMutation, onExit }) {
   const card = queue[index];
   const total = queue.length;
   const done = index >= total || !card;
   const progress = total > 0 ? ((correct + incorrect) / total) * 100 : 0;
 
+  const typeConfig = card ? getCardTypeConfig(card.card_type) : null;
+  const diffConfig = card ? DIFFICULTY_CONFIG[card.difficulty_rating] : null;
+
   useEffect(() => {
     const handleKey = (e) => {
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
       if (e.code === 'Space' || e.code === 'Enter') { e.preventDefault(); setFlipped(f => !f); }
-      if (e.code === 'ArrowLeft')  { e.preventDefault(); goBack(); }
-      if (e.code === 'ArrowRight') { e.preventDefault(); goNext(); }
-      if (e.key === '1' && flipped) rate('again');
-      if (e.key === '2' && flipped) rate('hard');
-      if (e.key === '3' && flipped) rate('medium');
-      if (e.key === '4' && flipped) rate('easy');
+      if (e.code === 'ArrowLeft') { e.preventDefault(); if (index > 0) { setIndex(i => i - 1); setFlipped(false); } }
+      if (e.code === 'ArrowRight') { e.preventDefault(); if (index < total - 1) { setIndex(i => i + 1); setFlipped(false); } }
     };
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
-  }, [flipped, index, queue]);
+  }, [flipped, index, total]);
 
-  const goNext = useCallback(() => {
-    if (index < total - 1) { setIndex(i => i + 1); setFlipped(false); }
-  }, [index, total]);
-
-  const goBack = useCallback(() => {
-    if (index > 0) { setIndex(i => i - 1); setFlipped(false); }
-  }, [index]);
-
-  const rate = useCallback((rating) => {
+  const handleRate = useCallback((rating) => {
     if (!card) return;
-    if (rating === 'easy' || rating === 'medium') setCorrect(c => c + 1);
+    if (rating === 'easy') setCorrect(c => c + 1);
     else setIncorrect(c => c + 1);
     rateMutation.mutate({ card, rating });
     if (index < total - 1) { setIndex(i => i + 1); setFlipped(false); }
+    else setIndex(total);
   }, [card, index, total]);
 
   if (done) {
@@ -501,7 +436,7 @@ function StudyMode({ queue, index, setIndex, flipped, setFlipped, correct, setCo
           className="bg-slate-900/90 border border-white/10 rounded-3xl p-10 max-w-md w-full text-center shadow-2xl">
           <div className="text-6xl mb-4">{pct >= 80 ? '🏆' : pct >= 50 ? '⭐' : '📖'}</div>
           <h2 className="text-white font-black text-3xl mb-2">Session Complete!</h2>
-          <p className="text-slate-400 mb-8">You reviewed all {total} cards</p>
+          <p className="text-slate-400 mb-8">You reviewed {total} cards</p>
           <div className="grid grid-cols-3 gap-4 mb-8">
             <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-2xl p-4">
               <p className="text-emerald-400 font-black text-3xl">{correct}</p>
@@ -509,7 +444,7 @@ function StudyMode({ queue, index, setIndex, flipped, setFlipped, correct, setCo
             </div>
             <div className="bg-red-500/10 border border-red-500/20 rounded-2xl p-4">
               <p className="text-red-400 font-black text-3xl">{incorrect}</p>
-              <p className="text-red-400/70 text-xs mt-1">Incorrect</p>
+              <p className="text-red-400/70 text-xs mt-1">To review</p>
             </div>
             <div className="bg-violet-500/10 border border-violet-500/20 rounded-2xl p-4">
               <p className="text-violet-400 font-black text-3xl">{pct}%</p>
@@ -517,11 +452,9 @@ function StudyMode({ queue, index, setIndex, flipped, setFlipped, correct, setCo
             </div>
           </div>
           <div className="flex gap-3">
-            <button onClick={onExit} className="flex-1 py-3 rounded-2xl border border-white/10 text-slate-300 hover:bg-white/5 font-semibold transition-all">
-              Back to Deck
-            </button>
+            <button onClick={onExit} className="flex-1 py-3 rounded-2xl border border-white/10 text-slate-300 hover:bg-white/5 font-semibold">Back to Deck</button>
             <button onClick={() => { setIndex(0); setFlipped(false); setCorrect(0); setIncorrect(0); }}
-              className="flex-1 py-3 rounded-2xl bg-gradient-to-r from-violet-500 to-purple-600 text-white font-bold hover:brightness-110 transition-all">
+              className="flex-1 py-3 rounded-2xl bg-gradient-to-r from-violet-500 to-purple-600 text-white font-bold hover:brightness-110">
               Study Again
             </button>
           </div>
@@ -530,24 +463,18 @@ function StudyMode({ queue, index, setIndex, flipped, setFlipped, correct, setCo
     );
   }
 
-  const diffBadge = DIFF_BADGE[card.difficulty_rating];
-
   return (
     <div className="fixed inset-0 bg-gradient-to-br from-slate-950 via-violet-950/20 to-slate-950 z-50 flex flex-col">
       <div className="flex-shrink-0 flex items-center justify-between px-6 py-4 border-b border-white/10">
-        <button onClick={onExit} className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors text-sm font-medium">
+        <button onClick={onExit} className="flex items-center gap-2 text-slate-400 hover:text-white text-sm font-medium">
           <ArrowLeft className="w-4 h-4" /> Exit
         </button>
         <div className="flex items-center gap-4 text-sm">
-          <span className="text-slate-500 font-medium">Card <span className="text-white font-bold">{index + 1}</span> of <span className="text-white font-bold">{total}</span></span>
-          <div className="flex items-center gap-3 text-xs">
-            <span className="flex items-center gap-1 text-emerald-400 font-semibold"><Check className="w-3.5 h-3.5" /> {correct}</span>
-            <span className="flex items-center gap-1 text-red-400 font-semibold"><X className="w-3.5 h-3.5" /> {incorrect}</span>
-          </div>
+          <span className="text-slate-500">Card <span className="text-white font-bold">{index + 1}</span> of <span className="text-white font-bold">{total}</span></span>
+          <span className="text-emerald-400 font-semibold">{correct} ✓</span>
+          <span className="text-red-400 font-semibold">{incorrect} ✗</span>
         </div>
-        <div className="w-20 text-right">
-          <span className="text-xs text-slate-600">Space to flip</span>
-        </div>
+        <span className="text-xs text-slate-600">Space to flip</span>
       </div>
 
       <div className="flex-shrink-0 h-1 bg-white/5">
@@ -555,9 +482,9 @@ function StudyMode({ queue, index, setIndex, flipped, setFlipped, correct, setCo
           animate={{ width: `${progress}%` }} transition={{ duration: 0.4 }} />
       </div>
 
-      <div className="flex-1 flex flex-col items-center justify-center px-4 py-8 overflow-hidden">
-        <p className="text-slate-600 text-xs mb-6 tracking-wider uppercase font-medium">
-          {flipped ? 'Answer revealed' : 'Click card to reveal answer'}
+      <div className="flex-1 flex flex-col items-center justify-center px-4 py-8">
+        <p className="text-slate-600 text-xs mb-6 tracking-wider uppercase">
+          {flipped ? 'Answer revealed' : 'Click to reveal'}
         </p>
 
         <div className="w-full cursor-pointer select-none" style={{ maxWidth: '800px', perspective: '1200px' }}
@@ -568,21 +495,20 @@ function StudyMode({ queue, index, setIndex, flipped, setFlipped, correct, setCo
             <div className="bg-gradient-to-br from-slate-800/80 to-slate-900/80 border border-white/10 rounded-3xl shadow-2xl flex flex-col items-center justify-center text-center p-10 sm:p-14"
               style={{ backfaceVisibility: 'hidden', minHeight: '300px' }}>
               <div className="flex items-center gap-2 mb-6">
-                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-violet-500/10 border border-violet-500/20">
-                  <span className="text-violet-400 text-xs font-semibold uppercase tracking-widest">
-                    {TYPE_LABELS[card.card_type] || 'Question'}
+                {typeConfig && (
+                  <span className={`text-xs px-2.5 py-1 rounded-full border font-medium ${typeConfig.bg} ${typeConfig.color}`}>
+                    {typeConfig.emoji} {typeConfig.label}
                   </span>
-                </div>
-                {card.difficulty_rating && (
-                  <span className={`px-2.5 py-1 rounded-full border text-xs font-semibold ${diffBadge}`}>
-                    {card.difficulty_rating}
+                )}
+                {diffConfig && (
+                  <span className={`text-xs px-2.5 py-1 rounded-full border font-medium ${diffConfig.bg} ${diffConfig.color}`}>
+                    {diffConfig.label}
                   </span>
                 )}
               </div>
               <p className="text-white font-bold text-2xl sm:text-3xl leading-relaxed max-w-xl">{cleanText(card.front)}</p>
-              <p className="text-slate-600 text-sm mt-8">Tap · Click · Press Space</p>
+              <p className="text-slate-600 text-sm mt-8">Tap · Space · Enter</p>
             </div>
-
             {/* Back */}
             <div className="absolute inset-0 bg-gradient-to-br from-violet-900/50 to-purple-900/50 border border-violet-400/20 rounded-3xl shadow-2xl flex flex-col items-center justify-center text-center p-10 sm:p-14"
               style={{ backfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}>
@@ -594,55 +520,40 @@ function StudyMode({ queue, index, setIndex, flipped, setFlipped, correct, setCo
           </motion.div>
         </div>
 
-        {/* Rating buttons — 4 levels */}
-        <div className="mt-10 flex flex-col items-center gap-4 w-full max-w-[800px]">
-          <div className="flex items-center gap-4 w-full">
-            <button onClick={goBack} disabled={index === 0}
-              className="flex items-center gap-2 px-5 py-3 rounded-2xl bg-white/5 border border-white/10 text-slate-300 hover:bg-white/10 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-all font-medium text-sm flex-shrink-0">
-              <ChevronLeft className="w-4 h-4" /> Prev
-            </button>
+        <div className="mt-10 flex items-center gap-4 w-full max-w-[800px]">
+          <button onClick={() => { if (index > 0) { setIndex(i => i - 1); setFlipped(false); } }} disabled={index === 0}
+            className="flex items-center gap-2 px-5 py-3 rounded-2xl bg-white/5 border border-white/10 text-slate-300 hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed font-medium text-sm flex-shrink-0">
+            <ChevronLeft className="w-4 h-4" /> Prev
+          </button>
 
-            <div className="flex gap-2 flex-1 justify-center">
-              <AnimatePresence>
-                {flipped && (
-                  <>
-                    {[
-                      { key: 'again', label: 'Again', shortcut: '1', cls: 'bg-red-500/10 border-red-500/30 text-red-400 hover:bg-red-500/20' },
-                      { key: 'hard', label: 'Hard', shortcut: '2', cls: 'bg-orange-500/10 border-orange-500/30 text-orange-400 hover:bg-orange-500/20' },
-                      { key: 'medium', label: 'Good', shortcut: '3', cls: 'bg-amber-500/10 border-amber-500/30 text-amber-400 hover:bg-amber-500/20' },
-                      { key: 'easy', label: 'Easy', shortcut: '4', cls: 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20' },
-                    ].map((btn, i) => (
-                      <motion.button key={btn.key}
-                        initial={{ opacity: 0, y: 10, scale: 0.9 }} animate={{ opacity: 1, y: 0, scale: 1 }}
-                        exit={{ opacity: 0, y: 10, scale: 0.9 }} transition={{ delay: i * 0.05 }}
-                        onClick={() => rate(btn.key)}
-                        className={`flex flex-col items-center px-4 py-3 rounded-2xl border font-bold text-sm transition-all ${btn.cls}`}>
-                        {btn.label}
-                        <span className="text-xs opacity-40 mt-0.5">[{btn.shortcut}]</span>
-                      </motion.button>
-                    ))}
-                  </>
-                )}
-              </AnimatePresence>
-              {!flipped && (
-                <button onClick={() => setFlipped(true)}
-                  className="px-8 py-3.5 rounded-2xl bg-violet-500/10 border border-violet-500/30 text-violet-300 hover:bg-violet-500/20 font-bold text-sm transition-all">
-                  Reveal Answer
-                </button>
+          <div className="flex gap-3 flex-1 justify-center">
+            <AnimatePresence>
+              {flipped && (
+                <>
+                  {['again', 'hard', 'medium', 'easy'].map((r, ri) => (
+                    <motion.button key={r}
+                      initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }}
+                      transition={{ delay: ri * 0.05 }}
+                      onClick={() => handleRate(r)}
+                      className={`flex-1 py-3 rounded-2xl border font-bold text-xs capitalize transition-all ${DIFFICULTY_CONFIG[r]?.bg} ${DIFFICULTY_CONFIG[r]?.color}`}>
+                      {r}
+                    </motion.button>
+                  ))}
+                </>
               )}
-            </div>
-
-            <button onClick={goNext} disabled={index >= total - 1}
-              className="flex items-center gap-2 px-5 py-3 rounded-2xl bg-white/5 border border-white/10 text-slate-300 hover:bg-white/10 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-all font-medium text-sm flex-shrink-0">
-              Next <ChevronRight className="w-4 h-4" />
-            </button>
+            </AnimatePresence>
+            {!flipped && (
+              <button onClick={() => setFlipped(true)}
+                className="px-8 py-3.5 rounded-2xl bg-violet-500/10 border border-violet-500/30 text-violet-300 hover:bg-violet-500/20 font-bold text-sm">
+                Reveal Answer
+              </button>
+            )}
           </div>
 
-          <div className="flex items-center gap-6 text-xs text-slate-600">
-            <span>← → navigate</span>
-            <span>Space to flip</span>
-            <span>1 Again · 2 Hard · 3 Good · 4 Easy</span>
-          </div>
+          <button onClick={() => { if (index < total - 1) { setIndex(i => i + 1); setFlipped(false); } }} disabled={index >= total - 1}
+            className="flex items-center gap-2 px-5 py-3 rounded-2xl bg-white/5 border border-white/10 text-slate-300 hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed font-medium text-sm flex-shrink-0">
+            Next <ChevronRight className="w-4 h-4" />
+          </button>
         </div>
       </div>
     </div>
