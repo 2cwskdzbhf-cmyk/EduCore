@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  BookOpen, LayoutDashboard, Zap, Brain, Search, Radio, Layers
+  BookOpen, LayoutDashboard, Zap, Brain, Search, Radio, Layers, Sparkles
 } from 'lucide-react';
 import RevisionDashboard from '@/components/revision/RevisionDashboard';
 import NotebooksView from '@/components/revision/NotebooksView';
@@ -11,6 +11,7 @@ import NotebookWorkspace from '@/components/revision/workspace/NotebookWorkspace
 import SmartStudyHub from '@/components/revision/smartstudy/SmartStudyHub';
 import AudioLearningHub from '@/components/revision/audiolearning/AudioLearningHub';
 import DeepSourceHub from '@/components/revision/deepsource/DeepSourceHub';
+import NotebookSuperpowers from '@/components/revision/superpowers/NotebookSuperpowers';
 
 const NAV = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -18,6 +19,7 @@ const NAV = [
   { id: 'smart', label: 'Smart Study', icon: Zap },
   { id: 'audio', label: 'AI Audio & Video', icon: Radio },
   { id: 'deep', label: 'Deep Source Tools', icon: Layers },
+  { id: 'superpowers', label: 'Superpowers', icon: Sparkles },
 ];
 
 export default function RevisionHub() {
@@ -151,6 +153,11 @@ export default function RevisionHub() {
             {activeSection === 'deep' && (
               <motion.div key="deep" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }}>
                 <DeepSourceHub user={user} notebooks={notebooks} />
+              </motion.div>
+            )}
+            {activeSection === 'superpowers' && (
+              <motion.div key="superpowers" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }}>
+                <NotebookSuperpowers user={user} notebooks={notebooks} />
               </motion.div>
             )}
           </AnimatePresence>
