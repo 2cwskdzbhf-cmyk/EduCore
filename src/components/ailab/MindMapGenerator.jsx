@@ -74,8 +74,8 @@ function NodeCard({ node, onEdit, onDelete, onAddChild, depth = 0 }) {
 
 let nextId = 1000;
 
-export default function MindMapGenerator() {
-  const [notes, setNotes] = useState('');
+export default function MindMapGenerator({ preloadedText = '' }) {
+  const [notes, setNotes] = useState(preloadedText);
   const [tree, setTree] = useState(null);
   const [loading, setLoading] = useState(false);
 
