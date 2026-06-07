@@ -1,12 +1,11 @@
 import React, { useState, useCallback } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronLeft, BookOpen, Layers, Zap, X, Menu } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { ChevronLeft, BookOpen, Layers, Zap, X } from 'lucide-react';
 import WorkspaceLeftPanel from './WorkspaceLeftPanel';
-import StudioCenterPanel from './StudioCenterPanel';
-import StudioCreatedItems from './StudioCreatedItems';
-import StudioToolbar from './StudioToolbar';
+import StudioCentrePanel from './StudioCenterPanel';
+import StudioRightPanel from './StudioRightPanel';
 import FlashcardStudyOverlay from './FlashcardStudyOverlay';
 
 const COLOR_MAP = {
@@ -22,7 +21,7 @@ export default function NotebookWorkspace({ notebook, user, onBack }) {
   const queryClient = useQueryClient();
   const [selectedSourceIds, setSelectedSourceIds] = useState([]);
   const [activeTool, setActiveTool] = useState('chat');
-  const [mobilePanel, setMobilePanel] = useState(null); // 'sources' | 'items' | null
+  const [mobilePanel, setMobilePanel] = useState(null); // 'sources' | 'tools' | null
   const [studySession, setStudySession] = useState(null);
 
   const { data: sources = [], refetch: refetchSources } = useQuery({
@@ -103,21 +102,17 @@ export default function NotebookWorkspace({ notebook, user, onBack }) {
               className={`px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all ${mobilePanel === 'sources' ? 'bg-violet-500/20 text-violet-300' : 'bg-white/5 text-slate-400'}`}>
               Sources
             </button>
-            <button onClick={() => setMobilePanel(mobilePanel === 'items' ? null : 'items')}
-              className={`px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all ${mobilePanel === 'items' ? 'bg-violet-500/20 text-violet-300' : 'bg-white/5 text-slate-400'}`}>
-              Items
+            <button onClick={() => setMobilePanel(mobilePanel === 'tools' ? null : 'tools')}
+              className={`px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all ${mobilePanel === 'tools' ? 'bg-violet-500/20 text-violet-300' : 'bg-white/5 text-slate-400'}`}>
+              Studio
             </button>
           </div>
         </div>
       )}
 
-      {/* Studio Toolbar (below topbar) */}
-      {!isStudying && (
-        <StudioToolbar activeTool={activeTool} onSelectTool={setActiveTool} />
-      )}
-
-      {/* 3-column layout */}
+      {/* 3-column layout — no toolbar */}
       <div className="flex flex-1 overflow-hidden">
+
         {/* LEFT — Sources */}
         {!isStudying && (
           <div className={`
@@ -144,35 +139,40 @@ export default function NotebookWorkspace({ notebook, user, onBack }) {
           </div>
         )}
 
-        {/* CENTER — Studio (all tools) */}
+        {/* CENTER — Active tool (full width when no side panels on mobile) */}
         {!isStudying && (
           <div className={`flex-1 flex flex-col min-w-0 bg-slate-900/30 ${mobilePanel !== null ? 'hidden lg:flex' : 'flex'}`}>
-            <StudioCenterPanel
-              tool={activeTool}
+            <StudioCentrePanel
+              activeTool={activeTool}
               notebook={notebook}
               user={user}
               allSources={sources}
+              resources={resources}
+              flashcards={flashcards}
               onResourceCreated={handleResourceCreated}
-              onOpenStudy={openStudyMode}
+              onRefreshFlashcards={refetchFlashcards}
+              onRefreshResources={refetchResources}
             />
           </div>
         )}
 
-        {/* RIGHT — Created Items */}
+        {/* RIGHT — Studio tool launcher + Created Items */}
         {!isStudying && (
           <div className={`
-            ${mobilePanel === 'items' ? 'flex' : 'hidden'} lg:flex
-            w-full lg:w-[24%] xl:w-[22%] flex-col flex-shrink-0
-            border-l border-white/10 bg-slate-950/60
+            ${mobilePanel === 'tools' ? 'flex' : 'hidden'} lg:flex
+            w-full lg:w-[240px] xl:w-[260px] flex-col flex-shrink-0
+            border-l border-white/10 bg-slate-950/80
             lg:relative absolute inset-0 top-0 z-20 lg:z-auto
           `}>
-            {mobilePanel === 'items' && (
+            {mobilePanel === 'tools' && (
               <div className="lg:hidden flex-shrink-0 flex items-center justify-between px-4 py-3 border-b border-white/10">
-                <p className="text-white font-bold text-sm">Created Items</p>
+                <p className="text-white font-bold text-sm">Studio</p>
                 <button onClick={() => setMobilePanel(null)}><X className="w-4 h-4 text-slate-400" /></button>
               </div>
             )}
-            <StudioCreatedItems
+            <StudioRightPanel
+              activeTool={activeTool}
+              onSelectTool={(id) => { setActiveTool(id); setMobilePanel(null); }}
               resources={resources}
               flashcards={flashcards}
               onRefresh={handleResourceCreated}

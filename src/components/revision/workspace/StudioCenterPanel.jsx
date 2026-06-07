@@ -1126,27 +1126,28 @@ function NotesTool({ notebook, user, onResourceCreated }) {
 }
 
 // ─── Main export ──────────────────────────────────────────────────────────────
-export default function StudioCenterPanel({ tool, notebook, user, allSources, onResourceCreated, onOpenStudy }) {
+export default function StudioCenterPanel({ activeTool, tool, notebook, user, allSources, onResourceCreated, onOpenStudy }) {
+  const t = activeTool || tool || 'chat';
   const props = { notebook, user, allSources, onResourceCreated, onOpenStudy };
 
   return (
     <AnimatePresence mode="wait">
-      <motion.div key={tool} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.15 }} className="flex flex-col h-full">
-        {tool === 'chat' && <AIChatTool {...props} />}
-        {tool === 'flashcards' && <FlashcardTool {...props} />}
-        {tool === 'quiz' && <QuizTool {...props} />}
-        {tool === 'test' && <SimpleGenTool tool="test" {...props} />}
-        {tool === 'exam_sim' && <SimpleGenTool tool="exam_sim" {...props} />}
-        {tool === 'equation' && <EquationTool {...props} />}
-        {tool === 'chemistry' && <ChemistryTool {...props} />}
-        {tool === 'graph' && <GraphTool {...props} />}
-        {tool === 'mindmap' && <MindMapTool {...props} />}
-        {tool === 'explainer' && <MediaTool tool="explainer" {...props} />}
-        {tool === 'podcast' && <MediaTool tool="podcast" {...props} />}
-        {tool === 'voice_tutor' && <MediaTool tool="voice_tutor" {...props} />}
-        {tool === 'summary' && <SimpleGenTool tool="summary" {...props} />}
-        {tool === 'notes' && <NotesTool {...props} />}
-        {tool === 'topic_breakdown' && <SimpleGenTool tool="topic_breakdown" {...props} />}
+      <motion.div key={t} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.15 }} className="flex flex-col h-full">
+        {t === 'chat' && <AIChatTool {...props} />}
+        {t === 'flashcards' && <FlashcardTool {...props} />}
+        {t === 'quiz' && <QuizTool {...props} />}
+        {t === 'test' && <SimpleGenTool tool="test" {...props} />}
+        {t === 'exam_sim' && <SimpleGenTool tool="exam_sim" {...props} />}
+        {t === 'equation' && <EquationTool {...props} />}
+        {t === 'chemistry' && <ChemistryTool {...props} />}
+        {t === 'graph' && <GraphTool {...props} />}
+        {t === 'mindmap' && <MindMapTool {...props} />}
+        {t === 'explainer' && <MediaTool tool="explainer" {...props} />}
+        {t === 'podcast' && <MediaTool tool="podcast" {...props} />}
+        {t === 'voice_tutor' && <MediaTool tool="voice_tutor" {...props} />}
+        {t === 'summary' && <SimpleGenTool tool="summary" {...props} />}
+        {t === 'notes' && <NotesTool {...props} />}
+        {t === 'topic_breakdown' && <SimpleGenTool tool="topic_breakdown" {...props} />}
       </motion.div>
     </AnimatePresence>
   );
