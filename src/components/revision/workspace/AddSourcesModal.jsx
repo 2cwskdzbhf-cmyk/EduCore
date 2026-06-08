@@ -117,39 +117,16 @@ Format in clear markdown with headings and bullet points. Aim for ${isDeep ? '12
   // ── Google Drive ─────────────────────────────────────────────────────────
   const [driveError, setDriveError] = useState(null);
 
-  // Google OAuth client ID (public, safe to embed) — used only for Drive Picker scope
-  const GOOGLE_CLIENT_ID = '514313700188-q7iqbj9htavabkj04k0apao1n3u04pru.apps.googleusercontent.com';
-  const PICKER_SCOPE = 'https://www.googleapis.com/auth/drive.readonly';
-
-  const getUserDriveToken = () => new Promise((resolve, reject) => {
-    const loadGsi = () => {
-      const tokenClient = window.google.accounts.oauth2.initTokenClient({
-        client_id: GOOGLE_CLIENT_ID,
-        scope: PICKER_SCOPE,
-        callback: (resp) => {
-          if (resp.error) reject(new Error(resp.error));
-          else resolve(resp.access_token);
-        },
-      });
-      tokenClient.requestAccessToken({ prompt: 'consent' });
-    };
-
-    if (!window.google?.accounts?.oauth2) {
-      const s = document.createElement('script');
-      s.src = 'https://accounts.google.com/gsi/client';
-      s.onload = loadGsi;
-      s.onerror = () => reject(new Error('Failed to load Google Sign-In'));
-      document.head.appendChild(s);
-    } else {
-      loadGsi();
-    }
-  });
+  const getUserDriveToken = async () => {
+    const res = await base44.functions.invoke('getDriveAccessToken', {});
+    if (!res.data?.accessToken) throw new Error(res.data?.error || 'Could not get Drive token');
+    return res.data.accessToken;
+  };
 
   const openGoogleDrive = async () => {
     setGdrivePicking(true);
     setDriveError(null);
     try {
-      // Each user signs into their own Google account here
       const token = await getUserDriveToken();
 
       const launchPicker = () => {
