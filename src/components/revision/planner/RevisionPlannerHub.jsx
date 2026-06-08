@@ -8,9 +8,9 @@ import DailyTasks from './DailyTasks';
 import PlannerDashboard from './PlannerDashboard';
 
 const TABS = [
-  { id: 'dashboard', label: 'Progress Dashboard', icon: BarChart3 },
-  { id: 'tasks', label: 'Daily Tasks', icon: ListTodo },
-  { id: 'planner', label: 'Smart Planner', icon: Brain },
+  { id: 'dashboard', label: 'Progress', icon: BarChart3 },
+  { id: 'tasks',     label: 'Daily Tasks', icon: ListTodo },
+  { id: 'planner',   label: 'Smart Planner', icon: Brain },
 ];
 
 export default function RevisionPlannerHub({ user }) {
@@ -23,7 +23,7 @@ export default function RevisionPlannerHub({ user }) {
     enabled: !!user?.email,
   });
 
-  const { data: tasks = [], refetch: refetchTasks } = useQuery({
+  const { data: tasks = [] } = useQuery({
     queryKey: ['revisionTasks', user?.email],
     queryFn: () => base44.entities.RevisionTask.filter({ student_email: user.email }, 'date'),
     enabled: !!user?.email,
@@ -44,27 +44,29 @@ export default function RevisionPlannerHub({ user }) {
 
   return (
     <div className="space-y-4">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-white font-black text-2xl">Revision Planner</h2>
-          <p className="text-slate-400 text-sm mt-0.5">AI-powered timetable · daily tasks · progress tracking</p>
+          <h2 className="text-[#3D52A0] font-black text-2xl">Revision Planner</h2>
+          <p className="text-[#8697C4] text-sm mt-0.5">AI-powered scheduling · daily tasks · progress tracking</p>
         </div>
         {todayDue > 0 && (
-          <div className="flex items-center gap-2 bg-violet-500/20 border border-violet-500/30 rounded-xl px-3 py-2">
-            <div className="w-2 h-2 bg-violet-400 rounded-full animate-pulse" />
-            <span className="text-violet-300 text-sm font-semibold">{todayDue} tasks due today</span>
-          </div>
+          <button onClick={() => setActiveTab('tasks')}
+            className="flex items-center gap-2 bg-[#7091E6]/15 border border-[#7091E6]/30 rounded-xl px-3 py-2 hover:bg-[#7091E6]/25 transition-all">
+            <div className="w-2 h-2 bg-[#7091E6] rounded-full animate-pulse" />
+            <span className="text-[#3D52A0] text-sm font-semibold">{todayDue} due today</span>
+          </button>
         )}
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-2 bg-white/5 border border-white/10 rounded-2xl p-1">
+      <div className="flex gap-2 bg-white/30 backdrop-blur-md border border-white/25 rounded-2xl p-1 shadow-sm">
         {TABS.map(tab => (
           <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-            className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-sm font-medium transition-all ${
+            className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-sm font-semibold transition-all ${
               activeTab === tab.id
-                ? 'bg-violet-500/20 text-violet-300 border border-violet-500/30'
-                : 'text-slate-400 hover:text-white'
+                ? 'bg-white/60 text-[#3D52A0] shadow-sm border border-white/40'
+                : 'text-[#8697C4] hover:text-[#3D52A0] hover:bg-white/20'
             }`}>
             <tab.icon className="w-4 h-4" />
             <span className="hidden sm:inline">{tab.label}</span>
