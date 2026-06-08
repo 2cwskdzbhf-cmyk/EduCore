@@ -152,6 +152,7 @@ export default function NotebookWorkspace({ notebook, user, onBack }) {
               onResourceCreated={handleResourceCreated}
               onRefreshFlashcards={refetchFlashcards}
               onRefreshResources={refetchResources}
+              onOpenStudy={openStudyMode}
             />
           </div>
         )}
