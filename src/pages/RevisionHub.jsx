@@ -48,11 +48,11 @@ export default function RevisionHub() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-violet-900/20 to-slate-900 flex">
+    <div className="min-h-screen flex" style={{ background: 'linear-gradient(135deg, #0c1024 0%, #151f50 50%, #0c1024 100%)' }}>
       {/* Sidebar */}
-      <aside className="hidden lg:flex w-56 flex-shrink-0 flex-col bg-slate-950/60 backdrop-blur-xl border-r border-white/10 py-6 px-3">
+      <aside className="hidden lg:flex w-56 flex-shrink-0 flex-col backdrop-blur-xl border-r border-white/10 py-6 px-3" style={{ background: 'rgba(8,12,26,0.6)' }}>
         <div className="flex items-center gap-2 px-3 mb-8">
-          <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center">
+          <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #3D52A0, #7091E6)' }}>
             <Brain className="w-4 h-4 text-white" />
           </div>
           <span className="text-white font-black text-base">Revision Hub</span>
@@ -60,10 +60,9 @@ export default function RevisionHub() {
         <nav className="space-y-1 flex-1">
           {NAV.map(item => (
             <button key={item.id} onClick={() => setActiveSection(item.id)}
+              style={activeSection === item.id ? { background: 'rgba(61,82,160,0.25)', color: '#ADB8DA', border: '1px solid rgba(112,145,230,0.35)' } : {}}
               className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
-                activeSection === item.id
-                  ? 'bg-violet-500/20 text-violet-300 border border-violet-500/30'
-                  : 'text-slate-400 hover:text-white hover:bg-white/5'
+                activeSection === item.id ? '' : 'text-slate-400 hover:text-white hover:bg-white/5'
               }`}>
               <item.icon className="w-4 h-4 flex-shrink-0" />
               {item.label}
@@ -85,12 +84,13 @@ export default function RevisionHub() {
       {/* Main */}
       <main className="flex-1 overflow-y-auto">
         {/* Top bar */}
-        <div className="sticky top-0 z-20 bg-slate-950/80 backdrop-blur-xl border-b border-white/10 px-6 py-3 flex items-center gap-4">
+        <div className="sticky top-0 z-20 backdrop-blur-xl border-b border-white/10 px-6 py-3 flex items-center gap-4" style={{ background: 'rgba(8,12,26,0.8)' }}>
           <div className="flex lg:hidden items-center gap-2">
             {NAV.map(item => (
               <button key={item.id} onClick={() => setActiveSection(item.id)}
+                style={activeSection === item.id ? { background: 'rgba(61,82,160,0.25)', color: '#ADB8DA' } : {}}
                 className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                  activeSection === item.id ? 'bg-violet-500/20 text-violet-300' : 'text-slate-400 hover:text-white'
+                  activeSection === item.id ? '' : 'text-slate-400 hover:text-white'
                 }`}>
                 {item.label}
               </button>
@@ -102,7 +102,7 @@ export default function RevisionHub() {
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               placeholder="Search notebooks, flashcards, notes..."
-              className="w-full pl-9 pr-4 py-2 bg-white/5 border border-white/10 rounded-xl text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-violet-500/50"
+              className="w-full pl-9 pr-4 py-2 bg-white/5 border border-white/10 rounded-xl text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-[#7091E6]/50"
             />
           </div>
         </div>

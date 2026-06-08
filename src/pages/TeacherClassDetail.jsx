@@ -277,18 +277,18 @@ export default function TeacherClassDetail() {
   };
 
   if (!classData) return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900/20 to-slate-900 flex items-center justify-center">
-      <Loader2 className="w-8 h-8 animate-spin text-purple-400" />
+    <div className="min-h-screen flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #0c1024 0%, #151f50 50%, #0c1024 100%)' }}>
+      <Loader2 className="w-8 h-8 animate-spin" style={{ color: '#7091E6' }} />
     </div>
   );
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900/20 to-slate-900">
+    <div className="min-h-screen" style={{ background: 'linear-gradient(135deg, #0c1024 0%, #151f50 50%, #0c1024 100%)' }}>
       <div className="flex h-screen">
         {/* Sidebar */}
         <aside className={`
           fixed lg:relative inset-y-0 left-0 z-40 w-64 flex-shrink-0
-          bg-slate-950/70 backdrop-blur-xl border-r border-white/10
+          backdrop-blur-xl border-r border-white/10" style={{ background: 'rgba(8,12,26,0.7)' }}
           flex flex-col transition-transform duration-300
           ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
         `}>
@@ -333,9 +333,10 @@ export default function TeacherClassDetail() {
                 <button
                   key={item.id}
                   onClick={() => { setActiveTab(item.id); setSidebarOpen(false); setCreateMode(''); }}
+                  style={activeTab === item.id ? { background: 'linear-gradient(135deg, #3D52A0, #7091E6)', boxShadow: '0 4px 15px rgba(61,82,160,0.3)' } : {}}
                   className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all text-left ${
                     activeTab === item.id
-                      ? 'bg-gradient-to-r from-purple-500 to-blue-500 text-white shadow-lg shadow-purple-500/20'
+                      ? 'text-white'
                       : 'text-slate-400 hover:text-white hover:bg-white/5'
                   }`}
                 >
@@ -360,7 +361,7 @@ export default function TeacherClassDetail() {
         {/* Main content */}
         <main className="flex-1 overflow-y-auto">
           {/* Mobile header */}
-          <div className="lg:hidden flex items-center gap-3 p-4 border-b border-white/10 bg-slate-950/50 backdrop-blur-xl sticky top-0 z-20">
+          <div className="lg:hidden flex items-center gap-3 p-4 border-b border-white/10 backdrop-blur-xl sticky top-0 z-20" style={{ background: 'rgba(8,12,26,0.5)' }}>
             <button onClick={() => setSidebarOpen(true)} className="text-slate-400 hover:text-white">
               <Menu className="w-5 h-5" />
             </button>
@@ -445,7 +446,7 @@ export default function TeacherClassDetail() {
                             className="relative overflow-hidden rounded-2xl border-2 border-purple-500/50 bg-gradient-to-br from-purple-900/50 to-pink-900/30 p-7 cursor-pointer hover:border-purple-400/80 transition-all group">
                             <div className="w-12 h-12 mb-4 rounded-2xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center"><Sparkles className="w-6 h-6 text-white" /></div>
                             <div className="flex items-center gap-2 mb-1"><h4 className="text-xl font-bold text-white">AI Generate</h4><span className="text-xs px-2 py-0.5 rounded-full bg-purple-500/30 text-purple-200 border border-purple-400/30">Recommended</span></div>
-                            <p className="text-sm text-purple-200/70">AI creates questions in seconds based on topic & difficulty.</p>
+                            <p className="text-sm text-purple-200/70">AI creates questions in seconds based on topic &amp; difficulty.</p>
                           </motion.div>
                         </div>
                       </>
@@ -497,7 +498,7 @@ export default function TeacherClassDetail() {
                         </div>
                         <Button onClick={() => generatePracticeMutation.mutate({ regenerateIndex:null, regenerateFeedback:'' })}
                           disabled={!selectedTopic||generatePracticeMutation.isPending||cooldownRemaining>0}
-                          className="w-full bg-gradient-to-r from-purple-500 to-blue-500">
+                          className="w-full text-white" style={{ background: 'linear-gradient(135deg, #3D52A0, #7091E6)' }}>
                           {generatePracticeMutation.isPending ? <><Loader2 className="w-4 h-4 mr-2 animate-spin"/>Generating...</> : cooldownRemaining>0 ? `Wait ${cooldownRemaining}s...` : <><Sparkles className="w-4 h-4 mr-2"/>Generate Questions</>}
                         </Button>
                         {generatedQuestions.length > 0 && (
@@ -808,7 +809,7 @@ function ConfirmModal({ title, description, danger, loading, onConfirm, onCancel
           </div>
           <div className="flex gap-3 justify-end">
             <Button variant="outline" onClick={onCancel} disabled={loading} className="border-white/20 text-white hover:bg-white/10">Cancel</Button>
-            <Button onClick={onConfirm} disabled={loading} className="bg-gradient-to-r from-red-500 to-red-600 text-white">
+            <Button onClick={onConfirm} disabled={loading} className="bg-gradient-to-r bg-red-600 text-white">
               {loading ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2"/>Processing...</> : confirmLabel}
             </Button>
           </div>
@@ -859,7 +860,7 @@ function ClassLeaderboard({ classData, submissions, onSelectStudent }) {
 
   return (
     <div className="space-y-4">
-      <h2 className="text-2xl font-bold text-white flex items-center gap-2"><Trophy className="w-6 h-6 text-amber-400"/> Class Analytics & Leaderboard</h2>
+      <h2 className="text-2xl font-bold text-white flex items-center gap-2"><Trophy className="w-6 h-6 text-amber-400"/> Class Analytics &amp; Leaderboard</h2>
 
       {/* Summary stats */}
       <div className="grid grid-cols-3 gap-3">
@@ -898,7 +899,7 @@ function ClassLeaderboard({ classData, submissions, onSelectStudent }) {
                 {index<3?medalEmojis[index]:index+1}
               </div>
               {/* Avatar */}
-              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+              <div className="w-8 h-8 rounded-full bg-gradient-to-br flex items-center justify-center text-white text-xs font-bold flex-shrink-0" style={{ background: 'linear-gradient(135deg, #3D52A0, #7091E6)' }}>
                 {student.displayName.charAt(0).toUpperCase()}
               </div>
               {/* Name */}

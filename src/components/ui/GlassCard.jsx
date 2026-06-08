@@ -8,7 +8,7 @@ export default function GlassCard({ children, className, hover = true, onClick, 
       className={cn(
         "relative backdrop-blur-xl bg-white/5 rounded-2xl border border-white/10",
         "shadow-[0_8px_32px_0_rgba(0,0,0,0.37)]",
-        hover && "transition-all duration-300 hover:bg-white/10 hover:shadow-[0_8px_48px_0_rgba(139,92,246,0.3)] hover:-translate-y-1",
+        hover && "transition-all duration-300 hover:bg-white/10 hover:shadow-[0_8px_48px_0_rgba(61,82,160,0.3)] hover:-translate-y-1",
         onClick && "cursor-pointer",
         className
       )}
@@ -33,7 +33,7 @@ export function StatCard({ icon: Icon, label, value, onClick, delay = 0 }) {
         className="p-8 text-center"
       >
         {Icon && (
-          <div className="w-12 h-12 mx-auto mb-4 rounded-xl bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center">
+          <div className="w-12 h-12 mx-auto mb-4 rounded-xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #3D52A0, #7091E6)' }}>
             <Icon className="w-6 h-6 text-white" />
           </div>
         )}
