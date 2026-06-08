@@ -283,12 +283,12 @@ export default function TeacherClassDetail() {
   );
 
   return (
-    <div className="min-h-screen" style={{ background: 'linear-gradient(135deg, #0c1024 0%, #151f50 50%, #0c1024 100%)' }}>
+    <div className="min-h-screen" style={{ background: 'linear-gradient(135deg, #EDE8F5 0%, #c5d0f0 40%, #7091E6 100%)' }}>
       <div className="flex h-screen">
         {/* Sidebar */}
         <aside className={`
           fixed lg:relative inset-y-0 left-0 z-40 w-64 flex-shrink-0
-          backdrop-blur-xl border-r border-white/10" style={{ background: 'rgba(8,12,26,0.7)' }}
+          backdrop-blur-xl border-r" style={{ background: 'rgba(255,255,255,0.25)', borderRight: '1px solid rgba(255,255,255,0.35)' }}
           flex flex-col transition-transform duration-300
           ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
         `}>
@@ -333,7 +333,7 @@ export default function TeacherClassDetail() {
                 <button
                   key={item.id}
                   onClick={() => { setActiveTab(item.id); setSidebarOpen(false); setCreateMode(''); }}
-                  style={activeTab === item.id ? { background: 'linear-gradient(135deg, #3D52A0, #7091E6)', boxShadow: '0 4px 15px rgba(61,82,160,0.3)' } : {}}
+                  style={activeTab === item.id ? { background: 'linear-gradient(135deg, #7091E6, #3D52A0)', boxShadow: '0 4px 15px rgba(112,145,230,0.35)' } : {}}
                   className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all text-left ${
                     activeTab === item.id
                       ? 'text-white'
@@ -361,7 +361,7 @@ export default function TeacherClassDetail() {
         {/* Main content */}
         <main className="flex-1 overflow-y-auto">
           {/* Mobile header */}
-          <div className="lg:hidden flex items-center gap-3 p-4 border-b border-white/10 backdrop-blur-xl sticky top-0 z-20" style={{ background: 'rgba(8,12,26,0.5)' }}>
+          <div className="lg:hidden flex items-center gap-3 p-4 border-b backdrop-blur-xl sticky top-0 z-20" style={{ background: 'rgba(237,232,245,0.85)', borderColor: 'rgba(255,255,255,0.4)' }}>
             <button onClick={() => setSidebarOpen(true)} className="text-slate-400 hover:text-white">
               <Menu className="w-5 h-5" />
             </button>
