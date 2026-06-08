@@ -1358,7 +1358,7 @@ export default function StudioCenterPanel({ activeTool, tool, notebook, user, al
       <motion.div key={t} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.15 }} className="flex flex-col h-full">
         {t === 'chat' && <AIChatTool {...props} />}
         {t === 'flashcards' && <FlashcardTool {...props} />}
-        {t === 'quiz' && <QuizBuilder {...props} />}
+        {t === 'quiz' && <QuizTool {...props} />}
         {t === 'test' && <ExamSimulator {...props} />}
         {t === 'equation' && <EquationTool {...props} />}
         {t === 'chemistry' && <ChemistryTool {...props} />}
