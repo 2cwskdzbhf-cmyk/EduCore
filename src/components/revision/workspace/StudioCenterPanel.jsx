@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import ExamSimulator from './ExamSimulator';
 import QuizBuilder from './QuizBuilder';
 import QuizBuilderTool from './QuizBuilderTool';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -1254,7 +1255,7 @@ export default function StudioCenterPanel({ activeTool, tool, notebook, user, al
         {t === 'chat' && <AIChatTool {...props} />}
         {t === 'flashcards' && <FlashcardTool {...props} />}
         {t === 'quiz' && <QuizBuilder {...props} />}
-        {t === 'test' && <SimpleGenTool tool="test" {...props} />}
+        {t === 'test' && <ExamSimulator {...props} />}
         {t === 'exam_sim' && <SimpleGenTool tool="exam_sim" {...props} />}
         {t === 'equation' && <EquationTool {...props} />}
         {t === 'chemistry' && <ChemistryTool {...props} />}
