@@ -473,18 +473,48 @@ SOURCES:\n${combined}`,
 }
 
 // ─── Quiz Tool ────────────────────────────────────────────────────────────────
+// Plays a short tone using Web Audio API
+function playTone(type) {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    if (type === 'correct') {
+      osc.frequency.setValueAtTime(880, ctx.currentTime);
+      osc.frequency.setValueAtTime(1100, ctx.currentTime + 0.08);
+      gain.gain.setValueAtTime(0.18, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.35);
+    } else {
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(220, ctx.currentTime);
+      gain.gain.setValueAtTime(0.15, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.25);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.25);
+    }
+  } catch {}
+}
+
 function QuizTool({ notebook, user, allSources, onResourceCreated }) {
   const [loading, setLoading] = useState(false);
   const [questions, setQuestions] = useState([]);
+  // answers: { [qi]: selectedIndex }
+  // revealed: { [qi]: true } — once answered, show green/red immediately
   const [answers, setAnswers] = useState({});
-  const [submitted, setSubmitted] = useState(false);
-  const [score, setScore] = useState(0);
+  const [revealed, setRevealed] = useState({});
+  const [score, setScore] = useState(null);
 
   const hasContent = allSources.some(s => s.content_text);
   if (!hasContent) return <NoSources />;
 
+  const allAnswered = questions.length > 0 && Object.keys(answers).length === questions.length;
+
   const generate = async () => {
-    setLoading(true); setQuestions([]); setAnswers({}); setSubmitted(false);
+    setLoading(true); setQuestions([]); setAnswers({}); setRevealed({}); setScore(null);
     const ctx = getSourceContext(allSources);
     const result = await base44.integrations.Core.InvokeLLM({
       prompt: `Generate a 10-question multiple choice quiz from these sources. Cover the most important concepts.\n\nSOURCES:\n${ctx}`,
@@ -520,76 +550,153 @@ function QuizTool({ notebook, user, allSources, onResourceCreated }) {
     setLoading(false);
   };
 
-  const submit = () => {
-    let correct = 0;
-    questions.forEach((q, i) => { if (answers[i] === q.correct_index) correct++; });
-    setScore(correct); setSubmitted(true);
+  // Instant feedback: answer locks in immediately and shows green/red
+  const handleAnswer = (qi, oi, correct_index) => {
+    if (revealed[qi] !== undefined) return; // already answered
+    const isCorrect = oi === correct_index;
+    playTone(isCorrect ? 'correct' : 'wrong');
+    setAnswers(a => ({ ...a, [qi]: oi }));
+    setRevealed(r => ({ ...r, [qi]: true }));
+    if (allAnswered || Object.keys(answers).length + 1 === questions.length) {
+      // Calculate score when all questions answered
+      const newAnswers = { ...answers, [qi]: oi };
+      const correct = questions.filter((q, i) => newAnswers[i] === q.correct_index).length;
+      setTimeout(() => setScore(correct), 400);
+    }
   };
 
   if (loading) return (
-    <div className="flex flex-col items-center justify-center h-full gap-4">
-      <Loader2 className="w-10 h-10 text-indigo-400 animate-spin" />
-      <p className="text-white font-bold">Generating Quiz…</p>
+    <div className="flex flex-col items-center justify-center h-full gap-4"
+      style={{ background: 'linear-gradient(135deg, #EDE8F5 0%, #c8d4f5 100%)' }}>
+      <div className="w-14 h-14 rounded-2xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #7091E6, #3D52A0)' }}>
+        <Loader2 className="w-7 h-7 text-white animate-spin" />
+      </div>
+      <p className="font-bold text-lg" style={{ color: '#3D52A0' }}>Generating Quiz…</p>
     </div>
   );
 
   if (questions.length === 0) return (
-    <div className="flex flex-col items-center justify-center h-full gap-6 p-8 text-center">
-      <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-500 to-blue-600 flex items-center justify-center shadow-lg shadow-indigo-500/30">
+    <div className="flex flex-col items-center justify-center h-full gap-6 p-8 text-center"
+      style={{ background: 'linear-gradient(135deg, #EDE8F5 0%, #c8d4f5 100%)' }}>
+      <div className="w-16 h-16 rounded-2xl flex items-center justify-center shadow-lg"
+        style={{ background: 'linear-gradient(135deg, #7091E6, #3D52A0)' }}>
         <Zap className="w-8 h-8 text-white" />
       </div>
       <div>
-        <h2 className="text-white font-bold text-xl mb-2">Quiz Generator</h2>
-        <p className="text-slate-400 text-sm max-w-md">Auto-generates a 10-question multiple choice quiz from your sources with instant marking.</p>
+        <h2 className="font-black text-xl mb-2" style={{ color: '#3D52A0' }}>Quiz Generator</h2>
+        <p className="text-sm max-w-md" style={{ color: '#8697C4' }}>
+          10-question quiz with instant green/red feedback and sound effects.
+        </p>
       </div>
-      <button onClick={generate} className="px-8 py-3 bg-gradient-to-r from-indigo-500 to-blue-600 text-white rounded-xl font-bold text-base hover:brightness-110 transition-all shadow-lg">
+      <button onClick={generate}
+        className="px-8 py-3.5 rounded-2xl text-white font-bold text-base shadow-lg"
+        style={{ background: 'linear-gradient(135deg, #7091E6, #3D52A0)' }}>
         Generate Quiz
       </button>
     </div>
   );
 
+  const answeredCount = Object.keys(answers).length;
+
   return (
-    <div className="flex flex-col h-full overflow-y-auto">
-      <div className="flex-shrink-0 px-6 py-4 border-b border-white/10 flex items-center justify-between">
+    <div className="flex flex-col h-full" style={{ background: 'linear-gradient(135deg, #EDE8F5 0%, #c8d4f5 100%)' }}>
+      {/* Header */}
+      <div className="flex-shrink-0 px-6 py-4 flex items-center justify-between"
+        style={{ background: 'rgba(255,255,255,0.45)', backdropFilter: 'blur(20px)', borderBottom: '1px solid rgba(255,255,255,0.4)' }}>
         <div>
-          <h2 className="text-white font-bold">Multiple Choice Quiz</h2>
-          <p className="text-slate-400 text-xs">{questions.length} questions · {notebook.name}</p>
+          <h2 className="font-black" style={{ color: '#3D52A0' }}>Multiple Choice Quiz</h2>
+          <p className="text-xs" style={{ color: '#8697C4' }}>{questions.length} questions · {notebook.name}</p>
         </div>
-        <div className="flex gap-2">
-          {submitted && <span className="px-3 py-1.5 bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 rounded-xl text-sm font-bold">{score}/{questions.length} correct</span>}
-          <button onClick={generate} className="px-3 py-1.5 bg-white/5 border border-white/10 text-slate-400 rounded-xl text-xs hover:text-white transition-all">New Quiz</button>
-        </div>
-      </div>
-      <div className="flex-1 overflow-y-auto p-6 space-y-6">
-        {questions.map((q, qi) => (
-          <div key={qi} className={`p-5 rounded-2xl border transition-all ${
-            submitted ? (answers[qi] === q.correct_index ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-red-500/10 border-red-500/30') : 'bg-white/[0.04] border-white/10'
-          }`}>
-            <p className="text-white font-semibold mb-4"><span className="text-slate-500 mr-2">Q{qi+1}.</span>{q.question}</p>
-            <div className="grid grid-cols-1 gap-2">
-              {q.options.map((opt, oi) => (
-                <button key={oi} onClick={() => !submitted && setAnswers(a => ({ ...a, [qi]: oi }))}
-                  className={`text-left px-4 py-2.5 rounded-xl border text-sm transition-all ${
-                    submitted
-                      ? oi === q.correct_index ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-200' : answers[qi] === oi ? 'bg-red-500/20 border-red-500/40 text-red-300' : 'bg-white/[0.03] border-white/10 text-slate-400'
-                      : answers[qi] === oi ? 'bg-violet-500/20 border-violet-500/40 text-violet-200' : 'bg-white/[0.03] border-white/10 text-slate-300 hover:bg-white/[0.07]'
-                  }`}>
-                  <span className="font-bold mr-2 text-slate-500">{['A','B','C','D'][oi]}.</span>{opt}
-                </button>
-              ))}
-            </div>
-            {submitted && <p className="text-slate-400 text-xs mt-3 italic">{q.explanation}</p>}
-          </div>
-        ))}
-      </div>
-      {!submitted && (
-        <div className="flex-shrink-0 p-4 border-t border-white/10">
-          <button onClick={submit} disabled={Object.keys(answers).length < questions.length}
-            className="w-full py-3 bg-gradient-to-r from-indigo-500 to-blue-600 text-white rounded-xl font-bold disabled:opacity-40 hover:brightness-110 transition-all">
-            Submit Quiz ({Object.keys(answers).length}/{questions.length} answered)
+        <div className="flex items-center gap-3">
+          {score !== null && (
+            <span className="px-3 py-1.5 rounded-xl text-sm font-black"
+              style={{ background: score / questions.length >= 0.7 ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.12)', color: score / questions.length >= 0.7 ? '#059669' : '#dc2626', border: `1px solid ${score / questions.length >= 0.7 ? 'rgba(16,185,129,0.3)' : 'rgba(239,68,68,0.25)'}` }}>
+              {score}/{questions.length} correct
+            </span>
+          )}
+          <button onClick={generate}
+            className="px-3 py-1.5 rounded-xl text-xs font-semibold transition-all"
+            style={{ background: 'rgba(255,255,255,0.5)', border: '1px solid rgba(255,255,255,0.4)', color: '#3D52A0' }}>
+            New Quiz
           </button>
         </div>
-      )}
+      </div>
+
+      {/* Questions */}
+      <div className="flex-1 overflow-y-auto p-5 space-y-5">
+        {questions.map((q, qi) => {
+          const isRevealed = revealed[qi] !== undefined;
+          const selectedOi = answers[qi];
+          const isQCorrect = selectedOi === q.correct_index;
+          return (
+            <motion.div key={qi}
+              className="rounded-2xl p-5 transition-all"
+              style={{
+                background: !isRevealed ? 'rgba(255,255,255,0.3)' : isQCorrect ? 'rgba(16,185,129,0.08)' : 'rgba(239,68,68,0.07)',
+                border: !isRevealed ? '1px solid rgba(255,255,255,0.45)' : isQCorrect ? '1.5px solid rgba(16,185,129,0.35)' : '1.5px solid rgba(239,68,68,0.3)',
+                backdropFilter: 'blur(12px)',
+              }}>
+              <p className="font-semibold text-sm mb-4" style={{ color: '#3D52A0' }}>
+                <span className="font-black mr-2" style={{ color: '#8697C4' }}>Q{qi + 1}.</span>{q.question}
+              </p>
+              <div className="grid grid-cols-1 gap-2">
+                {q.options.map((opt, oi) => {
+                  let bg = 'rgba(255,255,255,0.5)';
+                  let border = '1px solid rgba(255,255,255,0.4)';
+                  let color = '#3D52A0';
+                  let icon = null;
+                  if (isRevealed) {
+                    if (oi === q.correct_index) {
+                      bg = 'rgba(16,185,129,0.18)'; border = '2px solid #10b981'; color = '#065f46';
+                      icon = <CheckCircle className="w-4 h-4 flex-shrink-0" style={{ color: '#10b981' }} />;
+                    } else if (oi === selectedOi) {
+                      bg = 'rgba(239,68,68,0.15)'; border = '2px solid #ef4444'; color = '#7f1d1d';
+                      icon = <XCircle className="w-4 h-4 flex-shrink-0" style={{ color: '#ef4444' }} />;
+                    } else {
+                      bg = 'rgba(255,255,255,0.25)'; color = '#8697C4';
+                    }
+                  } else if (selectedOi === oi) {
+                    bg = 'rgba(112,145,230,0.18)'; border = '2px solid #7091E6';
+                  }
+                  return (
+                    <button key={oi}
+                      onClick={() => handleAnswer(qi, oi, q.correct_index)}
+                      disabled={isRevealed}
+                      className="text-left px-4 py-2.5 rounded-xl text-sm font-medium transition-all flex items-center gap-2 disabled:cursor-default"
+                      style={{ background: bg, border, color }}>
+                      <span className="font-black text-xs w-5 flex-shrink-0" style={{ color: isRevealed ? (oi === q.correct_index ? '#10b981' : oi === selectedOi ? '#ef4444' : '#8697C4') : '#8697C4' }}>
+                        {['A','B','C','D'][oi]}.
+                      </span>
+                      <span className="flex-1">{opt}</span>
+                      {icon}
+                    </button>
+                  );
+                })}
+              </div>
+              {isRevealed && (
+                <motion.p initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }}
+                  className="text-xs mt-3 italic px-1" style={{ color: '#8697C4' }}>
+                  {q.explanation}
+                </motion.p>
+              )}
+            </motion.div>
+          );
+        })}
+      </div>
+
+      {/* Progress bar */}
+      <div className="flex-shrink-0 px-6 py-3"
+        style={{ background: 'rgba(255,255,255,0.4)', backdropFilter: 'blur(20px)', borderTop: '1px solid rgba(255,255,255,0.4)' }}>
+        <div className="flex items-center justify-between mb-1.5">
+          <span className="text-xs font-semibold" style={{ color: '#8697C4' }}>{answeredCount}/{questions.length} answered</span>
+          {score !== null && <span className="text-xs font-black" style={{ color: score / questions.length >= 0.7 ? '#10b981' : '#ef4444' }}>{Math.round((score / questions.length) * 100)}%</span>}
+        </div>
+        <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(112,145,230,0.15)' }}>
+          <motion.div className="h-full rounded-full" style={{ background: 'linear-gradient(90deg, #7091E6, #3D52A0)' }}
+            animate={{ width: `${(answeredCount / questions.length) * 100}%` }}
+            transition={{ duration: 0.3 }} />
+        </div>
+      </div>
     </div>
   );
 }
@@ -1256,7 +1363,6 @@ export default function StudioCenterPanel({ activeTool, tool, notebook, user, al
         {t === 'flashcards' && <FlashcardTool {...props} />}
         {t === 'quiz' && <QuizBuilder {...props} />}
         {t === 'test' && <ExamSimulator {...props} />}
-        {t === 'exam_sim' && <SimpleGenTool tool="exam_sim" {...props} />}
         {t === 'equation' && <EquationTool {...props} />}
         {t === 'chemistry' && <ChemistryTool {...props} />}
         {t === 'graph' && <GraphTool {...props} />}
