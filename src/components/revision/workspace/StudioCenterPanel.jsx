@@ -15,7 +15,7 @@ import {
   AlertTriangle, ThumbsUp, ThumbsDown,
   Calculator, FlaskConical, BarChart2, Network,
   Video, Mic2, MessageSquare, FileText, StickyNote, BookOpen,
-  Layers, Zap, ClipboardCheck, Timer, CheckCircle, XCircle,
+  Layers, Zap, ClipboardCheck, CheckCircle, XCircle,
   ChevronDown, ChevronUp, Sparkles, RotateCcw as Reset
 } from 'lucide-react';
 import {
@@ -608,14 +608,12 @@ function SimpleGenTool({ tool, notebook, user, allSources, onResourceCreated }) 
 
   const PROMPTS = {
     test: `Generate a 5-question long-form exam test with mark schemes for "${notebook.name}". Include extended writing questions, calculation questions, and evaluation questions. Provide full model answers and mark allocation.`,
-    exam_sim: `Create a full timed exam simulation for "${notebook.name}". Include a mix of multiple choice, short answer, and extended response questions. Provide total marks, time allowed, and a detailed mark scheme.`,
     summary: `Write a comprehensive, well-structured summary of all key topics from the following sources. Use clear headings, bullet points, and highlight the most important concepts.`,
     topic_breakdown: `Provide a complete topic breakdown for "${notebook.name}". For each main topic: key concepts, important facts, formulas if applicable, likely exam questions, and common misconceptions.`,
   };
 
   const CONFIGS = {
     test: { label: 'Test', icon: ClipboardCheck, color: 'from-rose-500 to-pink-600', resource_type: 'exam_questions', desc: 'Long-form exam questions with mark scheme' },
-    exam_sim: { label: 'Exam Simulation', icon: Timer, color: 'from-red-500 to-orange-600', resource_type: 'exam_questions', desc: 'Full timed exam with analytics' },
     summary: { label: 'Summary', icon: FileText, color: 'from-cyan-500 to-sky-600', resource_type: 'summary', desc: 'Comprehensive source summary' },
     topic_breakdown: { label: 'Topic Breakdown', icon: BookOpen, color: 'from-slate-500 to-slate-600', resource_type: 'topic_breakdown', desc: 'Full topic overview and breakdown' },
   };
@@ -1111,8 +1109,6 @@ export default function StudioCenterPanel({ activeTool, tool, notebook, user, al
         {t === 'chat' && <AIChatTool {...props} />}
         {t === 'flashcards' && <FlashcardTool {...props} />}
         {t === 'quiz' && <QuizBuilder {...props} />}
-        {t === 'test' && <ExamSimulator {...props} />}
-        {t === 'exam_sim' && <SimpleGenTool tool="exam_sim" {...props} />}
         {t === 'equation' && <EquationTool {...props} />}
         {t === 'chemistry' && <ChemistryTool {...props} />}
         {t === 'graph' && <GraphTool {...props} />}
