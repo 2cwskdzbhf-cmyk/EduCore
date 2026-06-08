@@ -374,12 +374,14 @@ ${batch.chunk}`,
       {/* Tab switcher */}
       <div className="flex-shrink-0 flex border-b border-white/10">
         <button onClick={() => setPanelTab('chat')}
-          className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-bold transition-all border-b-2 ${panelTab === 'chat' ? 'border-violet-400 text-violet-300' : 'border-transparent text-slate-500 hover:text-slate-300'}`}>
+          className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-bold transition-all border-b-2 ${panelTab === 'chat' ? 'border-blue-500' : 'border-transparent hover:opacity-70'}`}
+          style={{ color: panelTab === 'chat' ? '#3D52A0' : '#8697C4' }}>
           <BrainCircuit className="w-3.5 h-3.5" /> AI Tutor
         </button>
         <button onClick={() => setPanelTab('quiz')}
-          className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-bold transition-all border-b-2 ${panelTab === 'quiz' ? 'border-violet-400 text-violet-300' : 'border-transparent text-slate-500 hover:text-slate-300'}`}>
-          <ClipboardList className="w-3.5 h-3.5" /> Quiz & Test
+          className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-bold transition-all border-b-2 ${panelTab === 'quiz' ? 'border-blue-500' : 'border-transparent hover:opacity-70'}`}
+          style={{ color: panelTab === 'quiz' ? '#3D52A0' : '#8697C4' }}>
+          <ClipboardList className="w-3.5 h-3.5" /> Quiz {'&'} Test
         </button>
       </div>
 
@@ -399,8 +401,8 @@ ${batch.chunk}`,
           <BrainCircuit className="w-3.5 h-3.5 text-white" />
         </div>
         <div className="flex-1 min-w-0">
-          <h2 className="text-white font-bold text-sm leading-tight">Studio AI</h2>
-          <p className="text-[10px] text-slate-500 leading-tight">
+          <h2 className="font-bold text-sm leading-tight" style={{ color: '#3D52A0' }}>Studio AI</h2>
+          <p className="text-[10px] leading-tight" style={{ color: '#8697C4' }}>
             {selectedSources.length > 0 ? `${selectedSources.length} source${selectedSources.length !== 1 ? 's' : ''} selected` : `All ${allSources.length} sources`}
           </p>
         </div>
@@ -431,7 +433,8 @@ ${batch.chunk}`,
       <div className="flex-shrink-0 px-4 pt-2 pb-1.5 flex gap-1.5 overflow-x-auto scrollbar-hide">
         {QUICK_CHIPS.map(c => (
           <button key={c.label} onClick={() => sendMessage(c.prompt)} disabled={loading || generating}
-            className="flex-shrink-0 px-3 py-1.5 rounded-full bg-white/5 border border-white/10 text-xs text-slate-300 hover:text-white hover:bg-violet-500/15 hover:border-violet-500/30 transition-all font-medium whitespace-nowrap disabled:opacity-40">
+            className="flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap disabled:opacity-40 transition-all"
+            style={{ background: 'rgba(112,145,230,0.12)', border: '1px solid rgba(112,145,230,0.25)', color: '#3D52A0' }}>
             {c.label}
           </button>
         ))}
@@ -482,13 +485,14 @@ ${batch.chunk}`,
             <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-violet-600 to-purple-700 flex items-center justify-center text-xl mx-auto mb-3 shadow-lg shadow-violet-500/30">
               <BrainCircuit className="w-6 h-6 text-white" />
             </div>
-            <p className="text-white font-bold text-sm mb-1">Studio AI Assistant</p>
-            <p className="text-slate-400 text-xs mb-1">Fully connected to your sources.</p>
-            <p className="text-slate-500 text-[11px] mb-5">All generated content saves directly to Studio.</p>
+            <p className="font-bold text-sm mb-1" style={{ color: '#3D52A0' }}>Studio AI Assistant</p>
+            <p className="text-xs mb-1" style={{ color: '#8697C4' }}>Fully connected to your sources.</p>
+            <p className="text-[11px] mb-5" style={{ color: '#8697C4' }}>All generated content saves directly to Studio.</p>
             <div className="space-y-2 max-w-xs mx-auto">
               {SUGGESTED.map(q => (
                 <button key={q} onClick={() => sendMessage(q)}
-                  className="w-full text-left px-3 py-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/[0.08] text-slate-300 text-xs transition-all flex items-center justify-between gap-2">
+                  className="w-full text-left px-3 py-2 rounded-xl text-xs transition-all flex items-center justify-between gap-2"
+                  style={{ background: 'rgba(112,145,230,0.08)', border: '1px solid rgba(112,145,230,0.2)', color: '#3D52A0' }}>
                   <span>"{q}"</span>
                   <ChevronRight className="w-3 h-3 flex-shrink-0 text-slate-500" />
                 </button>
@@ -508,11 +512,14 @@ ${batch.chunk}`,
             <div className={`max-w-[88%] ${m.role === 'user' ? 'order-1' : ''}`}>
               <div className={`px-3.5 py-2.5 rounded-2xl text-sm leading-relaxed ${
                 m.role === 'user'
-                  ? 'bg-gradient-to-br from-violet-600 to-purple-700 text-white rounded-br-sm shadow-lg shadow-violet-500/20'
-                  : 'bg-white/[0.06] border border-white/10 text-slate-200 rounded-bl-sm'
-              }`}>
+                  ? 'rounded-br-sm shadow-lg'
+                  : 'rounded-bl-sm'
+              }`} style={m.role === 'user'
+                ? { background: 'linear-gradient(135deg, #7091E6, #3D52A0)', color: '#fff', boxShadow: '0 4px 15px rgba(112,145,230,0.3)' }
+                : { background: 'rgba(255,255,255,0.55)', border: '1px solid rgba(112,145,230,0.2)', color: '#3D52A0', backdropFilter: 'blur(12px)' }
+              }>
                 <p className="whitespace-pre-wrap">{m.content}</p>
-                <p className="text-[10px] opacity-40 mt-1">{new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                <p className="text-[10px] mt-1" style={{ opacity: 0.5 }}>{new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
               </div>
               {m.role === 'assistant' && (
                 <div className="flex items-center gap-1 mt-1 pl-0.5">
@@ -562,7 +569,7 @@ ${batch.chunk}`,
 
       {/* Input */}
       <div className="flex-shrink-0 p-4 border-t border-white/10">
-        <div className="flex gap-2.5 items-end bg-white/5 border border-white/15 focus-within:border-violet-500/50 rounded-2xl p-3 transition-all">
+        <div className="flex gap-2.5 items-end rounded-2xl p-3 transition-all" style={{ background: 'rgba(255,255,255,0.5)', border: '1px solid rgba(112,145,230,0.3)', backdropFilter: 'blur(12px)' }}>
           <textarea
             ref={textareaRef}
             value={input}
@@ -570,15 +577,15 @@ ${batch.chunk}`,
             onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(input); } }}
             placeholder="Ask anything, generate flashcards, create a quiz…"
             rows={1}
-            style={{ maxHeight: '128px', overflowY: 'auto' }}
-            className="flex-1 bg-transparent text-white text-sm resize-none focus:outline-none placeholder:text-slate-500 leading-relaxed"
+            style={{ maxHeight: '128px', overflowY: 'auto', color: '#3D52A0' }}
+            className="flex-1 bg-transparent text-sm resize-none focus:outline-none leading-relaxed placeholder:text-blue-300"
           />
           <button onClick={() => sendMessage(input)} disabled={!input.trim() || loading || generating}
             className="w-9 h-9 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center disabled:opacity-40 flex-shrink-0 hover:brightness-110 transition-all shadow-lg shadow-violet-500/30">
             {loading ? <Loader2 className="w-4 h-4 text-white animate-spin" /> : <Send className="w-4 h-4 text-white" />}
           </button>
         </div>
-        <p className="text-[10px] text-slate-600 mt-1.5 px-1">Enter to send · Shift+Enter for new line · Generated content auto-saves to Studio</p>
+        <p className="text-[10px] mt-1.5 px-1" style={{ color: '#8697C4' }}>Enter to send · Shift+Enter for new line · Generated content auto-saves to Studio</p>
       </div>
       </>}
     </div>
