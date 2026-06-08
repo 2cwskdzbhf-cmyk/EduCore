@@ -158,8 +158,8 @@ export default function Layout({ children, currentPageName }) {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900/20 to-slate-900 flex items-center justify-center">
-        <div className="w-12 h-12 border-4 border-purple-500 border-t-transparent rounded-full animate-spin shadow-lg shadow-purple-500/50" />
+      <div className="min-h-screen flex items-center justify-center" style={{ background: '#0F1228' }}>
+        <div className="w-12 h-12 border-4 border-t-transparent rounded-full animate-spin" style={{ borderColor: '#7091E6', borderTopColor: 'transparent' }} />
       </div>
     );
   }
@@ -171,12 +171,13 @@ export default function Layout({ children, currentPageName }) {
   const navItems = getNavItems();
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900/20 to-slate-900">
+    <div className="min-h-screen" style={{ background: 'linear-gradient(135deg, #0F1228 0%, #1a2050 50%, #0F1228 100%)' }}>
       <aside 
         className={cn(
-          "hidden lg:flex fixed left-0 top-0 bottom-0 bg-slate-950/50 backdrop-blur-xl border-r border-white/10 flex-col z-50 transition-all duration-300 ease-out",
+          "hidden lg:flex fixed left-0 top-0 bottom-0 backdrop-blur-xl flex-col z-50 transition-all duration-300 ease-out",
           sidebarExpanded ? "w-64" : "w-20"
         )}
+        style={{ background: 'linear-gradient(180deg, #1e2d6e 0%, #0c1024 100%)', borderRight: '1px solid rgba(112,145,230,0.2)' }}
         onMouseEnter={() => setSidebarExpanded(true)}
         onMouseLeave={() => setSidebarExpanded(false)}
       >

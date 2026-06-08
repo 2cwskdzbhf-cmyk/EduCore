@@ -10,6 +10,14 @@ module.exports = {
   			sm: 'calc(var(--radius) - 4px)'
   		},
   		colors: {
+  			/* ── Brand tokens as Tailwind classes ── */
+  			brand: {
+  				primary:   'rgb(61 82 160)',   /* #3D52A0 */
+  				secondary: 'rgb(112 145 230)', /* #7091E6 */
+  				surface:   'rgb(134 151 196)', /* #8697C4 */
+  				base:      'rgb(173 184 218)', /* #ADB8DA */
+  				light:     'rgb(237 232 245)', /* #EDE8F5 */
+  			},
   			background: 'hsl(var(--background))',
   			foreground: 'hsl(var(--foreground))',
   			card: {
