@@ -236,16 +236,63 @@ function QuizBuilderConfig({ notebook, allSources, onStart }) {
   );
 }
 
+// ─── Audio feedback helpers ───────────────────────────────────────────────────
+function playSuccessSound() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.frequency.setValueAtTime(523, ctx.currentTime);
+    osc.frequency.setValueAtTime(659, ctx.currentTime + 0.1);
+    osc.frequency.setValueAtTime(784, ctx.currentTime + 0.2);
+    gain.gain.setValueAtTime(0.18, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + 0.5);
+  } catch {}
+}
+
+function playErrorSound() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(220, ctx.currentTime);
+    osc.frequency.setValueAtTime(180, ctx.currentTime + 0.08);
+    gain.gain.setValueAtTime(0.14, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + 0.3);
+  } catch {}
+}
+
 // ─── Quiz Player ──────────────────────────────────────────────────────────────
 function QuizPlayer({ questions, config, onSubmit }) {
   const [currentIdx, setCurrentIdx] = useState(0);
   const [answers, setAnswers] = useState({});
+  const [instantFeedback, setInstantFeedback] = useState({}); // {qIdx: 'correct'|'wrong'}
 
   const q = questions[currentIdx];
   const totalAnswered = Object.keys(answers).length;
-  const progress = (currentIdx / questions.length) * 100;
 
-  const setAnswer = (val) => setAnswers(prev => ({ ...prev, [currentIdx]: val }));
+  const setAnswer = (val) => {
+    if (answers[currentIdx] !== undefined) return; // don't allow changing after answered
+    setAnswers(prev => ({ ...prev, [currentIdx]: val }));
+
+    // Instant feedback for MCQ and fill-in-blank
+    if (q.type === 'mcq') {
+      const correct = val === q.correct_index;
+      setInstantFeedback(prev => ({ ...prev, [currentIdx]: { chosen: val, correct } }));
+      if (correct) playSuccessSound(); else playErrorSound();
+    } else if (q.type === 'fill') {
+      const correct = (val + '').trim().toLowerCase() === (q.correct_answer || '').trim().toLowerCase();
+      setInstantFeedback(prev => ({ ...prev, [currentIdx]: { chosen: val, correct } }));
+      if (correct) playSuccessSound(); else playErrorSound();
+    }
+  };
 
   return (
     <div className="flex flex-col h-full">
@@ -287,17 +334,37 @@ function QuizPlayer({ questions, config, onSubmit }) {
             {/* MCQ options */}
             {q.type === 'mcq' && q.options && (
               <div className="space-y-2.5">
-                {q.options.map((opt, oi) => (
-                  <button key={oi} onClick={() => setAnswer(oi)}
-                    className={`w-full text-left px-5 py-3.5 rounded-2xl border text-sm transition-all ${
-                      answers[currentIdx] === oi
-                        ? 'bg-indigo-500/20 border-indigo-500/50 text-white shadow-md shadow-indigo-500/10'
-                        : 'bg-white/[0.04] border-white/10 text-slate-300 hover:bg-white/[0.08] hover:border-white/20'
-                    }`}>
-                    <span className="font-bold text-slate-500 mr-3">{['A','B','C','D'][oi]}.</span>
-                    {opt}
-                  </button>
-                ))}
+                {q.options.map((opt, oi) => {
+                  const fb = instantFeedback[currentIdx];
+                  const isChosen = fb?.chosen === oi;
+                  const isCorrect = oi === q.correct_index;
+                  let style = 'bg-white/[0.04] border-white/10 text-slate-300 hover:bg-white/[0.08] hover:border-white/20';
+                  if (fb) {
+                    if (isChosen && fb.correct) style = 'bg-emerald-500/20 border-emerald-500/60 text-white shadow-lg shadow-emerald-500/20';
+                    else if (isChosen && !fb.correct) style = 'bg-red-500/20 border-red-500/60 text-white shadow-lg shadow-red-500/20';
+                    else if (!isChosen && isCorrect && !fb.correct) style = 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300';
+                    else style = 'bg-white/[0.02] border-white/5 text-slate-500 opacity-50';
+                  } else if (answers[currentIdx] === oi) {
+                    style = 'bg-indigo-500/20 border-indigo-500/50 text-white shadow-md shadow-indigo-500/10';
+                  }
+                  return (
+                    <motion.button
+                      key={oi}
+                      onClick={() => setAnswer(oi)}
+                      whileTap={!fb ? { scale: 0.98 } : {}}
+                      animate={isChosen && fb ? { scale: [1, 1.02, 1] } : {}}
+                      transition={{ duration: 0.2 }}
+                      className={`w-full text-left px-5 py-3.5 rounded-2xl border text-sm transition-all ${style}`}>
+                      <span className="font-bold text-slate-500 mr-3">{['A','B','C','D'][oi]}.</span>
+                      {opt}
+                      {isChosen && fb && (
+                        <span className="float-right">
+                          {fb.correct ? '✓' : '✗'}
+                        </span>
+                      )}
+                    </motion.button>
+                  );
+                })}
               </div>
             )}
 
@@ -346,7 +413,7 @@ function QuizPlayer({ questions, config, onSubmit }) {
         <span className="text-slate-600 text-xs">{totalAnswered}/{questions.length} answered</span>
 
         {currentIdx < questions.length - 1 ? (
-          <button onClick={() => setCurrentIdx(i => Math.min(questions.length - 1, i + 1))}
+          <button onClick={() => setCurrentIdx(i => i + 1)}
             className="flex items-center gap-2 px-4 py-2.5 bg-indigo-500/20 border border-indigo-500/40 text-indigo-300 rounded-xl text-sm hover:bg-indigo-500/30 transition-all">
             Next <ChevronRight className="w-4 h-4" />
           </button>

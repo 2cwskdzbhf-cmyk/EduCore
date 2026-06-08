@@ -15,15 +15,15 @@ function formatTime(secs) {
 }
 
 const GLASS = {
-  background: 'rgba(255,255,255,0.18)',
-  backdropFilter: 'blur(20px)',
-  WebkitBackdropFilter: 'blur(20px)',
-  border: '1px solid rgba(255,255,255,0.3)',
-  boxShadow: '0 4px 24px rgba(61,82,160,0.13)',
+  background: 'rgba(255,255,255,0.22)',
+  backdropFilter: 'blur(24px)',
+  WebkitBackdropFilter: 'blur(24px)',
+  border: '1px solid rgba(255,255,255,0.35)',
+  boxShadow: '0 4px 32px rgba(61,82,160,0.13)',
 };
 
 const SELECT_STYLE = {
-  background: 'rgba(255,255,255,0.45)',
+  background: 'rgba(255,255,255,0.50)',
   border: '1px solid rgba(255,255,255,0.4)',
   borderRadius: '12px',
   color: '#3D52A0',
@@ -32,6 +32,7 @@ const SELECT_STYLE = {
   fontWeight: 500,
   width: '100%',
   outline: 'none',
+  cursor: 'pointer',
 };
 
 const GRAD_BTN = {
@@ -78,8 +79,8 @@ function TestSetupPanel({ notebook, allSources, onStart }) {
             <Shield className="w-5 h-5 text-white" />
           </div>
           <div>
-            <h2 className="font-black text-xl" style={{ color: '#3D52A0' }}>Exam Simulator</h2>
-            <p className="text-sm" style={{ color: '#8697C4' }}>Configure your test settings</p>
+            <h2 className="font-black text-xl" style={{ color: '#3D52A0' }}>Exam Simulation</h2>
+            <p className="text-sm" style={{ color: '#8697C4' }}>Configure your exam settings</p>
           </div>
         </div>
 
@@ -92,14 +93,14 @@ function TestSetupPanel({ notebook, allSources, onStart }) {
                 className="flex-1 py-2.5 rounded-xl text-sm font-semibold transition-all"
                 style={!useCustomTopic
                   ? { ...GRAD_BTN, padding: '10px 0' }
-                  : { background: 'rgba(255,255,255,0.4)', border: '1px solid rgba(255,255,255,0.5)', color: '#3D52A0', borderRadius: '12px', fontWeight: 600 }}>
+                  : { background: 'rgba(255,255,255,0.45)', border: '1px solid rgba(255,255,255,0.5)', color: '#3D52A0', borderRadius: '12px', fontWeight: 600 }}>
                 From My Sources
               </button>
               <button onClick={() => setUseCustomTopic(true)}
                 className="flex-1 py-2.5 rounded-xl text-sm font-semibold transition-all"
                 style={useCustomTopic
                   ? { ...GRAD_BTN, padding: '10px 0' }
-                  : { background: 'rgba(255,255,255,0.4)', border: '1px solid rgba(255,255,255,0.5)', color: '#3D52A0', borderRadius: '12px', fontWeight: 600 }}>
+                  : { background: 'rgba(255,255,255,0.45)', border: '1px solid rgba(255,255,255,0.5)', color: '#3D52A0', borderRadius: '12px', fontWeight: 600 }}>
                 Custom Topic
               </button>
             </div>
@@ -108,7 +109,7 @@ function TestSetupPanel({ notebook, allSources, onStart }) {
                 value={customTopic}
                 onChange={e => setCustomTopic(e.target.value)}
                 placeholder="e.g. waterfalls, photosynthesis, World War 2"
-                style={{ ...SELECT_STYLE }}
+                style={SELECT_STYLE}
               />
             ) : !hasSources ? (
               <p className="text-sm p-3 rounded-xl" style={{ background: 'rgba(220,55,55,0.08)', color: '#c0392b' }}>
@@ -116,7 +117,7 @@ function TestSetupPanel({ notebook, allSources, onStart }) {
               </p>
             ) : (
               <p className="text-sm p-3 rounded-xl" style={{ background: 'rgba(112,145,230,0.1)', color: '#3D52A0' }}>
-                {allSources.filter(s => s.content_text).length} source(s) loaded for {notebook.name}
+                ✓ {allSources.filter(s => s.content_text).length} source(s) loaded for {notebook.name}
               </p>
             )}
           </div>
@@ -169,7 +170,7 @@ function TestSetupPanel({ notebook, allSources, onStart }) {
                 <button key={m.id} onClick={() => setTestMode(m.id)}
                   className="w-full flex items-center gap-3 p-3 rounded-xl text-left transition-all"
                   style={{
-                    background: testMode === m.id ? 'rgba(112,145,230,0.15)' : 'rgba(255,255,255,0.35)',
+                    background: testMode === m.id ? 'rgba(112,145,230,0.18)' : 'rgba(255,255,255,0.38)',
                     border: testMode === m.id ? '1.5px solid rgba(112,145,230,0.5)' : '1px solid rgba(255,255,255,0.4)',
                   }}>
                   <span className="text-lg">{m.icon}</span>
@@ -193,9 +194,9 @@ function TestSetupPanel({ notebook, allSources, onStart }) {
               timeLimitSeconds: parseInt(timeLimit) * 60,
             })}
             disabled={!canStart}
-            className="w-full py-4 rounded-2xl text-white font-black text-base transition-all disabled:opacity-40"
-            style={{ background: 'linear-gradient(135deg, #7091E6, #3D52A0)', boxShadow: '0 4px 20px rgba(61,82,160,0.3)' }}>
-            Start Exam
+            className="w-full py-4 rounded-2xl text-white font-black text-base transition-all disabled:opacity-40 hover:brightness-110 active:scale-[0.98]"
+            style={{ background: 'linear-gradient(135deg, #7091E6, #3D52A0)', boxShadow: '0 4px 24px rgba(61,82,160,0.3)' }}>
+            🚀 Start Exam
           </button>
         </div>
       </motion.div>
@@ -214,6 +215,14 @@ function GeneratingScreen({ numQuestions }) {
       </div>
       <p className="font-black text-xl" style={{ color: '#3D52A0' }}>Building Your Exam</p>
       <p className="text-sm" style={{ color: '#8697C4' }}>Generating {numQuestions} questions — please wait</p>
+      <div className="flex gap-2 mt-1">
+        {[0,1,2,3,4].map(i => (
+          <motion.div key={i} className="w-2 h-2 rounded-full"
+            style={{ background: '#7091E6' }}
+            animate={{ opacity: [0.3, 1, 0.3] }}
+            transition={{ duration: 1.2, delay: i * 0.2, repeat: Infinity }} />
+        ))}
+      </div>
     </div>
   );
 }
@@ -223,24 +232,25 @@ function AntiCheatWarning({ warnings, maxWarnings, onDismiss }) {
   const isFinal = warnings >= maxWarnings;
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center"
-      style={{ background: 'rgba(220,55,55,0.3)', backdropFilter: 'blur(8px)' }}>
+      style={{ background: 'rgba(220,55,55,0.25)', backdropFilter: 'blur(10px)' }}>
       <motion.div
         initial={{ scale: 0.8, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
-        className="rounded-3xl p-8 max-w-sm mx-4 text-center bg-white shadow-2xl">
+        className="rounded-3xl p-8 max-w-sm mx-4 text-center"
+        style={{ background: '#fff', boxShadow: '0 20px 60px rgba(220,55,55,0.25)' }}>
         <div className="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-4">
           <AlertTriangle className="w-8 h-8 text-red-500" />
         </div>
         <h3 className="font-black text-xl text-red-600 mb-2">Warning {warnings}/{maxWarnings}</h3>
         <p className="text-gray-600 text-sm mb-6">
           {isFinal
-            ? 'You have exceeded the maximum warnings. The test will now end.'
-            : 'You left the exam window. Return immediately or your test will be ended.'}
+            ? 'Maximum violations reached. The exam will now end.'
+            : 'You left the exam window. Return immediately or your exam will end.'}
         </p>
         <button onClick={onDismiss}
           className="w-full py-3 rounded-xl font-bold text-white text-sm"
           style={{ background: isFinal ? '#dc2626' : 'linear-gradient(135deg, #7091E6, #3D52A0)' }}>
-          {isFinal ? 'End Test Now' : 'Return to Test'}
+          {isFinal ? 'End Exam Now' : 'Return to Exam'}
         </button>
       </motion.div>
     </div>
@@ -268,7 +278,7 @@ function ReviewScreen({ questions, answers, flagged, onGoTo, onSubmit, onBack })
             const isFlagged = flagged.has(i);
             return (
               <button key={i} onClick={() => onGoTo(i)}
-                className="w-full text-left p-4 rounded-2xl transition-all"
+                className="w-full text-left p-4 rounded-2xl transition-all hover:brightness-95"
                 style={{
                   background: 'rgba(255,255,255,0.5)',
                   border: isFlagged ? '1.5px solid #fbbf24' : isAnswered ? '1.5px solid rgba(16,185,129,0.4)' : '1.5px solid rgba(220,55,55,0.3)',
@@ -305,13 +315,13 @@ function ReviewScreen({ questions, answers, flagged, onGoTo, onSubmit, onBack })
         </div>
         <button onClick={onBack}
           className="px-5 py-2.5 rounded-xl font-semibold text-sm"
-          style={{ background: 'rgba(255,255,255,0.5)', border: '1px solid rgba(255,255,255,0.4)', color: '#3D52A0' }}>
+          style={{ background: 'rgba(255,255,255,0.55)', border: '1px solid rgba(255,255,255,0.4)', color: '#3D52A0' }}>
           Continue
         </button>
         <button onClick={onSubmit}
           className="px-6 py-2.5 rounded-xl font-bold text-sm text-white"
           style={{ background: 'linear-gradient(135deg, #7091E6, #3D52A0)' }}>
-          Submit Test
+          Submit Exam
         </button>
       </div>
     </div>
@@ -328,17 +338,17 @@ function TestMode({ questions, settings, notebook, user, allSources, onFinish })
   const [showReview, setShowReview] = useState(false);
   const [warnings, setWarnings] = useState(0);
   const [showWarning, setShowWarning] = useState(false);
-  const [ended, setEnded] = useState(false);
   const timerRef = useRef(null);
   const autoSaveRef = useRef(null);
   const endedRef = useRef(false);
   const warningsRef = useRef(0);
+  const timeLeftRef = useRef(settings.timeLimitSeconds);
 
   const MAX_WARNINGS = 3;
   const q = questions[currentIndex];
   const totalAnswered = Object.keys(answers).length;
 
-  // Enter fullscreen
+  // Enter fullscreen on mount
   useEffect(() => {
     const el = document.documentElement;
     if (el.requestFullscreen) el.requestFullscreen().catch(() => {});
@@ -374,6 +384,17 @@ function TestMode({ questions, settings, notebook, user, allSources, onFinish })
     return () => document.removeEventListener('keydown', blockKeys);
   }, []);
 
+  const submitTest = useCallback((autoEnded, suddenDeath, currentAnswers) => {
+    if (endedRef.current) return;
+    endedRef.current = true;
+    clearInterval(timerRef.current);
+    clearInterval(autoSaveRef.current);
+    localStorage.removeItem(`exam_${notebook.id}`);
+    if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(() => {});
+    const timeUsed = settings.timeLimitSeconds - timeLeftRef.current;
+    onFinish({ answers: currentAnswers || answers, flagged: new Set(flagged), autoEnded, suddenDeath, timeUsed });
+  }, [answers, flagged, notebook.id, settings.timeLimitSeconds, onFinish]);
+
   const triggerWarning = useCallback(() => {
     if (endedRef.current) return;
     warningsRef.current += 1;
@@ -381,10 +402,10 @@ function TestMode({ questions, settings, notebook, user, allSources, onFinish })
     setShowWarning(true);
   }, []);
 
-  // Anti-cheat: tab/window
+  // Anti-cheat: tab/window visibility
   useEffect(() => {
     const handleVisibility = () => { if (document.hidden) triggerWarning(); };
-    const handleBlur = () => triggerWarning();
+    const handleBlur = () => { if (!document.fullscreenElement) triggerWarning(); };
     document.addEventListener('visibilitychange', handleVisibility);
     window.addEventListener('blur', handleBlur);
     return () => {
@@ -393,9 +414,9 @@ function TestMode({ questions, settings, notebook, user, allSources, onFinish })
     };
   }, [triggerWarning]);
 
-  // Anti-cheat: fullscreen
+  // Anti-cheat: fullscreen exit
   useEffect(() => {
-    const onFSChange = () => { if (!document.fullscreenElement) triggerWarning(); };
+    const onFSChange = () => { if (!document.fullscreenElement && !endedRef.current) triggerWarning(); };
     document.addEventListener('fullscreenchange', onFSChange);
     return () => document.removeEventListener('fullscreenchange', onFSChange);
   }, [triggerWarning]);
@@ -404,16 +425,18 @@ function TestMode({ questions, settings, notebook, user, allSources, onFinish })
   useEffect(() => {
     timerRef.current = setInterval(() => {
       setTimeLeft(t => {
-        if (t <= 1) {
+        const next = t - 1;
+        timeLeftRef.current = next;
+        if (next <= 0) {
           clearInterval(timerRef.current);
           if (!endedRef.current) submitTest(false, false);
           return 0;
         }
-        return t - 1;
+        return next;
       });
     }, 1000);
     return () => clearInterval(timerRef.current);
-  }, []);
+  }, [submitTest]);
 
   // Auto-save
   useEffect(() => {
@@ -423,23 +446,9 @@ function TestMode({ questions, settings, notebook, user, allSources, onFinish })
     return () => clearInterval(autoSaveRef.current);
   }, [answers, flagged, currentIndex, notebook.id]);
 
-  const submitTest = (autoEnded, suddenDeath) => {
-    if (endedRef.current) return;
-    endedRef.current = true;
-    setEnded(true);
-    clearInterval(timerRef.current);
-    clearInterval(autoSaveRef.current);
-    localStorage.removeItem(`exam_${notebook.id}`);
-    if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(() => {});
-    setTimeLeft(prev => {
-      onFinish({ answers, flagged: new Set(flagged), autoEnded, suddenDeath, timeUsed: settings.timeLimitSeconds - prev });
-      return prev;
-    });
-  };
-
   const dismissWarning = () => {
     if (warningsRef.current >= MAX_WARNINGS) {
-      submitTest(true, false);
+      submitTest(true, false, answers);
     } else {
       setShowWarning(false);
       if (!document.fullscreenElement) document.documentElement.requestFullscreen?.().catch(() => {});
@@ -449,11 +458,12 @@ function TestMode({ questions, settings, notebook, user, allSources, onFinish })
   const handleAnswer = (value) => {
     const newAnswers = { ...answers, [currentIndex]: value };
     setAnswers(newAnswers);
+    // Sudden death — check after a short delay, but DO NOT reveal correct/wrong visually during test
     if (settings.testMode === 'sudden_death') {
       const isCorrect = q.type === 'short_answer'
         ? (value + '').toLowerCase().includes((q.correct_answer || '').toLowerCase().slice(0, 10))
         : value === q.correct_index;
-      if (!isCorrect) setTimeout(() => submitTest(false, true), 700);
+      if (!isCorrect) setTimeout(() => submitTest(false, true, newAnswers), 800);
     }
   };
 
@@ -476,6 +486,7 @@ function TestMode({ questions, settings, notebook, user, allSources, onFinish })
   };
 
   const timerColor = timeLeft < 60 ? '#ef4444' : timeLeft < 300 ? '#f59e0b' : '#3D52A0';
+  const timerBg = timeLeft < 60 ? 'rgba(239,68,68,0.12)' : timeLeft < 300 ? 'rgba(245,158,11,0.12)' : 'rgba(255,255,255,0.6)';
 
   if (showReview) {
     return (
@@ -484,7 +495,7 @@ function TestMode({ questions, settings, notebook, user, allSources, onFinish })
         answers={answers}
         flagged={flagged}
         onGoTo={i => { setCurrentIndex(i); setShowReview(false); }}
-        onSubmit={() => submitTest(false, false)}
+        onSubmit={() => submitTest(false, false, answers)}
         onBack={() => setShowReview(false)}
       />
     );
@@ -498,28 +509,32 @@ function TestMode({ questions, settings, notebook, user, allSources, onFinish })
 
       {/* Top bar */}
       <div className="flex-shrink-0 flex items-center justify-between px-6 py-3"
-        style={{ background: 'rgba(255,255,255,0.5)', backdropFilter: 'blur(20px)', borderBottom: '1px solid rgba(255,255,255,0.4)' }}>
+        style={{ background: 'rgba(255,255,255,0.55)', backdropFilter: 'blur(20px)', borderBottom: '1px solid rgba(255,255,255,0.4)' }}>
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-lg flex items-center justify-center"
             style={{ background: 'linear-gradient(135deg, #7091E6, #3D52A0)' }}>
             <Shield className="w-4 h-4 text-white" />
           </div>
           <div>
-            <p className="font-bold text-sm" style={{ color: '#3D52A0' }}>{notebook.name} — Exam</p>
+            <p className="font-bold text-sm" style={{ color: '#3D52A0' }}>{notebook.name} — Exam Simulation</p>
             <p className="text-xs" style={{ color: '#8697C4' }}>Q{currentIndex + 1} of {questions.length} · {totalAnswered} answered</p>
           </div>
         </div>
 
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 px-4 py-2 rounded-xl font-black text-lg"
-            style={{ background: 'rgba(255,255,255,0.6)', border: `2px solid ${timerColor}`, color: timerColor }}>
+          {/* Timer */}
+          <motion.div
+            animate={timeLeft < 60 ? { scale: [1, 1.05, 1] } : {}}
+            transition={{ duration: 1, repeat: timeLeft < 60 ? Infinity : 0 }}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl font-black text-lg"
+            style={{ background: timerBg, border: `2px solid ${timerColor}`, color: timerColor }}>
             <Timer className="w-4 h-4" />
             {formatTime(timeLeft)}
-          </div>
+          </motion.div>
 
           <button onClick={() => setShowNavigator(v => !v)}
             className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-semibold transition-all"
-            style={{ background: showNavigator ? 'rgba(112,145,230,0.15)' : 'rgba(255,255,255,0.5)', border: '1px solid rgba(255,255,255,0.4)', color: '#3D52A0' }}>
+            style={{ background: showNavigator ? 'rgba(112,145,230,0.18)' : 'rgba(255,255,255,0.55)', border: '1px solid rgba(255,255,255,0.4)', color: '#3D52A0' }}>
             <Grid3X3 className="w-4 h-4" />
             <span className="hidden sm:inline">Navigator</span>
           </button>
@@ -540,7 +555,7 @@ function TestMode({ questions, settings, notebook, user, allSources, onFinish })
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: -10, opacity: 0 }}
             className="absolute top-16 right-6 z-20 p-4 rounded-2xl w-64"
-            style={{ background: 'rgba(255,255,255,0.9)', backdropFilter: 'blur(20px)', border: '1px solid rgba(255,255,255,0.5)', boxShadow: '0 8px 32px rgba(61,82,160,0.15)' }}>
+            style={{ background: 'rgba(255,255,255,0.92)', backdropFilter: 'blur(20px)', border: '1px solid rgba(255,255,255,0.5)', boxShadow: '0 8px 32px rgba(61,82,160,0.15)' }}>
             <p className="text-xs font-bold uppercase tracking-wider mb-3" style={{ color: '#8697C4' }}>Question Navigator</p>
             <div className="grid grid-cols-5 gap-2 mb-3">
               {questions.map((_, i) => {
@@ -554,7 +569,7 @@ function TestMode({ questions, settings, notebook, user, allSources, onFinish })
                     style={{
                       background: isCurrent ? 'linear-gradient(135deg, #7091E6, #3D52A0)' : isFlagged ? '#fbbf24' : isAnswered ? '#10b981' : 'rgba(200,212,245,0.4)',
                       color: (isCurrent || isAnswered) ? '#fff' : isFlagged ? '#92400e' : '#3D52A0',
-                      opacity: !canNav ? 0.4 : 1,
+                      opacity: !canNav ? 0.35 : 1,
                     }}>
                     {i + 1}
                   </button>
@@ -564,7 +579,7 @@ function TestMode({ questions, settings, notebook, user, allSources, onFinish })
             <div className="flex flex-wrap gap-3 text-xs" style={{ color: '#8697C4' }}>
               <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-sm bg-emerald-500 inline-block" /> Answered</span>
               <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-sm bg-yellow-400 inline-block" /> Flagged</span>
-              <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-sm inline-block" style={{ background: 'rgba(200,212,245,0.4)', border: '1px solid #ccc' }} /> Blank</span>
+              <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-sm inline-block" style={{ background: 'rgba(200,212,245,0.5)', border: '1px solid #ccc' }} /> Blank</span>
             </div>
           </motion.div>
         )}
@@ -573,8 +588,9 @@ function TestMode({ questions, settings, notebook, user, allSources, onFinish })
       {/* Question card */}
       <div className="flex-1 flex items-center justify-center p-6 overflow-y-auto">
         <AnimatePresence mode="wait">
-          <motion.div key={currentIndex} initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}
-            transition={{ duration: 0.15 }}
+          <motion.div key={currentIndex}
+            initial={{ opacity: 0, x: 24 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -24 }}
+            transition={{ duration: 0.18 }}
             className="w-full max-w-2xl rounded-3xl p-8"
             style={GLASS}>
 
@@ -585,7 +601,7 @@ function TestMode({ questions, settings, notebook, user, allSources, onFinish })
                     Q{currentIndex + 1} / {questions.length}
                   </span>
                   <span className="px-3 py-1 rounded-full text-xs font-semibold capitalize" style={{ background: 'rgba(134,151,196,0.15)', color: '#8697C4' }}>
-                    {q.type || 'multiple choice'}
+                    {(q.type || 'multiple choice').replace(/_/g, ' ')}
                   </span>
                   {flagged.has(currentIndex) && (
                     <span className="px-3 py-1 rounded-full text-xs font-bold bg-yellow-100 text-yellow-700">Flagged</span>
@@ -596,7 +612,7 @@ function TestMode({ questions, settings, notebook, user, allSources, onFinish })
               <button onClick={toggleFlag}
                 className="ml-4 p-2.5 rounded-xl transition-all flex-shrink-0"
                 style={{
-                  background: flagged.has(currentIndex) ? '#fef3c7' : 'rgba(255,255,255,0.5)',
+                  background: flagged.has(currentIndex) ? '#fef3c7' : 'rgba(255,255,255,0.55)',
                   border: flagged.has(currentIndex) ? '1.5px solid #fbbf24' : '1px solid rgba(255,255,255,0.4)',
                   color: flagged.has(currentIndex) ? '#d97706' : '#8697C4',
                 }}>
@@ -604,6 +620,7 @@ function TestMode({ questions, settings, notebook, user, allSources, onFinish })
               </button>
             </div>
 
+            {/* Answer area — NO correct/wrong feedback shown during exam */}
             {q.type === 'short_answer' ? (
               <textarea
                 value={answers[currentIndex] || ''}
@@ -611,38 +628,46 @@ function TestMode({ questions, settings, notebook, user, allSources, onFinish })
                 placeholder="Type your answer here"
                 rows={4}
                 className="w-full px-4 py-3 rounded-xl text-sm resize-none focus:outline-none"
-                style={{ background: 'rgba(255,255,255,0.6)', border: '1.5px solid rgba(112,145,230,0.3)', color: '#3D52A0' }}
+                style={{ background: 'rgba(255,255,255,0.65)', border: '1.5px solid rgba(112,145,230,0.3)', color: '#3D52A0' }}
               />
             ) : q.type === 'true_false' ? (
               <div className="grid grid-cols-2 gap-3">
-                {['True', 'False'].map((opt, i) => (
-                  <button key={opt} onClick={() => handleAnswer(i)}
-                    className="py-4 rounded-xl font-bold text-base transition-all"
-                    style={{
-                      background: answers[currentIndex] === i ? 'linear-gradient(135deg, #7091E6, #3D52A0)' : 'rgba(255,255,255,0.5)',
-                      border: answers[currentIndex] === i ? 'none' : '1px solid rgba(255,255,255,0.4)',
-                      color: answers[currentIndex] === i ? '#fff' : '#3D52A0',
-                    }}>
-                    {i === 0 ? 'True' : 'False'}
-                  </button>
-                ))}
+                {['True', 'False'].map((opt, i) => {
+                  const selected = answers[currentIndex] === i;
+                  return (
+                    <button key={opt} onClick={() => handleAnswer(i)}
+                      className="py-4 rounded-xl font-bold text-base transition-all"
+                      style={{
+                        background: selected ? 'linear-gradient(135deg, #7091E6, #3D52A0)' : 'rgba(255,255,255,0.55)',
+                        border: selected ? 'none' : '1px solid rgba(255,255,255,0.4)',
+                        color: selected ? '#fff' : '#3D52A0',
+                        boxShadow: selected ? '0 4px 16px rgba(112,145,230,0.3)' : 'none',
+                      }}>
+                      {opt}
+                    </button>
+                  );
+                })}
               </div>
             ) : (
               <div className="space-y-3">
-                {(q.options || []).map((opt, i) => (
-                  <button key={i} onClick={() => handleAnswer(i)}
-                    className="w-full text-left px-5 py-3.5 rounded-xl text-sm font-medium transition-all"
-                    style={{
-                      background: answers[currentIndex] === i ? 'rgba(112,145,230,0.15)' : 'rgba(255,255,255,0.5)',
-                      border: answers[currentIndex] === i ? '2px solid #7091E6' : '1px solid rgba(255,255,255,0.4)',
-                      color: '#3D52A0',
-                    }}>
-                    <span className="font-black mr-2" style={{ color: answers[currentIndex] === i ? '#7091E6' : '#8697C4' }}>
-                      {['A','B','C','D','E'][i]}.
-                    </span>
-                    {opt}
-                  </button>
-                ))}
+                {(q.options || []).map((opt, i) => {
+                  const selected = answers[currentIndex] === i;
+                  return (
+                    <button key={i} onClick={() => handleAnswer(i)}
+                      className="w-full text-left px-5 py-3.5 rounded-xl text-sm font-medium transition-all"
+                      style={{
+                        background: selected ? 'rgba(112,145,230,0.18)' : 'rgba(255,255,255,0.55)',
+                        border: selected ? '2px solid #7091E6' : '1px solid rgba(255,255,255,0.4)',
+                        color: '#3D52A0',
+                        boxShadow: selected ? '0 2px 12px rgba(112,145,230,0.2)' : 'none',
+                      }}>
+                      <span className="font-black mr-2" style={{ color: selected ? '#7091E6' : '#8697C4' }}>
+                        {['A','B','C','D','E'][i]}.
+                      </span>
+                      {opt}
+                    </button>
+                  );
+                })}
               </div>
             )}
 
@@ -650,7 +675,7 @@ function TestMode({ questions, settings, notebook, user, allSources, onFinish })
               <button onClick={goPrev}
                 disabled={currentIndex === 0 || settings.testMode === 'hard'}
                 className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-sm transition-all disabled:opacity-30"
-                style={{ background: 'rgba(255,255,255,0.5)', border: '1px solid rgba(255,255,255,0.4)', color: '#3D52A0' }}>
+                style={{ background: 'rgba(255,255,255,0.55)', border: '1px solid rgba(255,255,255,0.4)', color: '#3D52A0' }}>
                 <ChevronLeft className="w-4 h-4" />
                 {settings.testMode === 'hard' ? 'Locked' : 'Previous'}
               </button>
@@ -745,8 +770,8 @@ function ResultsScreen({ questions, answers, settings, timeUsed, suddenDeath, au
         {/* Score card */}
         <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
           className="rounded-3xl p-8 text-center" style={GLASS}>
-          {suddenDeath && <p className="font-bold text-sm mb-3" style={{ color: '#ef4444' }}>Sudden Death — Test Ended</p>}
-          {autoEnded && <p className="font-bold text-sm mb-3" style={{ color: '#f59e0b' }}>Test auto-ended (anti-cheat violations)</p>}
+          {suddenDeath && <p className="font-bold text-sm mb-3" style={{ color: '#ef4444' }}>💀 Sudden Death — Exam Ended Early</p>}
+          {autoEnded && <p className="font-bold text-sm mb-3" style={{ color: '#f59e0b' }}>⚠️ Exam auto-ended (integrity violations)</p>}
           <div className="w-24 h-24 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-xl"
             style={{ background: `${gradeColor}22`, border: `3px solid ${gradeColor}` }}>
             <span className="font-black text-4xl" style={{ color: gradeColor }}>{grade}</span>
@@ -761,7 +786,7 @@ function ResultsScreen({ questions, answers, settings, timeUsed, suddenDeath, au
           <div className="px-6 py-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.3)' }}>
             <h3 className="font-black" style={{ color: '#3D52A0' }}>Question Breakdown</h3>
           </div>
-          <div className="divide-y max-h-80 overflow-y-auto" style={{ '--tw-divide-opacity': 1 }}>
+          <div className="divide-y max-h-80 overflow-y-auto">
             {scored.map((q, i) => (
               <div key={i} className="px-6 py-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.2)' }}>
                 <div className="flex items-start gap-3">
@@ -791,13 +816,13 @@ function ResultsScreen({ questions, answers, settings, timeUsed, suddenDeath, au
           {loadingBreakdown ? (
             <div className="flex items-center gap-3 py-4">
               <Loader2 className="w-5 h-5 animate-spin" style={{ color: '#7091E6' }} />
-              <p className="text-sm" style={{ color: '#8697C4' }}>Analysing your performance</p>
+              <p className="text-sm" style={{ color: '#8697C4' }}>Analysing your performance…</p>
             </div>
           ) : breakdown ? (
             <div className="space-y-4">
               {breakdown.overall_feedback && (
                 <p className="text-sm leading-relaxed p-3 rounded-xl"
-                  style={{ background: 'rgba(255,255,255,0.4)', color: '#3D52A0' }}>
+                  style={{ background: 'rgba(255,255,255,0.45)', color: '#3D52A0' }}>
                   {breakdown.overall_feedback}
                 </p>
               )}
@@ -808,9 +833,7 @@ function ResultsScreen({ questions, answers, settings, timeUsed, suddenDeath, au
                   </p>
                   <ul className="space-y-1">
                     {breakdown.strengths?.map((s, i) => (
-                      <li key={i} className="text-xs p-2 rounded-lg" style={{ background: 'rgba(16,185,129,0.08)', color: '#3D52A0' }}>
-                        {s}
-                      </li>
+                      <li key={i} className="text-xs p-2 rounded-lg" style={{ background: 'rgba(16,185,129,0.08)', color: '#3D52A0' }}>{s}</li>
                     ))}
                   </ul>
                 </div>
@@ -820,9 +843,7 @@ function ResultsScreen({ questions, answers, settings, timeUsed, suddenDeath, au
                   </p>
                   <ul className="space-y-1">
                     {breakdown.weaknesses?.map((w, i) => (
-                      <li key={i} className="text-xs p-2 rounded-lg" style={{ background: 'rgba(239,68,68,0.08)', color: '#3D52A0' }}>
-                        {w}
-                      </li>
+                      <li key={i} className="text-xs p-2 rounded-lg" style={{ background: 'rgba(239,68,68,0.08)', color: '#3D52A0' }}>{w}</li>
                     ))}
                   </ul>
                 </div>
@@ -834,9 +855,7 @@ function ResultsScreen({ questions, answers, settings, timeUsed, suddenDeath, au
                   </p>
                   <ul className="space-y-1">
                     {breakdown.next_steps.map((s, i) => (
-                      <li key={i} className="text-xs p-2 rounded-lg" style={{ background: 'rgba(112,145,230,0.08)', color: '#3D52A0' }}>
-                        {s}
-                      </li>
+                      <li key={i} className="text-xs p-2 rounded-lg" style={{ background: 'rgba(112,145,230,0.08)', color: '#3D52A0' }}>{s}</li>
                     ))}
                   </ul>
                 </div>
@@ -850,7 +869,7 @@ function ResultsScreen({ questions, answers, settings, timeUsed, suddenDeath, au
           <button onClick={exportResults} disabled={exported}
             className="flex-1 py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all"
             style={{
-              background: exported ? '#10b981' : 'rgba(255,255,255,0.5)',
+              background: exported ? '#10b981' : 'rgba(255,255,255,0.55)',
               border: exported ? 'none' : '1px solid rgba(255,255,255,0.4)',
               color: exported ? '#fff' : '#3D52A0',
             }}>
@@ -885,10 +904,10 @@ export default function ExamSimulator({ notebook, user, allSources, onResourceCr
       : allSources.filter(s => s.content_text).map(s => `### ${s.name}\n${s.content_text.slice(0, 6000)}`).join('\n\n').slice(0, 14000);
 
     const typeInstructions = {
-      multiple_choice: 'All questions must be multiple choice with 4 options and a correct_index.',
-      true_false: 'All questions must be true/false with type="true_false", options=["True","False"], correct_index (0 or 1).',
+      multiple_choice: 'All questions must be multiple choice with 4 options and a correct_index (0-3).',
+      true_false: 'All questions must be true/false with type="true_false", options=["True","False"], correct_index (0=True, 1=False).',
       short_answer: 'All questions must be type="short_answer" with a correct_answer field (1-2 sentences).',
-      mixed: 'Mix of multiple choice (type="multiple_choice"), true_false (type="true_false"), and short_answer (type="short_answer").',
+      mixed: 'Mix of multiple_choice (type="multiple_choice"), true_false (type="true_false"), and short_answer (type="short_answer").',
     };
 
     const diffInstructions = {
