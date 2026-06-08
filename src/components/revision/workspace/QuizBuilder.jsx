@@ -3,8 +3,52 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { base44 } from '@/api/base44Client';
 import {
   Zap, Loader2, ChevronLeft, ChevronRight, CheckCircle2,
-  XCircle, RotateCcw, TrendingDown, Lightbulb, Trophy, Copy
+  XCircle, RotateCcw, TrendingDown, Lightbulb, CheckCircle
 } from 'lucide-react';
+
+// ─── Theme tokens ──────────────────────────────────────────────────────────────
+const GLASS = {
+  background: 'rgba(255,255,255,0.22)',
+  backdropFilter: 'blur(20px)',
+  WebkitBackdropFilter: 'blur(20px)',
+  border: '1px solid rgba(255,255,255,0.35)',
+  boxShadow: '0 4px 24px rgba(61,82,160,0.13)',
+};
+const BG = { background: 'linear-gradient(135deg, #EDE8F5 0%, #c8d4f5 100%)' };
+
+// ─── Sound utils (Web Audio API — no external files) ──────────────────────────
+function playSuccess() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(523, ctx.currentTime);
+    osc.frequency.setValueAtTime(659, ctx.currentTime + 0.12);
+    osc.frequency.setValueAtTime(784, ctx.currentTime + 0.22);
+    gain.gain.setValueAtTime(0.25, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.55);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + 0.55);
+  } catch {}
+}
+
+function playError() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(220, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(110, ctx.currentTime + 0.28);
+    gain.gain.setValueAtTime(0.2, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + 0.35);
+  } catch {}
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function getSourceContext(sources) {
@@ -12,124 +56,100 @@ function getSourceContext(sources) {
     .map(s => `### ${s.name}\n${s.content_text.slice(0, 8000)}`).join('\n\n---\n\n');
 }
 
-const Q_COUNTS = [5, 10, 15, 20, 25, 30, 40, 50];
+const Q_COUNTS = [5, 10, 15, 20, 25, 30];
 const Q_TYPES = [
-  { id: 'mcq', label: 'Multiple Choice' },
-  { id: 'short', label: 'Short Answer' },
-  { id: 'long', label: 'Long Answer' },
-  { id: 'fill', label: 'Fill-in-the-Blank' },
-  { id: 'mixed', label: 'Mixed Mode' },
+  { id: 'mcq', label: 'Multiple Choice', desc: 'Instant feedback on selection' },
+  { id: 'short', label: 'Short Answer', desc: 'AI-marked after submission' },
+  { id: 'mixed', label: 'Mixed Mode', desc: 'Combination of both' },
 ];
 const DIFFICULTIES = [
-  { id: 'easy', label: 'Easy', desc: 'Definitions & recall', color: 'from-emerald-500 to-teal-500' },
-  { id: 'medium', label: 'Medium', desc: 'Explanations & examples', color: 'from-amber-500 to-orange-500' },
-  { id: 'hard', label: 'Hard', desc: 'Multi-step reasoning', color: 'from-rose-500 to-pink-600' },
-  { id: 'adaptive', label: 'Adaptive', desc: 'Based on weak topics', color: 'from-violet-500 to-purple-600' },
+  { id: 'easy', label: 'Easy', desc: 'Definitions & recall' },
+  { id: 'medium', label: 'Medium', desc: 'Explanations & examples' },
+  { id: 'hard', label: 'Hard', desc: 'Multi-step reasoning' },
+  { id: 'adaptive', label: 'Adaptive', desc: 'Targets weak topics' },
 ];
 const EXAM_BOARDS = ['AQA', 'OCR', 'Edexcel', 'WJEC'];
 
-// ─── Build prompt for question generation ─────────────────────────────────────
+// ─── Build prompt ─────────────────────────────────────────────────────────────
 function buildGenerationPrompt(config, ctx, weakTopics) {
   const typeInstructions = {
-    mcq: 'All questions must be multiple choice with exactly 4 options (A, B, C, D). Include the correct answer index (0-3) and a brief explanation.',
+    mcq: 'All questions must be multiple choice with exactly 4 options. Include correct_index (0-3) and a brief explanation.',
     short: 'All questions require a short answer (1-3 sentences). Include the model answer and key marking points.',
-    long: 'All questions require extended written responses (a paragraph or more). Include a detailed mark scheme.',
-    fill: 'All questions are fill-in-the-blank. Show the sentence with a blank (___) and include the correct answer.',
-    mixed: 'Mix question types: include some multiple choice, some short answer, and some fill-in-the-blank questions.',
+    mixed: 'Mix question types: roughly half multiple choice (type="mcq") and half short answer (type="short").',
   };
   const diffInstructions = {
-    easy: 'Focus on basic definitions, key vocabulary, simple recall. Suitable for a student just starting revision.',
-    medium: 'Focus on explanations, comparisons, examples, cause-and-effect. Require some understanding.',
-    hard: 'Focus on multi-step reasoning, application, analysis, and evaluation. Require deep understanding.',
+    easy: 'Focus on basic definitions, key vocabulary, simple recall.',
+    medium: 'Focus on explanations, comparisons, examples, cause-and-effect.',
+    hard: 'Focus on multi-step reasoning, application, analysis, and evaluation.',
     adaptive: weakTopics?.length
-      ? `Focus specifically on these detected weak topics: ${weakTopics.join(', ')}. Target misconceptions and gaps.`
-      : 'Cover all topics with a mix of difficulty, focusing on areas most likely to appear in exams.',
+      ? `Focus specifically on these detected weak topics: ${weakTopics.join(', ')}.`
+      : 'Cover all topics with a mix of difficulty.',
   };
-
   return `You are an expert exam question writer generating a ${config.examBoard}-style quiz.
-
 TASK: Generate exactly ${config.numQuestions} questions.
-QUESTION TYPE: ${typeInstructions[config.questionType]}
+QUESTION TYPE: ${typeInstructions[config.questionType] || typeInstructions.mixed}
 DIFFICULTY: ${diffInstructions[config.difficulty]}
-EXAM BOARD STYLE: ${config.examBoard} — use mark scheme language and style appropriate for this board.
-
 For EACH question return:
 - question: the question text
-- type: one of "mcq", "short", "long", "fill"
+- type: "mcq" or "short"
 - options: array of 4 strings (only for mcq, null otherwise)
 - correct_index: 0-3 (only for mcq, null otherwise)
-- correct_answer: the model answer or correct word for fill-in-blank
+- correct_answer: the model answer
 - mark_scheme: detailed marking guidance
-- topic: the topic/concept this question tests
-- marks: number of marks (1 for mcq/fill, 3-6 for short/long)
-
-SOURCE MATERIAL:
-${ctx}`;
+- topic: the topic/concept tested
+- marks: number of marks (1 for mcq, 3-6 for short)
+SOURCE MATERIAL:\n${ctx}`;
 }
 
-// ─── Quiz Builder (config screen) ─────────────────────────────────────────────
+// ─── Config Screen ─────────────────────────────────────────────────────────────
 function QuizBuilderConfig({ notebook, allSources, onStart }) {
   const [numQuestions, setNumQuestions] = useState(10);
   const [questionType, setQuestionType] = useState('mcq');
   const [difficulty, setDifficulty] = useState('medium');
   const [examBoard, setExamBoard] = useState('AQA');
-  const [selectedSourceIds, setSelectedSourceIds] = useState(null); // null = all
-  const [showSourcePicker, setShowSourcePicker] = useState(false);
 
   const hasSources = allSources.some(s => s.content_text);
 
-  const toggleSource = (id) => {
-    if (!selectedSourceIds) {
-      setSelectedSourceIds(allSources.map(s => s.id).filter(x => x !== id));
-    } else {
-      setSelectedSourceIds(prev =>
-        prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
-      );
-    }
-  };
-
-  const effectiveSources = selectedSourceIds
-    ? allSources.filter(s => selectedSourceIds.includes(s.id))
-    : allSources;
-
   if (!hasSources) {
     return (
-      <div className="flex flex-col items-center justify-center h-full text-center p-8">
+      <div className="flex flex-col items-center justify-center h-full text-center p-8" style={BG}>
         <div className="text-5xl mb-4">📚</div>
-        <h3 className="text-white font-bold text-lg mb-2">No sources yet</h3>
-        <p className="text-slate-400 text-sm max-w-sm">This notebook has no sources yet. Add sources first to generate a quiz.</p>
+        <h3 className="font-bold text-lg mb-2" style={{ color: '#3D52A0' }}>No sources yet</h3>
+        <p className="text-sm" style={{ color: '#8697C4' }}>Add sources first to generate a quiz.</p>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col h-full overflow-y-auto">
+    <div className="flex flex-col h-full overflow-y-auto" style={BG}>
       {/* Header */}
-      <div className="flex-shrink-0 px-6 py-5 border-b border-white/10">
+      <div className="flex-shrink-0 px-6 py-5" style={{ borderBottom: '1px solid rgba(255,255,255,0.4)', background: 'rgba(255,255,255,0.3)' }}>
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-indigo-500 to-blue-600 flex items-center justify-center shadow-lg shadow-indigo-500/30">
+          <div className="w-10 h-10 rounded-2xl flex items-center justify-center shadow-lg"
+            style={{ background: 'linear-gradient(135deg, #7091E6, #3D52A0)' }}>
             <Zap className="w-5 h-5 text-white" />
           </div>
           <div>
-            <h2 className="text-white font-bold text-lg">Quiz Builder</h2>
-            <p className="text-slate-400 text-xs">{notebook.name}</p>
+            <h2 className="font-black text-lg" style={{ color: '#3D52A0' }}>Quiz Builder</h2>
+            <p className="text-xs" style={{ color: '#8697C4' }}>{notebook.name}</p>
           </div>
         </div>
       </div>
 
-      <div className="flex-1 p-6 space-y-8">
-
+      <div className="flex-1 p-6 space-y-6">
         {/* Number of Questions */}
         <div>
-          <p className="text-white font-semibold mb-3">Number of Questions</p>
+          <p className="text-xs font-bold uppercase tracking-widest mb-3" style={{ color: '#8697C4' }}>Number of Questions</p>
           <div className="flex flex-wrap gap-2">
             {Q_COUNTS.map(n => (
               <button key={n} onClick={() => setNumQuestions(n)}
-                className={`px-4 py-2 rounded-xl text-sm font-bold transition-all border ${
-                  numQuestions === n
-                    ? 'bg-indigo-500/30 border-indigo-500/60 text-indigo-300'
-                    : 'bg-white/5 border-white/10 text-slate-400 hover:text-white hover:border-white/20'
-                }`}>
+                className="px-4 py-2 rounded-xl text-sm font-bold transition-all"
+                style={{
+                  background: numQuestions === n ? 'linear-gradient(135deg, #7091E6, #3D52A0)' : 'rgba(255,255,255,0.5)',
+                  border: numQuestions === n ? 'none' : '1px solid rgba(255,255,255,0.5)',
+                  color: numQuestions === n ? '#fff' : '#3D52A0',
+                  boxShadow: numQuestions === n ? '0 2px 10px rgba(61,82,160,0.25)' : 'none',
+                }}>
                 {n}
               </button>
             ))}
@@ -138,17 +158,23 @@ function QuizBuilderConfig({ notebook, allSources, onStart }) {
 
         {/* Question Type */}
         <div>
-          <p className="text-white font-semibold mb-3">Question Type</p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          <p className="text-xs font-bold uppercase tracking-widest mb-3" style={{ color: '#8697C4' }}>Question Type</p>
+          <div className="space-y-2">
             {Q_TYPES.map(t => (
               <button key={t.id} onClick={() => setQuestionType(t.id)}
-                className={`px-4 py-3 rounded-xl text-sm font-medium text-left transition-all border ${
-                  questionType === t.id
-                    ? 'bg-indigo-500/20 border-indigo-500/50 text-white'
-                    : 'bg-white/5 border-white/10 text-slate-400 hover:text-white hover:border-white/20'
-                }`}>
-                {questionType === t.id && <span className="mr-2 text-indigo-400">✓</span>}
-                {t.label}
+                className="w-full px-4 py-3 rounded-xl text-sm font-semibold text-left transition-all flex items-center gap-3"
+                style={{
+                  background: questionType === t.id ? 'rgba(112,145,230,0.15)' : 'rgba(255,255,255,0.45)',
+                  border: questionType === t.id ? '1.5px solid rgba(112,145,230,0.5)' : '1px solid rgba(255,255,255,0.5)',
+                }}>
+                <div className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0"
+                  style={{ background: questionType === t.id ? 'linear-gradient(135deg, #7091E6, #3D52A0)' : 'rgba(134,151,196,0.2)' }}>
+                  {questionType === t.id && <CheckCircle className="w-3 h-3 text-white" />}
+                </div>
+                <div>
+                  <div style={{ color: '#3D52A0' }}>{t.label}</div>
+                  <div className="text-xs" style={{ color: '#8697C4' }}>{t.desc}</div>
+                </div>
               </button>
             ))}
           </div>
@@ -156,17 +182,17 @@ function QuizBuilderConfig({ notebook, allSources, onStart }) {
 
         {/* Difficulty */}
         <div>
-          <p className="text-white font-semibold mb-3">Difficulty</p>
+          <p className="text-xs font-bold uppercase tracking-widest mb-3" style={{ color: '#8697C4' }}>Difficulty</p>
           <div className="grid grid-cols-2 gap-2">
             {DIFFICULTIES.map(d => (
               <button key={d.id} onClick={() => setDifficulty(d.id)}
-                className={`px-4 py-3 rounded-xl text-sm text-left transition-all border ${
-                  difficulty === d.id
-                    ? `bg-gradient-to-r ${d.color} border-transparent text-white shadow-md`
-                    : 'bg-white/5 border-white/10 text-slate-400 hover:text-white hover:border-white/20'
-                }`}>
-                <div className="font-bold">{d.label}</div>
-                <div className={`text-xs mt-0.5 ${difficulty === d.id ? 'text-white/70' : 'text-slate-500'}`}>{d.desc}</div>
+                className="px-4 py-3 rounded-xl text-sm text-left transition-all"
+                style={{
+                  background: difficulty === d.id ? 'rgba(112,145,230,0.15)' : 'rgba(255,255,255,0.45)',
+                  border: difficulty === d.id ? '1.5px solid rgba(112,145,230,0.5)' : '1px solid rgba(255,255,255,0.5)',
+                }}>
+                <div className="font-bold" style={{ color: '#3D52A0' }}>{d.label}</div>
+                <div className="text-xs mt-0.5" style={{ color: '#8697C4' }}>{d.desc}</div>
               </button>
             ))}
           </div>
@@ -174,256 +200,223 @@ function QuizBuilderConfig({ notebook, allSources, onStart }) {
 
         {/* Exam Board */}
         <div>
-          <p className="text-white font-semibold mb-3">Exam Board Style</p>
+          <p className="text-xs font-bold uppercase tracking-widest mb-3" style={{ color: '#8697C4' }}>Exam Board</p>
           <div className="flex gap-2 flex-wrap">
             {EXAM_BOARDS.map(b => (
               <button key={b} onClick={() => setExamBoard(b)}
-                className={`px-4 py-2 rounded-xl text-sm font-bold transition-all border ${
-                  examBoard === b
-                    ? 'bg-violet-500/30 border-violet-500/60 text-violet-300'
-                    : 'bg-white/5 border-white/10 text-slate-400 hover:text-white'
-                }`}>
+                className="px-4 py-2 rounded-xl text-sm font-bold transition-all"
+                style={{
+                  background: examBoard === b ? 'linear-gradient(135deg, #7091E6, #3D52A0)' : 'rgba(255,255,255,0.5)',
+                  border: examBoard === b ? 'none' : '1px solid rgba(255,255,255,0.5)',
+                  color: examBoard === b ? '#fff' : '#3D52A0',
+                }}>
                 {b}
               </button>
             ))}
           </div>
         </div>
-
-        {/* Source Selection */}
-        <div>
-          <div className="flex items-center justify-between mb-3">
-            <p className="text-white font-semibold">Sources</p>
-            <button onClick={() => setShowSourcePicker(v => !v)}
-              className="text-xs text-indigo-400 hover:text-indigo-300 transition-colors">
-              {showSourcePicker ? 'Hide' : 'Select specific sources'}
-            </button>
-          </div>
-          {!showSourcePicker ? (
-            <div className="px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-slate-400 text-sm">
-              Using all {allSources.filter(s => s.content_text).length} sources in this notebook
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {allSources.filter(s => s.content_text).map(s => {
-                const isSelected = !selectedSourceIds || selectedSourceIds.includes(s.id);
-                return (
-                  <label key={s.id} className="flex items-center gap-3 px-4 py-3 bg-white/5 border border-white/10 rounded-xl cursor-pointer hover:bg-white/8 transition-all">
-                    <input type="checkbox" checked={isSelected} onChange={() => toggleSource(s.id)}
-                      className="w-4 h-4 accent-indigo-500" />
-                    <span className="text-slate-300 text-sm truncate">{s.name}</span>
-                  </label>
-                );
-              })}
-              {selectedSourceIds && selectedSourceIds.length === 0 && (
-                <p className="text-red-400 text-xs px-1">Select at least one source</p>
-              )}
-            </div>
-          )}
-        </div>
       </div>
 
-      {/* Start button */}
-      <div className="flex-shrink-0 p-6 border-t border-white/10">
+      {/* Start */}
+      <div className="flex-shrink-0 p-6" style={{ borderTop: '1px solid rgba(255,255,255,0.4)', background: 'rgba(255,255,255,0.3)' }}>
         <button
-          onClick={() => onStart({ numQuestions, questionType, difficulty, examBoard, sources: effectiveSources })}
-          disabled={effectiveSources.length === 0 || (selectedSourceIds && selectedSourceIds.length === 0)}
-          className="w-full py-4 bg-gradient-to-r from-indigo-500 to-blue-600 text-white font-bold text-base rounded-2xl hover:brightness-110 transition-all shadow-xl shadow-indigo-500/25 disabled:opacity-40">
+          onClick={() => onStart({ numQuestions, questionType, difficulty, examBoard, sources: allSources.filter(s => s.content_text) })}
+          className="w-full py-4 rounded-2xl text-white font-black text-base transition-all hover:brightness-110"
+          style={{ background: 'linear-gradient(135deg, #7091E6, #3D52A0)', boxShadow: '0 4px 20px rgba(61,82,160,0.3)' }}>
           Generate {numQuestions}-Question Quiz →
         </button>
-        <p className="text-center text-slate-600 text-xs mt-2">AI will generate from {effectiveSources.filter(s=>s.content_text).length} source{effectiveSources.length !== 1 ? 's' : ''}</p>
+        <p className="text-center text-xs mt-2" style={{ color: '#8697C4' }}>
+          Using {allSources.filter(s => s.content_text).length} source{allSources.filter(s=>s.content_text).length !== 1 ? 's' : ''}
+        </p>
       </div>
     </div>
   );
 }
 
-// ─── Audio feedback helpers ───────────────────────────────────────────────────
-function playSuccessSound() {
-  try {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.connect(gain); gain.connect(ctx.destination);
-    osc.frequency.setValueAtTime(523, ctx.currentTime);
-    osc.frequency.setValueAtTime(659, ctx.currentTime + 0.1);
-    osc.frequency.setValueAtTime(784, ctx.currentTime + 0.2);
-    gain.gain.setValueAtTime(0.18, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5);
-    osc.start(ctx.currentTime);
-    osc.stop(ctx.currentTime + 0.5);
-  } catch {}
-}
-
-function playErrorSound() {
-  try {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.connect(gain); gain.connect(ctx.destination);
-    osc.type = 'sawtooth';
-    osc.frequency.setValueAtTime(220, ctx.currentTime);
-    osc.frequency.setValueAtTime(180, ctx.currentTime + 0.08);
-    gain.gain.setValueAtTime(0.14, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
-    osc.start(ctx.currentTime);
-    osc.stop(ctx.currentTime + 0.3);
-  } catch {}
-}
-
-// ─── Quiz Player ──────────────────────────────────────────────────────────────
+// ─── Quiz Player (instant MCQ feedback + sounds) ───────────────────────────────
 function QuizPlayer({ questions, config, onSubmit }) {
   const [currentIdx, setCurrentIdx] = useState(0);
   const [answers, setAnswers] = useState({});
-  const [instantFeedback, setInstantFeedback] = useState({}); // {qIdx: 'correct'|'wrong'}
+  const [revealed, setRevealed] = useState({}); // idx -> 'correct' | 'wrong'
+  const advanceTimer = useRef(null);
 
   const q = questions[currentIdx];
+  const isMCQ = q?.type === 'mcq';
   const totalAnswered = Object.keys(answers).length;
+  const feedbackState = revealed[currentIdx]; // 'correct' | 'wrong' | undefined
 
-  const setAnswer = (val) => {
-    if (answers[currentIdx] !== undefined) return; // don't allow changing after answered
-    setAnswers(prev => ({ ...prev, [currentIdx]: val }));
+  const selectMCQ = (oi) => {
+    if (revealed[currentIdx] !== undefined) return; // already locked
+    const isCorrect = oi === q.correct_index;
+    const newAnswers = { ...answers, [currentIdx]: oi };
+    const newRevealed = { ...revealed, [currentIdx]: isCorrect ? 'correct' : 'wrong' };
+    setAnswers(newAnswers);
+    setRevealed(newRevealed);
+    if (isCorrect) playSuccess(); else playError();
 
-    // Instant feedback for MCQ and fill-in-blank
-    if (q.type === 'mcq') {
-      const correct = val === q.correct_index;
-      setInstantFeedback(prev => ({ ...prev, [currentIdx]: { chosen: val, correct } }));
-      if (correct) playSuccessSound(); else playErrorSound();
-    } else if (q.type === 'fill') {
-      const correct = (val + '').trim().toLowerCase() === (q.correct_answer || '').trim().toLowerCase();
-      setInstantFeedback(prev => ({ ...prev, [currentIdx]: { chosen: val, correct } }));
-      if (correct) playSuccessSound(); else playErrorSound();
+    // Auto-advance after feedback delay
+    clearTimeout(advanceTimer.current);
+    advanceTimer.current = setTimeout(() => {
+      if (currentIdx < questions.length - 1) {
+        setCurrentIdx(i => i + 1);
+      } else {
+        onSubmit(newAnswers);
+      }
+    }, 950);
+  };
+
+  const setTextAnswer = (val) => setAnswers(prev => ({ ...prev, [currentIdx]: val }));
+
+  const goNext = () => {
+    if (currentIdx < questions.length - 1) setCurrentIdx(i => i + 1);
+    else onSubmit(answers);
+  };
+
+  const getOptionStyle = (oi) => {
+    if (feedbackState === undefined) {
+      return answers[currentIdx] === oi
+        ? { background: 'rgba(112,145,230,0.18)', border: '2px solid #7091E6', color: '#3D52A0' }
+        : { background: 'rgba(255,255,255,0.5)', border: '1px solid rgba(255,255,255,0.5)', color: '#3D52A0' };
     }
+    if (oi === q.correct_index) {
+      return { background: 'rgba(16,185,129,0.18)', border: '2px solid #10b981', color: '#064e3b' };
+    }
+    if (oi === answers[currentIdx] && feedbackState === 'wrong') {
+      return { background: 'rgba(239,68,68,0.13)', border: '2px solid #ef4444', color: '#7f1d1d' };
+    }
+    return { background: 'rgba(255,255,255,0.3)', border: '1px solid rgba(255,255,255,0.3)', color: '#8697C4', opacity: 0.55 };
   };
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full" style={BG}>
       {/* Progress bar */}
-      <div className="flex-shrink-0 px-6 py-3 border-b border-white/10">
+      <div className="flex-shrink-0 px-6 py-3"
+        style={{ borderBottom: '1px solid rgba(255,255,255,0.4)', background: 'rgba(255,255,255,0.35)' }}>
         <div className="flex items-center justify-between mb-2">
-          <span className="text-slate-400 text-xs font-medium">Question {currentIdx + 1} of {questions.length}</span>
-          <span className="text-slate-500 text-xs">{totalAnswered} answered</span>
+          <span className="text-xs font-semibold" style={{ color: '#8697C4' }}>Question {currentIdx + 1} of {questions.length}</span>
+          <span className="text-xs" style={{ color: '#8697C4' }}>{totalAnswered} answered</span>
         </div>
-        <div className="h-1.5 w-full bg-white/10 rounded-full overflow-hidden">
-          <motion.div className="h-full bg-gradient-to-r from-indigo-500 to-blue-400 rounded-full"
+        <div className="h-1.5 w-full rounded-full overflow-hidden" style={{ background: 'rgba(112,145,230,0.18)' }}>
+          <motion.div className="h-full rounded-full"
+            style={{ background: 'linear-gradient(90deg, #7091E6, #3D52A0)' }}
             animate={{ width: `${((currentIdx + 1) / questions.length) * 100}%` }}
             transition={{ duration: 0.3 }} />
         </div>
       </div>
 
-      {/* Question */}
-      <div className="flex-1 overflow-y-auto px-6 py-8">
+      {/* Question area */}
+      <div className="flex-1 overflow-y-auto px-6 py-6">
         <AnimatePresence mode="wait">
-          <motion.div key={currentIdx} initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}
-            transition={{ duration: 0.2 }} className="max-w-2xl mx-auto">
+          <motion.div key={currentIdx}
+            initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}
+            transition={{ duration: 0.18 }} className="max-w-2xl mx-auto">
 
-            <div className="flex items-start gap-3 mb-6">
-              <span className="flex-shrink-0 w-8 h-8 rounded-full bg-indigo-500/20 border border-indigo-500/40 flex items-center justify-center text-indigo-300 text-sm font-bold">
-                {currentIdx + 1}
-              </span>
-              <div className="flex-1">
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 bg-white/5 px-2 py-0.5 rounded-full">
-                    {q.type === 'mcq' ? 'Multiple Choice' : q.type === 'short' ? 'Short Answer' : q.type === 'long' ? 'Long Answer' : 'Fill in the Blank'}
-                  </span>
-                  {q.marks && <span className="text-[10px] text-slate-600">{q.marks} mark{q.marks !== 1 ? 's' : ''}</span>}
+            {/* Question card */}
+            <div className="rounded-3xl p-6 mb-4" style={GLASS}>
+              <div className="flex items-start gap-3 mb-5">
+                <span className="flex-shrink-0 w-9 h-9 rounded-full flex items-center justify-center text-sm font-black text-white"
+                  style={{ background: 'linear-gradient(135deg, #7091E6, #3D52A0)' }}>
+                  {currentIdx + 1}
+                </span>
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-2 flex-wrap">
+                    <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full"
+                      style={{ background: 'rgba(112,145,230,0.15)', color: '#3D52A0' }}>
+                      {q.type === 'mcq' ? 'Multiple Choice' : q.type === 'short' ? 'Short Answer' : 'Fill in Blank'}
+                    </span>
+                    {q.marks && <span className="text-[10px]" style={{ color: '#8697C4' }}>{q.marks} mark{q.marks !== 1 ? 's' : ''}</span>}
+                    {q.topic && <span className="text-[10px]" style={{ color: '#8697C4' }}>• {q.topic}</span>}
+                  </div>
+                  <p className="font-bold text-base leading-relaxed" style={{ color: '#3D52A0' }}>{q.question}</p>
                 </div>
-                <p className="text-white font-semibold text-lg leading-relaxed">{q.question}</p>
-                {q.topic && <p className="text-slate-500 text-xs mt-1">Topic: {q.topic}</p>}
               </div>
-            </div>
 
-            {/* MCQ options */}
-            {q.type === 'mcq' && q.options && (
-              <div className="space-y-2.5">
-                {q.options.map((opt, oi) => {
-                  const fb = instantFeedback[currentIdx];
-                  const isChosen = fb?.chosen === oi;
-                  const isCorrect = oi === q.correct_index;
-                  let style = 'bg-white/[0.04] border-white/10 text-slate-300 hover:bg-white/[0.08] hover:border-white/20';
-                  if (fb) {
-                    if (isChosen && fb.correct) style = 'bg-emerald-500/20 border-emerald-500/60 text-white shadow-lg shadow-emerald-500/20';
-                    else if (isChosen && !fb.correct) style = 'bg-red-500/20 border-red-500/60 text-white shadow-lg shadow-red-500/20';
-                    else if (!isChosen && isCorrect && !fb.correct) style = 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300';
-                    else style = 'bg-white/[0.02] border-white/5 text-slate-500 opacity-50';
-                  } else if (answers[currentIdx] === oi) {
-                    style = 'bg-indigo-500/20 border-indigo-500/50 text-white shadow-md shadow-indigo-500/10';
-                  }
-                  return (
-                    <motion.button
-                      key={oi}
-                      onClick={() => setAnswer(oi)}
-                      whileTap={!fb ? { scale: 0.98 } : {}}
-                      animate={isChosen && fb ? { scale: [1, 1.02, 1] } : {}}
-                      transition={{ duration: 0.2 }}
-                      className={`w-full text-left px-5 py-3.5 rounded-2xl border text-sm transition-all ${style}`}>
-                      <span className="font-bold text-slate-500 mr-3">{['A','B','C','D'][oi]}.</span>
-                      {opt}
-                      {isChosen && fb && (
-                        <span className="float-right">
-                          {fb.correct ? '✓' : '✗'}
-                        </span>
+              {/* MCQ options */}
+              {isMCQ && q.options && (
+                <div className="space-y-2.5">
+                  {q.options.map((opt, oi) => (
+                    <motion.button key={oi} onClick={() => selectMCQ(oi)}
+                      disabled={feedbackState !== undefined}
+                      whileTap={feedbackState === undefined ? { scale: 0.985 } : {}}
+                      className="w-full text-left px-5 py-3.5 rounded-xl text-sm font-medium transition-all flex items-center gap-3"
+                      style={getOptionStyle(oi)}>
+                      <span className="font-black text-xs flex-shrink-0"
+                        style={{ color: feedbackState !== undefined && oi === q.correct_index ? '#10b981' : '#7091E6' }}>
+                        {['A','B','C','D'][oi]}.
+                      </span>
+                      <span className="flex-1">{opt}</span>
+                      {feedbackState !== undefined && oi === q.correct_index && (
+                        <CheckCircle2 className="w-4 h-4 flex-shrink-0" style={{ color: '#10b981' }} />
+                      )}
+                      {feedbackState === 'wrong' && oi === answers[currentIdx] && oi !== q.correct_index && (
+                        <XCircle className="w-4 h-4 flex-shrink-0" style={{ color: '#ef4444' }} />
                       )}
                     </motion.button>
-                  );
-                })}
-              </div>
-            )}
+                  ))}
+                </div>
+              )}
 
-            {/* Fill in blank */}
-            {q.type === 'fill' && (
-              <input
-                value={answers[currentIdx] || ''}
-                onChange={e => setAnswer(e.target.value)}
-                placeholder="Type your answer…"
-                className="w-full px-5 py-3.5 bg-white/5 border border-white/15 focus:border-indigo-500/50 rounded-2xl text-white placeholder:text-slate-500 focus:outline-none text-sm transition-all"
-              />
-            )}
+              {/* Short answer */}
+              {q.type === 'short' && (
+                <textarea value={answers[currentIdx] || ''} onChange={e => setTextAnswer(e.target.value)}
+                  placeholder="Write your answer (1–3 sentences)…" rows={4}
+                  className="w-full px-5 py-3.5 rounded-xl text-sm resize-none focus:outline-none"
+                  style={{ background: 'rgba(255,255,255,0.65)', border: '1.5px solid rgba(112,145,230,0.3)', color: '#3D52A0' }} />
+              )}
 
-            {/* Short answer */}
-            {q.type === 'short' && (
-              <textarea
-                value={answers[currentIdx] || ''}
-                onChange={e => setAnswer(e.target.value)}
-                placeholder="Write your answer (1–3 sentences)…"
-                rows={4}
-                className="w-full px-5 py-3.5 bg-white/5 border border-white/15 focus:border-indigo-500/50 rounded-2xl text-white placeholder:text-slate-500 focus:outline-none text-sm resize-none transition-all"
-              />
-            )}
+              {/* Fill */}
+              {q.type === 'fill' && (
+                <input value={answers[currentIdx] || ''} onChange={e => setTextAnswer(e.target.value)}
+                  placeholder="Type your answer…"
+                  className="w-full px-5 py-3.5 rounded-xl text-sm focus:outline-none"
+                  style={{ background: 'rgba(255,255,255,0.65)', border: '1.5px solid rgba(112,145,230,0.3)', color: '#3D52A0' }} />
+              )}
+            </div>
 
-            {/* Long answer */}
-            {q.type === 'long' && (
-              <textarea
-                value={answers[currentIdx] || ''}
-                onChange={e => setAnswer(e.target.value)}
-                placeholder="Write your extended answer here…"
-                rows={8}
-                className="w-full px-5 py-3.5 bg-white/5 border border-white/15 focus:border-indigo-500/50 rounded-2xl text-white placeholder:text-slate-500 focus:outline-none text-sm resize-none transition-all"
-              />
-            )}
+            {/* Instant feedback banner (MCQ only) */}
+            <AnimatePresence>
+              {feedbackState && (
+                <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+                  className="rounded-2xl px-5 py-3.5 flex items-center gap-3"
+                  style={{
+                    background: feedbackState === 'correct' ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.1)',
+                    border: feedbackState === 'correct' ? '1.5px solid rgba(16,185,129,0.45)' : '1.5px solid rgba(239,68,68,0.35)',
+                  }}>
+                  {feedbackState === 'correct' ? (
+                    <>
+                      <CheckCircle2 className="w-5 h-5 flex-shrink-0" style={{ color: '#10b981' }} />
+                      <p className="font-bold text-sm" style={{ color: '#064e3b' }}>Correct! Moving on…</p>
+                    </>
+                  ) : (
+                    <>
+                      <XCircle className="w-5 h-5 flex-shrink-0" style={{ color: '#ef4444' }} />
+                      <p className="font-bold text-sm" style={{ color: '#7f1d1d' }}>Incorrect — correct answer highlighted in green</p>
+                    </>
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
           </motion.div>
         </AnimatePresence>
       </div>
 
-      {/* Navigation */}
-      <div className="flex-shrink-0 px-6 py-4 border-t border-white/10 flex items-center justify-between gap-3">
-        <button onClick={() => setCurrentIdx(i => Math.max(0, i - 1))} disabled={currentIdx === 0}
-          className="flex items-center gap-2 px-4 py-2.5 bg-white/5 border border-white/10 text-slate-400 rounded-xl text-sm disabled:opacity-30 hover:text-white transition-all">
-          <ChevronLeft className="w-4 h-4" /> Prev
-        </button>
-
-        <span className="text-slate-600 text-xs">{totalAnswered}/{questions.length} answered</span>
-
-        {currentIdx < questions.length - 1 ? (
-          <button onClick={() => setCurrentIdx(i => i + 1)}
-            className="flex items-center gap-2 px-4 py-2.5 bg-indigo-500/20 border border-indigo-500/40 text-indigo-300 rounded-xl text-sm hover:bg-indigo-500/30 transition-all">
-            Next <ChevronRight className="w-4 h-4" />
+      {/* Navigation (text answer questions only) */}
+      {!isMCQ && (
+        <div className="flex-shrink-0 px-6 py-4 flex items-center justify-between gap-3"
+          style={{ borderTop: '1px solid rgba(255,255,255,0.4)', background: 'rgba(255,255,255,0.35)' }}>
+          <button onClick={() => setCurrentIdx(i => Math.max(0, i - 1))} disabled={currentIdx === 0}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold disabled:opacity-30 transition-all"
+            style={{ background: 'rgba(255,255,255,0.55)', border: '1px solid rgba(255,255,255,0.5)', color: '#3D52A0' }}>
+            <ChevronLeft className="w-4 h-4" /> Prev
           </button>
-        ) : (
-          <button onClick={() => onSubmit(answers)}
-            className="flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-indigo-500 to-blue-600 text-white rounded-xl text-sm font-bold hover:brightness-110 transition-all shadow-lg shadow-indigo-500/20">
-            Submit Quiz ✓
+          <span className="text-xs" style={{ color: '#8697C4' }}>{totalAnswered}/{questions.length} answered</span>
+          <button onClick={goNext}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold text-white transition-all"
+            style={{ background: 'linear-gradient(135deg, #7091E6, #3D52A0)' }}>
+            {currentIdx < questions.length - 1 ? <><span>Next</span><ChevronRight className="w-4 h-4" /></> : 'Submit ✓'}
           </button>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -436,135 +429,133 @@ function QuizResults({ questions, answers, results, config, onRetry, onNewQuiz }
   const totalMarks = questions.reduce((s, q) => s + (q.marks || 1), 0);
   const earnedMarks = results.reduce((s, r) => s + (r.marks_awarded || 0), 0);
   const pct = Math.round((earnedMarks / totalMarks) * 100);
-
   const grade = pct >= 90 ? 'A*' : pct >= 80 ? 'A' : pct >= 70 ? 'B' : pct >= 60 ? 'C' : pct >= 50 ? 'D' : 'U';
-  const gradeColor = pct >= 70 ? 'text-emerald-400' : pct >= 50 ? 'text-amber-400' : 'text-red-400';
-
+  const gradeColor = pct >= 70 ? '#10b981' : pct >= 50 ? '#f59e0b' : '#ef4444';
   const weakTopics = [...new Set(results.filter(r => !r.is_correct).map(r => questions[r.index]?.topic).filter(Boolean))];
 
   return (
-    <div className="flex flex-col h-full overflow-y-auto">
-      {/* Score header */}
-      <div className="flex-shrink-0 px-6 py-6 border-b border-white/10">
-        <div className="flex items-center gap-4 mb-4">
-          <div className="flex-1">
-            <h2 className="text-white font-bold text-xl mb-1">Quiz Complete</h2>
-            <p className="text-slate-400 text-sm">{config.numQuestions} questions · {config.difficulty} · {config.examBoard}</p>
+    <div className="flex flex-col h-full overflow-y-auto" style={BG}>
+      {/* Score card */}
+      <div className="flex-shrink-0 px-6 py-6" style={{ borderBottom: '1px solid rgba(255,255,255,0.4)' }}>
+        <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
+          className="rounded-3xl p-6 text-center" style={GLASS}>
+          <div className="w-20 h-20 rounded-2xl flex items-center justify-center mx-auto mb-3 shadow-xl"
+            style={{ background: `${gradeColor}20`, border: `3px solid ${gradeColor}` }}>
+            <span className="font-black text-4xl" style={{ color: gradeColor }}>{grade}</span>
           </div>
-          <div className="text-right">
-            <div className={`text-4xl font-black ${gradeColor}`}>{grade}</div>
-            <div className="text-slate-400 text-sm">{pct}%</div>
+          <h2 className="font-black text-3xl mb-1" style={{ color: '#3D52A0' }}>{pct}%</h2>
+          <p className="text-sm mb-4" style={{ color: '#8697C4' }}>{earnedMarks}/{totalMarks} marks · {config.difficulty} · {config.examBoard}</p>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="rounded-2xl p-3" style={{ background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.25)' }}>
+              <div className="font-black text-xl" style={{ color: '#10b981' }}>{score}</div>
+              <div className="text-xs" style={{ color: '#8697C4' }}>Correct</div>
+            </div>
+            <div className="rounded-2xl p-3" style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)' }}>
+              <div className="font-black text-xl" style={{ color: '#ef4444' }}>{questions.length - score}</div>
+              <div className="text-xs" style={{ color: '#8697C4' }}>Incorrect</div>
+            </div>
           </div>
-        </div>
-
-        <div className="grid grid-cols-3 gap-3">
-          <div className="bg-white/5 border border-white/10 rounded-2xl p-3 text-center">
-            <div className="text-white font-bold text-lg">{earnedMarks}/{totalMarks}</div>
-            <div className="text-slate-500 text-xs">Marks</div>
-          </div>
-          <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-2xl p-3 text-center">
-            <div className="text-emerald-400 font-bold text-lg">{score}</div>
-            <div className="text-slate-500 text-xs">Correct</div>
-          </div>
-          <div className="bg-red-500/10 border border-red-500/20 rounded-2xl p-3 text-center">
-            <div className="text-red-400 font-bold text-lg">{questions.length - score}</div>
-            <div className="text-slate-500 text-xs">Incorrect</div>
-          </div>
-        </div>
+        </motion.div>
       </div>
 
-      <div className="flex-1 p-6 space-y-6">
+      <div className="flex-1 p-6 space-y-5">
         {/* Weak topics */}
         {weakTopics.length > 0 && (
-          <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-4">
+          <div className="rounded-2xl p-4"
+            style={{ background: 'rgba(251,191,36,0.1)', border: '1px solid rgba(251,191,36,0.3)' }}>
             <div className="flex items-center gap-2 mb-2">
-              <TrendingDown className="w-4 h-4 text-amber-400" />
-              <p className="text-amber-300 font-semibold text-sm">Weak Topics Detected</p>
+              <TrendingDown className="w-4 h-4" style={{ color: '#d97706' }} />
+              <p className="font-bold text-sm" style={{ color: '#d97706' }}>Weak Topics Detected</p>
             </div>
             <div className="flex flex-wrap gap-2">
               {weakTopics.map((t, i) => (
-                <span key={i} className="px-3 py-1 bg-amber-500/20 border border-amber-500/30 rounded-full text-amber-200 text-xs">{t}</span>
+                <span key={i} className="px-3 py-1 rounded-full text-xs font-semibold"
+                  style={{ background: 'rgba(251,191,36,0.15)', color: '#92400e', border: '1px solid rgba(251,191,36,0.3)' }}>
+                  {t}
+                </span>
               ))}
             </div>
           </div>
         )}
 
         {/* Next steps */}
-        {results[0]?.next_steps && (
-          <div className="bg-violet-500/10 border border-violet-500/30 rounded-2xl p-4">
+        {results[results.length - 1]?.next_steps && (
+          <div className="rounded-2xl p-4"
+            style={{ background: 'rgba(112,145,230,0.1)', border: '1px solid rgba(112,145,230,0.3)' }}>
             <div className="flex items-center gap-2 mb-2">
-              <Lightbulb className="w-4 h-4 text-violet-400" />
-              <p className="text-violet-300 font-semibold text-sm">Suggested Next Steps</p>
+              <Lightbulb className="w-4 h-4" style={{ color: '#7091E6' }} />
+              <p className="font-bold text-sm" style={{ color: '#3D52A0' }}>Suggested Next Steps</p>
             </div>
-            <p className="text-slate-300 text-sm leading-relaxed">{results[0].next_steps}</p>
+            <p className="text-sm leading-relaxed" style={{ color: '#3D52A0' }}>{results[results.length - 1].next_steps}</p>
           </div>
         )}
 
         {/* Per-question breakdown */}
         <div>
-          <p className="text-white font-semibold mb-3">Question Breakdown</p>
+          <p className="font-black mb-3" style={{ color: '#3D52A0' }}>Question Breakdown</p>
           <div className="space-y-2">
             {questions.map((q, i) => {
               const r = results.find(x => x.index === i);
               const correct = r?.is_correct;
               const isOpen = expandedIdx === i;
               return (
-                <div key={i} className={`rounded-2xl border overflow-hidden transition-all ${
-                  correct ? 'border-emerald-500/20 bg-emerald-500/[0.05]' : 'border-red-500/20 bg-red-500/[0.05]'
-                }`}>
-                  <button className="w-full flex items-start gap-3 p-4 text-left" onClick={() => setExpandedIdx(isOpen ? null : i)}>
-                    <div className={`flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center mt-0.5 ${correct ? 'bg-emerald-500/20' : 'bg-red-500/20'}`}>
+                <div key={i} className="rounded-2xl overflow-hidden"
+                  style={{
+                    background: correct ? 'rgba(16,185,129,0.08)' : 'rgba(239,68,68,0.06)',
+                    border: correct ? '1px solid rgba(16,185,129,0.25)' : '1px solid rgba(239,68,68,0.2)',
+                  }}>
+                  <button className="w-full flex items-start gap-3 p-4 text-left"
+                    onClick={() => setExpandedIdx(isOpen ? null : i)}>
+                    <div className="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center mt-0.5"
+                      style={{ background: correct ? 'rgba(16,185,129,0.2)' : 'rgba(239,68,68,0.15)' }}>
                       {correct
-                        ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                        : <XCircle className="w-3.5 h-3.5 text-red-400" />}
+                        ? <CheckCircle2 className="w-3.5 h-3.5" style={{ color: '#10b981' }} />
+                        : <XCircle className="w-3.5 h-3.5" style={{ color: '#ef4444' }} />}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-white text-sm font-medium leading-snug">{q.question}</p>
-                      <div className="flex items-center gap-2 mt-1">
-                        {q.topic && <span className="text-[10px] text-slate-500">{q.topic}</span>}
-                        <span className={`text-[10px] font-bold ${correct ? 'text-emerald-400' : 'text-red-400'}`}>
+                      <p className="text-sm font-semibold leading-snug" style={{ color: '#3D52A0' }}>{q.question}</p>
+                      <div className="flex items-center gap-3 mt-1">
+                        {q.topic && <span className="text-[10px]" style={{ color: '#8697C4' }}>{q.topic}</span>}
+                        <span className="text-[10px] font-bold" style={{ color: correct ? '#10b981' : '#ef4444' }}>
                           {r?.marks_awarded || 0}/{q.marks || 1} marks
                         </span>
                       </div>
                     </div>
-                    <span className="text-slate-600 text-xs">{isOpen ? '▲' : '▼'}</span>
+                    <span className="text-xs flex-shrink-0" style={{ color: '#8697C4' }}>{isOpen ? '▲' : '▼'}</span>
                   </button>
 
                   <AnimatePresence>
                     {isOpen && (
                       <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }}
                         className="overflow-hidden">
-                        <div className="px-4 pb-4 space-y-3 border-t border-white/10">
-                          {/* User's answer */}
-                          <div className="mt-3">
-                            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">Your Answer</p>
-                            <p className="text-slate-300 text-sm">
+                        <div className="px-4 pb-4 space-y-3 pt-3"
+                          style={{ borderTop: '1px solid rgba(255,255,255,0.4)' }}>
+                          <div>
+                            <p className="text-[10px] font-bold uppercase tracking-wider mb-1" style={{ color: '#8697C4' }}>Your Answer</p>
+                            <p className="text-sm" style={{ color: '#3D52A0' }}>
                               {q.type === 'mcq' && answers[i] !== undefined
                                 ? `${['A','B','C','D'][answers[i]]}. ${q.options?.[answers[i]] || '(no answer)'}`
                                 : answers[i] || '(no answer)'}
                             </p>
                           </div>
-                          {/* Correct answer */}
                           <div>
-                            <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-500/70 mb-1">Correct Answer</p>
-                            <p className="text-emerald-300 text-sm">
-                              {q.type === 'mcq' && q.correct_index !== null
+                            <p className="text-[10px] font-bold uppercase tracking-wider mb-1" style={{ color: '#10b981' }}>Correct Answer</p>
+                            <p className="text-sm" style={{ color: '#3D52A0' }}>
+                              {q.type === 'mcq' && q.correct_index != null
                                 ? `${['A','B','C','D'][q.correct_index]}. ${q.options?.[q.correct_index]}`
                                 : q.correct_answer}
                             </p>
                           </div>
-                          {/* Mark scheme */}
                           {q.mark_scheme && (
                             <div>
-                              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">Mark Scheme ({config.examBoard})</p>
-                              <p className="text-slate-400 text-sm leading-relaxed">{q.mark_scheme}</p>
+                              <p className="text-[10px] font-bold uppercase tracking-wider mb-1" style={{ color: '#8697C4' }}>Mark Scheme ({config.examBoard})</p>
+                              <p className="text-sm leading-relaxed" style={{ color: '#3D52A0' }}>{q.mark_scheme}</p>
                             </div>
                           )}
-                          {/* AI feedback */}
                           {r?.feedback && (
-                            <div className="bg-white/5 rounded-xl p-3">
-                              <p className="text-[10px] font-bold uppercase tracking-wider text-violet-400 mb-1">AI Feedback</p>
-                              <p className="text-slate-300 text-sm">{r.feedback}</p>
+                            <div className="p-3 rounded-xl" style={{ background: 'rgba(112,145,230,0.1)', border: '1px solid rgba(112,145,230,0.2)' }}>
+                              <p className="text-[10px] font-bold uppercase tracking-wider mb-1" style={{ color: '#7091E6' }}>AI Feedback</p>
+                              <p className="text-sm" style={{ color: '#3D52A0' }}>{r.feedback}</p>
                             </div>
                           )}
                         </div>
@@ -579,13 +570,16 @@ function QuizResults({ questions, answers, results, config, onRetry, onNewQuiz }
       </div>
 
       {/* Actions */}
-      <div className="flex-shrink-0 p-6 border-t border-white/10 flex gap-3">
+      <div className="flex-shrink-0 p-6 flex gap-3"
+        style={{ borderTop: '1px solid rgba(255,255,255,0.4)', background: 'rgba(255,255,255,0.35)' }}>
         <button onClick={onRetry}
-          className="flex-1 flex items-center justify-center gap-2 py-3 bg-white/5 border border-white/10 text-slate-400 rounded-xl text-sm font-semibold hover:text-white transition-all">
-          <RotateCcw className="w-4 h-4" /> Retry Same Quiz
+          className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold transition-all"
+          style={{ background: 'rgba(255,255,255,0.55)', border: '1px solid rgba(255,255,255,0.5)', color: '#3D52A0' }}>
+          <RotateCcw className="w-4 h-4" /> Retry
         </button>
         <button onClick={onNewQuiz}
-          className="flex-1 py-3 bg-gradient-to-r from-indigo-500 to-blue-600 text-white rounded-xl text-sm font-bold hover:brightness-110 transition-all shadow-lg shadow-indigo-500/20">
+          className="flex-1 py-3 rounded-xl text-sm font-bold text-white transition-all hover:brightness-110"
+          style={{ background: 'linear-gradient(135deg, #7091E6, #3D52A0)', boxShadow: '0 4px 16px rgba(61,82,160,0.25)' }}>
           New Quiz →
         </button>
       </div>
@@ -593,9 +587,9 @@ function QuizResults({ questions, answers, results, config, onRetry, onNewQuiz }
   );
 }
 
-// ─── Main QuizBuilder component ────────────────────────────────────────────────
+// ─── Main export ──────────────────────────────────────────────────────────────
 export default function QuizBuilder({ notebook, user, allSources, onResourceCreated }) {
-  const [phase, setPhase] = useState('config'); // config | generating | playing | marking | results
+  const [phase, setPhase] = useState('config');
   const [config, setConfig] = useState(null);
   const [questions, setQuestions] = useState([]);
   const [answers, setAnswers] = useState({});
@@ -608,8 +602,6 @@ export default function QuizBuilder({ notebook, user, allSources, onResourceCrea
     setGenProgress('Loading sources…');
 
     const ctx = getSourceContext(cfg.sources);
-
-    // Detect weak topics from past resources if adaptive
     let weakTopics = [];
     if (cfg.difficulty === 'adaptive') {
       try {
@@ -627,10 +619,9 @@ export default function QuizBuilder({ notebook, user, allSources, onResourceCrea
     }
 
     setGenProgress('Generating questions with AI…');
-    const prompt = buildGenerationPrompt(cfg, ctx, weakTopics);
 
     const result = await base44.integrations.Core.InvokeLLM({
-      prompt,
+      prompt: buildGenerationPrompt(cfg, ctx, weakTopics),
       response_json_schema: {
         type: 'object',
         properties: {
@@ -666,7 +657,6 @@ export default function QuizBuilder({ notebook, user, allSources, onResourceCrea
     setAnswers(userAnswers);
     setPhase('marking');
 
-    // Build marking prompt
     const markingData = questions.map((q, i) => ({
       index: i,
       question: q.question,
@@ -680,19 +670,11 @@ export default function QuizBuilder({ notebook, user, allSources, onResourceCrea
       mark_scheme: q.mark_scheme,
     }));
 
-    const markingPrompt = `You are an expert ${config.examBoard} examiner. Mark each answer fairly and provide concise feedback.
-
-For each question:
-- is_correct: true/false (for MCQ: exact match; for written: use judgment)
-- marks_awarded: integer 0 to marks_available
-- feedback: 1-2 sentence personalised feedback
-- For the LAST item only, add next_steps: suggested revision based on overall performance
-
-QUESTIONS AND ANSWERS:
-${JSON.stringify(markingData, null, 2)}`;
-
     const markResult = await base44.integrations.Core.InvokeLLM({
-      prompt: markingPrompt,
+      prompt: `You are an expert ${config.examBoard} examiner. Mark each answer fairly and provide concise feedback.
+For each question: is_correct (true/false), marks_awarded (0 to marks_available), feedback (1-2 sentences).
+For the LAST item only, add next_steps: suggested revision based on overall performance.
+QUESTIONS AND ANSWERS:\n${JSON.stringify(markingData, null, 2)}`,
       response_json_schema: {
         type: 'object',
         properties: {
@@ -718,66 +700,60 @@ ${JSON.stringify(markingData, null, 2)}`;
     const marked = markResult?.results || [];
     setResults(marked);
 
-    // Save to NotebookResource
     const totalMarks = questions.reduce((s, q) => s + (q.marks || 1), 0);
     const earned = marked.reduce((s, r) => s + (r.marks_awarded || 0), 0);
     const pct = Math.round((earned / totalMarks) * 100);
-    const weakTopics = [...new Set(marked.filter(r => !r.is_correct).map(r => questions[r.index]?.topic).filter(Boolean))];
-
-    const saveContent = JSON.stringify({
-      score: pct,
-      earned_marks: earned,
-      total_marks: totalMarks,
-      questions,
-      answers: userAnswers,
-      results: marked,
-      weak_topics: weakTopics,
-      difficulty: config.difficulty,
-      question_type: config.questionType,
-      exam_board: config.examBoard,
-      num_questions: config.numQuestions,
-      completed_at: new Date().toISOString(),
-    });
+    const wkTopics = [...new Set(marked.filter(r => !r.is_correct).map(r => questions[r.index]?.topic).filter(Boolean))];
 
     const res = await base44.entities.NotebookResource.create({
       notebook_id: notebook.id, student_email: user.email,
       title: `Quiz — ${pct}% · ${config.difficulty} · ${new Date().toLocaleDateString()}`,
-      resource_type: 'quiz', content: saveContent,
-      source_ids: config.sources.map(s => s.id), source_count: config.sources.length,
+      resource_type: 'quiz',
+      content: JSON.stringify({
+        score: pct, earned_marks: earned, total_marks: totalMarks,
+        questions, answers: userAnswers, results: marked, weak_topics: wkTopics,
+        difficulty: config.difficulty, question_type: config.questionType,
+        exam_board: config.examBoard, num_questions: config.numQuestions,
+        completed_at: new Date().toISOString(),
+      }),
+      source_ids: config.sources?.map(s => s.id) || [],
+      source_count: config.sources?.length || 0,
     });
     onResourceCreated(res);
-
     setPhase('results');
   };
 
-  // ── Generating screen
+  const loadingStyle = { ...BG };
+
   if (phase === 'generating') return (
-    <div className="flex flex-col items-center justify-center h-full gap-6 p-8 text-center">
-      <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-500 to-blue-600 flex items-center justify-center shadow-lg shadow-indigo-500/30">
+    <div className="flex flex-col items-center justify-center h-full gap-6 p-8 text-center" style={loadingStyle}>
+      <div className="w-16 h-16 rounded-2xl flex items-center justify-center shadow-lg"
+        style={{ background: 'linear-gradient(135deg, #7091E6, #3D52A0)' }}>
         <Loader2 className="w-8 h-8 text-white animate-spin" />
       </div>
       <div>
-        <p className="text-white font-bold text-xl mb-2">Building Your Quiz…</p>
-        <p className="text-slate-400 text-sm">{genProgress}</p>
+        <p className="font-black text-xl mb-2" style={{ color: '#3D52A0' }}>Building Your Quiz…</p>
+        <p className="text-sm" style={{ color: '#8697C4' }}>{genProgress}</p>
       </div>
-      <div className="flex gap-1 mt-2">
+      <div className="flex gap-1">
         {[0,1,2,3,4].map(i => (
-          <motion.div key={i} className="w-2 h-2 bg-indigo-400 rounded-full"
-            animate={{ opacity: [0.3, 1, 0.3] }} transition={{ duration: 1.2, delay: i * 0.2, repeat: Infinity }} />
+          <motion.div key={i} className="w-2 h-2 rounded-full" style={{ background: '#7091E6' }}
+            animate={{ opacity: [0.3, 1, 0.3] }}
+            transition={{ duration: 1.2, delay: i * 0.2, repeat: Infinity }} />
         ))}
       </div>
     </div>
   );
 
-  // ── Marking screen
   if (phase === 'marking') return (
-    <div className="flex flex-col items-center justify-center h-full gap-6 p-8 text-center">
-      <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-lg shadow-violet-500/30">
+    <div className="flex flex-col items-center justify-center h-full gap-6 p-8 text-center" style={loadingStyle}>
+      <div className="w-16 h-16 rounded-2xl flex items-center justify-center shadow-lg"
+        style={{ background: 'linear-gradient(135deg, #8697C4, #7091E6)' }}>
         <Loader2 className="w-8 h-8 text-white animate-spin" />
       </div>
       <div>
-        <p className="text-white font-bold text-xl mb-2">Marking Your Answers…</p>
-        <p className="text-slate-400 text-sm">AI is reviewing your responses and generating feedback</p>
+        <p className="font-black text-xl mb-2" style={{ color: '#3D52A0' }}>Marking Your Answers…</p>
+        <p className="text-sm" style={{ color: '#8697C4' }}>AI is reviewing your responses</p>
       </div>
     </div>
   );
@@ -785,22 +761,19 @@ ${JSON.stringify(markingData, null, 2)}`;
   return (
     <AnimatePresence mode="wait">
       {phase === 'config' && (
-        <motion.div key="config" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="h-full">
+        <motion.div key="config" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="h-full">
           <QuizBuilderConfig notebook={notebook} allSources={allSources} onStart={generate} />
         </motion.div>
       )}
       {phase === 'playing' && (
-        <motion.div key="playing" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="h-full">
+        <motion.div key="playing" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="h-full">
           <QuizPlayer questions={questions} config={config} onSubmit={submitForMarking} />
         </motion.div>
       )}
       {phase === 'results' && (
-        <motion.div key="results" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="h-full">
+        <motion.div key="results" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="h-full">
           <QuizResults
-            questions={questions}
-            answers={answers}
-            results={results}
-            config={config}
+            questions={questions} answers={answers} results={results} config={config}
             onRetry={() => { setAnswers({}); setPhase('playing'); }}
             onNewQuiz={() => setPhase('config')}
           />
