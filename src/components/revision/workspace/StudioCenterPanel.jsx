@@ -251,18 +251,13 @@ function FlashcardTool({ notebook, user, allSources, onResourceCreated, onOpenSt
 
   const targetCount = cardCount === '200+' ? 200 : parseInt(cardCount, 10);
 
-  // Wraps a promise with a hard timeout; resolves with null on timeout
-  const withTimeout = (promise, ms) =>
-    Promise.race([promise, new Promise(res => setTimeout(() => res(null), ms))]);
-
   const generate = async () => {
     setPhase('generating');
     cancelRef.current = false;
     setProgress({ generated: 0, batchLabel: 'Preparing sources…' });
 
     const sourceParts = allSources.filter(s => s.content_text);
-    // Cap source context to avoid runaway — max 12000 chars total across all sources
-    const MAX_CTX = 12000;
+    const MAX_CTX = 14000;
     let combined = '';
     const usedSourceIds = [];
     for (const src of sourceParts) {
@@ -277,61 +272,59 @@ function FlashcardTool({ notebook, user, allSources, onResourceCreated, onOpenSt
       includeExamples ? 'Include worked examples and real-world application cards.' : 'Do NOT include example cards.',
     ].join(' ');
 
-    // Determine batches needed — max 40 cards per LLM call, capped at 5 batches
-    const PER_BATCH = 40;
-    const batchCount = Math.min(5, Math.ceil(targetCount / PER_BATCH));
+    // Cap at 2 batches max — each LLM call generates up to targetCount/2 cards
+    const batchCount = targetCount <= 25 ? 1 : 2;
     const cardsPerBatch = Math.ceil(targetCount / batchCount);
-
     const rawCards = [];
 
     for (let i = 0; i < batchCount; i++) {
-      if (cancelRef.current || rawCards.length >= targetCount) break;
-      setProgress({ generated: rawCards.length, batchLabel: `Generating batch ${i + 1} of ${batchCount}…` });
+      if (cancelRef.current) break;
+      if (rawCards.length >= targetCount) break;
 
-      const result = await withTimeout(
-        base44.integrations.Core.InvokeLLM({
-          prompt: `${diffPrompt} ${extraInstructions}
+      setProgress({ generated: rawCards.length, batchLabel: `Generating flashcards${batchCount > 1 ? ` (part ${i + 1} of ${batchCount})` : ''}…` });
+
+      // No timeout — let the LLM call complete fully
+      const result = await base44.integrations.Core.InvokeLLM({
+        prompt: `${diffPrompt} ${extraInstructions}
 Generate exactly ${cardsPerBatch} unique revision flashcards for "${notebook.subject || notebook.name}".
 Front: clear concise question or term. Back: accurate plain text answer (no markdown).
-Return only cards not already generated in previous batches.
 SOURCES:\n${combined}`,
-          response_json_schema: {
-            type: 'object',
-            properties: {
-              flashcards: {
-                type: 'array',
-                items: {
-                  type: 'object',
-                  properties: { front: { type: 'string' }, back: { type: 'string' } },
-                  required: ['front', 'back'],
-                  additionalProperties: false,
-                }
+        response_json_schema: {
+          type: 'object',
+          properties: {
+            flashcards: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: { front: { type: 'string' }, back: { type: 'string' } },
+                required: ['front', 'back'],
+                additionalProperties: false,
               }
-            },
-            required: ['flashcards'],
-            additionalProperties: false,
-          }
-        }),
-        12000 // 12s timeout per batch
-      );
+            }
+          },
+          required: ['flashcards'],
+          additionalProperties: false,
+        }
+      });
 
       const batchCards = result?.flashcards || [];
       for (const card of batchCards) {
-        if (cancelRef.current || rawCards.length >= targetCount) break;
+        if (rawCards.length >= targetCount) break;
         if (!card.front?.trim() || !card.back?.trim()) continue;
         rawCards.push({ front: cleanText(card.front), back: cleanText(card.back), sourceId: usedSourceIds[0] || null });
       }
-      setProgress({ generated: rawCards.length, batchLabel: `Generated ${rawCards.length} cards…` });
+      setProgress({ generated: rawCards.length, batchLabel: `Generated ${rawCards.length} cards — saving…` });
     }
 
+    // If cancelled or nothing generated, go back to setup
     if (cancelRef.current || rawCards.length === 0) {
       setPhase('setup');
       setProgress(null);
       return;
     }
 
-    // Bulk-create all cards at once (no per-card await loop)
-    setProgress({ generated: rawCards.length, batchLabel: 'Saving cards…' });
+    // Bulk-save all cards in one shot
+    setProgress({ generated: rawCards.length, batchLabel: 'Saving to your notebook…' });
     const allCreated = await base44.entities.RevisionFlashcard.bulkCreate(
       rawCards.map(c => ({
         notebook_id: notebook.id,
@@ -351,8 +344,9 @@ SOURCES:\n${combined}`,
       source_ids: usedSourceIds, source_count: usedSourceIds.length,
     });
     onResourceCreated(res);
-    onOpenStudy(allCreated, title);
 
+    // Open study mode — only reset phase AFTER study view is handed off
+    onOpenStudy(allCreated, title);
     setPhase('setup');
     setProgress(null);
   };
@@ -375,11 +369,7 @@ SOURCES:\n${combined}`,
           animate={{ width: progress ? `${Math.min(100, (progress.generated / targetCount) * 100)}%` : '5%' }}
           transition={{ duration: 0.5 }} />
       </div>
-      <button onClick={() => { cancelRef.current = true; }}
-        className="px-4 py-2 rounded-xl text-sm font-medium transition-all"
-        style={{ background: 'rgba(220,55,55,0.1)', border: '1px solid rgba(220,55,55,0.3)', color: '#dc3535' }}>
-        Cancel
-      </button>
+      <p className="text-xs" style={{ color: 'rgba(61,82,160,0.5)' }}>Please wait — this may take up to 30 seconds</p>
     </div>
   );
 
