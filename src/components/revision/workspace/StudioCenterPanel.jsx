@@ -238,30 +238,37 @@ const DIFFICULTY_PROMPTS = {
 };
 
 function FlashcardTool({ notebook, user, allSources, onResourceCreated, onOpenStudy }) {
-  const [phase, setPhase] = useState('setup'); // 'setup' | 'generating' | 'done'
+  const [phase, setPhase] = useState('setup'); // 'setup' | 'generating'
   const [difficulty, setDifficulty] = useState('medium');
   const [cardCount, setCardCount] = useState('25');
   const [includeDefinitions, setIncludeDefinitions] = useState(true);
   const [includeExamples, setIncludeExamples] = useState(true);
   const [progress, setProgress] = useState(null);
-  const cancelRef = useRef({ cancelled: false });
+  const cancelRef = useRef(false);
 
   const hasContent = allSources.some(s => s.content_text);
   if (!hasContent) return <NoSources />;
 
   const targetCount = cardCount === '200+' ? 200 : parseInt(cardCount, 10);
 
+  // Wraps a promise with a hard timeout; resolves with null on timeout
+  const withTimeout = (promise, ms) =>
+    Promise.race([promise, new Promise(res => setTimeout(() => res(null), ms))]);
+
   const generate = async () => {
     setPhase('generating');
-    cancelRef.current.cancelled = false;
+    cancelRef.current = false;
+    setProgress({ generated: 0, batchLabel: 'Preparing sources…' });
 
     const sourceParts = allSources.filter(s => s.content_text);
-    const CHUNK = 7000;
-    const batches = [];
+    // Cap source context to avoid runaway — max 12000 chars total across all sources
+    const MAX_CTX = 12000;
+    let combined = '';
+    const usedSourceIds = [];
     for (const src of sourceParts) {
-      for (let offset = 0; offset < src.content_text.length; offset += CHUNK) {
-        batches.push({ sourceName: src.name, sourceId: src.id, chunk: src.content_text.slice(offset, offset + CHUNK) });
-      }
+      if (combined.length >= MAX_CTX) break;
+      combined += `\n### ${src.name}\n${src.content_text.slice(0, MAX_CTX - combined.length)}`;
+      usedSourceIds.push(src.id);
     }
 
     const diffPrompt = DIFFICULTY_PROMPTS[difficulty] || DIFFICULTY_PROMPTS.medium;
@@ -270,51 +277,82 @@ function FlashcardTool({ notebook, user, allSources, onResourceCreated, onOpenSt
       includeExamples ? 'Include worked examples and real-world application cards.' : 'Do NOT include example cards.',
     ].join(' ');
 
-    const cardsPerBatch = Math.max(5, Math.ceil(targetCount / batches.length));
-    setProgress({ generated: 0, batchLabel: 'Starting…' });
-    const allCreated = [];
+    // Determine batches needed — max 40 cards per LLM call, capped at 5 batches
+    const PER_BATCH = 40;
+    const batchCount = Math.min(5, Math.ceil(targetCount / PER_BATCH));
+    const cardsPerBatch = Math.ceil(targetCount / batchCount);
 
-    for (let i = 0; i < batches.length; i++) {
-      if (cancelRef.current.cancelled || allCreated.length >= targetCount) break;
-      const batch = batches[i];
-      setProgress({ generated: allCreated.length, batchLabel: `Batch ${i+1}/${batches.length} — ${batch.sourceName}` });
+    const rawCards = [];
 
-      const result = await base44.integrations.Core.InvokeLLM({
-        prompt: `${diffPrompt} ${extraInstructions}
-Generate up to ${cardsPerBatch} revision flashcards for "${notebook.subject || notebook.name}".
-Front: clear question or term. Back: accurate plain text answer. No markdown symbols.
-TEXT (${batch.sourceName}): ${batch.chunk}`,
-        response_json_schema: {
-          type: 'object',
-          properties: { flashcards: { type: 'array', items: { type: 'object', properties: { front: { type: 'string' }, back: { type: 'string' } }, required: ['front','back'] } } }
-        }
-      });
+    for (let i = 0; i < batchCount; i++) {
+      if (cancelRef.current || rawCards.length >= targetCount) break;
+      setProgress({ generated: rawCards.length, batchLabel: `Generating batch ${i + 1} of ${batchCount}…` });
+
+      const result = await withTimeout(
+        base44.integrations.Core.InvokeLLM({
+          prompt: `${diffPrompt} ${extraInstructions}
+Generate exactly ${cardsPerBatch} unique revision flashcards for "${notebook.subject || notebook.name}".
+Front: clear concise question or term. Back: accurate plain text answer (no markdown).
+Return only cards not already generated in previous batches.
+SOURCES:\n${combined}`,
+          response_json_schema: {
+            type: 'object',
+            properties: {
+              flashcards: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: { front: { type: 'string' }, back: { type: 'string' } },
+                  required: ['front', 'back'],
+                  additionalProperties: false,
+                }
+              }
+            },
+            required: ['flashcards'],
+            additionalProperties: false,
+          }
+        }),
+        12000 // 12s timeout per batch
+      );
 
       const batchCards = result?.flashcards || [];
       for (const card of batchCards) {
-        if (cancelRef.current.cancelled || allCreated.length >= targetCount) break;
+        if (cancelRef.current || rawCards.length >= targetCount) break;
         if (!card.front?.trim() || !card.back?.trim()) continue;
-        const rec = await base44.entities.RevisionFlashcard.create({
-          notebook_id: notebook.id, student_email: user.email,
-          front: cleanText(card.front), back: cleanText(card.back),
-          is_ai_generated: true, source_id: batch.sourceId || null,
-        });
-        allCreated.push(rec);
+        rawCards.push({ front: cleanText(card.front), back: cleanText(card.back), sourceId: usedSourceIds[0] || null });
       }
-      setProgress(p => ({ ...p, generated: allCreated.length }));
+      setProgress({ generated: rawCards.length, batchLabel: `Generated ${rawCards.length} cards…` });
     }
 
-    if (allCreated.length > 0) {
-      const title = `${notebook.name} — Flashcards (${allCreated.length} cards)`;
-      const res = await base44.entities.NotebookResource.create({
-        notebook_id: notebook.id, student_email: user.email,
-        title, resource_type: 'flashcards',
-        content: JSON.stringify({ totalCards: allCreated.length, difficulty, includeDefinitions, includeExamples }),
-        source_ids: allSources.map(s => s.id), source_count: allSources.length,
-      });
-      onResourceCreated(res);
-      onOpenStudy(allCreated, title);
+    if (cancelRef.current || rawCards.length === 0) {
+      setPhase('setup');
+      setProgress(null);
+      return;
     }
+
+    // Bulk-create all cards at once (no per-card await loop)
+    setProgress({ generated: rawCards.length, batchLabel: 'Saving cards…' });
+    const allCreated = await base44.entities.RevisionFlashcard.bulkCreate(
+      rawCards.map(c => ({
+        notebook_id: notebook.id,
+        student_email: user.email,
+        front: c.front,
+        back: c.back,
+        is_ai_generated: true,
+        source_id: c.sourceId,
+      }))
+    );
+
+    const title = `${notebook.name} — Flashcards (${allCreated.length} cards)`;
+    const res = await base44.entities.NotebookResource.create({
+      notebook_id: notebook.id, student_email: user.email,
+      title, resource_type: 'flashcards',
+      content: JSON.stringify({ totalCards: allCreated.length, difficulty, includeDefinitions, includeExamples }),
+      source_ids: usedSourceIds, source_count: usedSourceIds.length,
+    });
+    onResourceCreated(res);
+    onOpenStudy(allCreated, title);
+
     setPhase('setup');
     setProgress(null);
   };
@@ -337,7 +375,7 @@ TEXT (${batch.sourceName}): ${batch.chunk}`,
           animate={{ width: progress ? `${Math.min(100, (progress.generated / targetCount) * 100)}%` : '5%' }}
           transition={{ duration: 0.5 }} />
       </div>
-      <button onClick={() => { cancelRef.current.cancelled = true; }}
+      <button onClick={() => { cancelRef.current = true; }}
         className="px-4 py-2 rounded-xl text-sm font-medium transition-all"
         style={{ background: 'rgba(220,55,55,0.1)', border: '1px solid rgba(220,55,55,0.3)', color: '#dc3535' }}>
         Cancel
