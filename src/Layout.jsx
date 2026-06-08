@@ -21,11 +21,20 @@ import {
   Calendar,
   Wrench
 } from 'lucide-react';
-
-// Note: BookOpen, ClipboardList, TrendingUp, Brain, Users already imported above
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import ProfileModal from '@/components/profile/ProfileModal';
+
+/* ── Brand palette ── */
+const B = {
+  primary:   '#3D52A0',
+  secondary: '#7091E6',
+  surface:   '#8697C4',
+  base:      '#ADB8DA',
+  light:     '#EDE8F5',
+  dark:      '#0c1024',
+  darkMid:   '#111830',
+};
 
 export default function Layout({ children, currentPageName }) {
   const navigate = useNavigate();
@@ -79,19 +88,13 @@ export default function Layout({ children, currentPageName }) {
 
         if (studentPages.includes(currentPageName)) {
           hasAccess = isStudent;
-          if (!hasAccess) {
-            redirectPage = isTeacher ? 'TeacherDashboard' : 'AdminPanel';
-          }
+          if (!hasAccess) redirectPage = isTeacher ? 'TeacherDashboard' : 'AdminPanel';
         } else if (teacherPages.includes(currentPageName)) {
           hasAccess = isTeacher || isAdmin;
-          if (!hasAccess) {
-            redirectPage = 'StudentDashboard';
-          }
+          if (!hasAccess) redirectPage = 'StudentDashboard';
         } else if (adminPages.includes(currentPageName)) {
           hasAccess = isAdmin;
-          if (!hasAccess) {
-            redirectPage = isTeacher ? 'TeacherDashboard' : 'StudentDashboard';
-          }
+          if (!hasAccess) redirectPage = isTeacher ? 'TeacherDashboard' : 'StudentDashboard';
         } else {
           hasAccess = true;
         }
@@ -158,41 +161,51 @@ export default function Layout({ children, currentPageName }) {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: '#0F1228' }}>
-        <div className="w-12 h-12 border-4 border-t-transparent rounded-full animate-spin" style={{ borderColor: '#7091E6', borderTopColor: 'transparent' }} />
+      <div className="min-h-screen flex items-center justify-center" style={{ background: B.dark }}>
+        <div className="w-12 h-12 border-4 rounded-full animate-spin" style={{ borderColor: B.base, borderTopColor: B.secondary }} />
       </div>
     );
   }
 
-  if (!user) {
-    return null;
-  }
+  if (!user) return null;
 
   const navItems = getNavItems();
 
+  const activeNavStyle = {
+    background: `linear-gradient(135deg, ${B.primary}, ${B.secondary})`,
+    color: 'white',
+    boxShadow: `0 4px 15px rgba(61,82,160,0.45)`,
+  };
+
+  const sidebarStyle = {
+    background: `linear-gradient(180deg, #1e2d6e 0%, ${B.dark} 100%)`,
+    borderRight: `1px solid rgba(112,145,230,0.18)`,
+  };
+
   return (
-    <div className="min-h-screen" style={{ background: 'linear-gradient(135deg, #0F1228 0%, #1a2050 50%, #0F1228 100%)' }}>
-      <aside 
+    <div className="min-h-screen" style={{ background: `linear-gradient(135deg, ${B.dark} 0%, #151f50 50%, ${B.dark} 100%)` }}>
+      {/* Desktop sidebar */}
+      <aside
         className={cn(
           "hidden lg:flex fixed left-0 top-0 bottom-0 backdrop-blur-xl flex-col z-50 transition-all duration-300 ease-out",
           sidebarExpanded ? "w-64" : "w-20"
         )}
-        style={{ background: 'linear-gradient(180deg, #1e2d6e 0%, #0c1024 100%)', borderRight: '1px solid rgba(112,145,230,0.2)' }}
+        style={sidebarStyle}
         onMouseEnter={() => setSidebarExpanded(true)}
         onMouseLeave={() => setSidebarExpanded(false)}
       >
-        <div className="p-6 border-b border-white/10">
+        {/* Logo */}
+        <div className="p-6" style={{ borderBottom: '1px solid rgba(112,145,230,0.15)' }}>
           <Link to={createPageUrl('Landing')} className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center flex-shrink-0 shadow-lg shadow-purple-500/50">
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 shadow-lg"
+              style={{ background: `linear-gradient(135deg, ${B.secondary}, ${B.primary})` }}>
               <GraduationCap className="w-6 h-6 text-white" />
             </div>
-            <motion.span 
-              className="text-xl font-bold bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent whitespace-nowrap"
+            <motion.span
+              className="text-xl font-bold whitespace-nowrap"
+              style={{ color: B.base }}
               initial={{ opacity: 0, width: 0 }}
-              animate={{ 
-                opacity: sidebarExpanded ? 1 : 0,
-                width: sidebarExpanded ? 'auto' : 0
-              }}
+              animate={{ opacity: sidebarExpanded ? 1 : 0, width: sidebarExpanded ? 'auto' : 0 }}
               transition={{ duration: 0.3 }}
             >
               EduCore
@@ -200,27 +213,21 @@ export default function Layout({ children, currentPageName }) {
           </Link>
         </div>
 
+        {/* Nav */}
         <nav className="flex-1 p-4">
-          <div className="space-y-2">
+          <div className="space-y-1">
             {navItems.map(item => (
               <Link
                 key={item.page + item.name}
                 to={createPageUrl(item.page)}
-                className={cn(
-                  "flex items-center gap-4 px-4 py-3 rounded-xl transition-all duration-300",
-                  currentPageName === item.page
-                    ? 'bg-gradient-to-r from-purple-500 to-blue-500 text-white shadow-lg shadow-purple-500/50'
-                    : 'text-slate-400 hover:bg-white/5 hover:text-white'
-                )}
+                className="flex items-center gap-4 px-4 py-3 rounded-xl transition-all duration-300"
+                style={currentPageName === item.page ? activeNavStyle : { color: B.base }}
               >
                 <item.icon className="w-5 h-5 flex-shrink-0" />
-                <motion.span 
+                <motion.span
                   className="font-medium whitespace-nowrap"
                   initial={{ opacity: 0, width: 0 }}
-                  animate={{ 
-                    opacity: sidebarExpanded ? 1 : 0,
-                    width: sidebarExpanded ? 'auto' : 0
-                  }}
+                  animate={{ opacity: sidebarExpanded ? 1 : 0, width: sidebarExpanded ? 'auto' : 0 }}
                   transition={{ duration: 0.3 }}
                 >
                   {item.name}
@@ -230,43 +237,35 @@ export default function Layout({ children, currentPageName }) {
           </div>
         </nav>
 
-        <div className={cn(
-          "border-t border-white/10",
-          sidebarExpanded ? "p-4" : "py-4 flex flex-col items-center"
-        )}>
-            <button
-              onClick={() => setProfileModalOpen(true)}
-              className={cn(
-                "w-full rounded-xl transition-all duration-300 mb-3 hover:bg-white/10 flex items-center",
-                sidebarExpanded ? "gap-3 overflow-hidden p-2" : "justify-center p-2"
+        {/* User / Logout */}
+        <div className={cn("border-t border-white/10", sidebarExpanded ? "p-4" : "py-4 flex flex-col items-center")}>
+          <button
+            onClick={() => setProfileModalOpen(true)}
+            className={cn("w-full rounded-xl transition-all duration-300 mb-3 hover:bg-white/10 flex items-center",
+              sidebarExpanded ? "gap-3 overflow-hidden p-2" : "justify-center p-2")}
+          >
+            <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold flex-shrink-0 shadow-lg overflow-hidden"
+              style={{ background: `linear-gradient(135deg, ${B.primary}, ${B.secondary})` }}>
+              {user.avatar_url ? (
+                <img src={user.avatar_url} alt="Avatar" className="w-full h-full object-cover" />
+              ) : (
+                user.full_name?.charAt(0) || user.email?.charAt(0) || '?'
               )}
+            </div>
+            <motion.div
+              className="flex-1 min-w-0"
+              initial={{ opacity: 0, width: 0 }}
+              animate={{ opacity: sidebarExpanded ? 1 : 0, width: sidebarExpanded ? 'auto' : 0 }}
+              transition={{ duration: 0.3 }}
             >
-              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center text-white font-bold flex-shrink-0 shadow-lg shadow-purple-500/50 overflow-hidden">
-                {user.avatar_url ? (
-                  <img src={user.avatar_url} alt="Avatar" className="w-full h-full object-cover" />
-                ) : (
-                  user.full_name?.charAt(0) || user.email?.charAt(0) || '?'
-                )}
-              </div>
-              <motion.div 
-                className="flex-1 min-w-0"
-                initial={{ opacity: 0, width: 0 }}
-                animate={{ 
-                  opacity: sidebarExpanded ? 1 : 0,
-                  width: sidebarExpanded ? 'auto' : 0
-                }}
-                transition={{ duration: 0.3 }}
-              >
-                <p className="font-medium text-white truncate text-sm text-left">{user.full_name || 'User'}</p>
-                <p className="text-xs text-slate-400 truncate capitalize text-left">{user.user_type || user.role || 'User'}</p>
-              </motion.div>
-            </button>
-          <Button 
-            variant="ghost" 
-            className={cn(
-              "text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-all duration-300",
-              sidebarExpanded ? "w-full justify-start px-4" : "w-10 h-10 justify-center p-0"
-            )}
+              <p className="font-medium text-white truncate text-sm text-left">{user.full_name || 'User'}</p>
+              <p className="text-xs truncate capitalize text-left" style={{ color: B.base }}>{user.user_type || user.role || 'User'}</p>
+            </motion.div>
+          </button>
+          <Button
+            variant="ghost"
+            className={cn("text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-all duration-300",
+              sidebarExpanded ? "w-full justify-start px-4" : "w-10 h-10 justify-center p-0")}
             onClick={handleLogout}
           >
             <LogOut className="w-4 h-4" />
@@ -275,42 +274,41 @@ export default function Layout({ children, currentPageName }) {
         </div>
       </aside>
 
-      <header className="lg:hidden fixed top-0 left-0 right-0 bg-slate-950/80 backdrop-blur-xl border-b border-white/10 z-50">
+      {/* Mobile top bar */}
+      <header className="lg:hidden fixed top-0 left-0 right-0 backdrop-blur-xl border-b z-50"
+        style={{ background: 'rgba(8,12,26,0.9)', borderColor: 'rgba(112,145,230,0.15)' }}>
         <div className="flex items-center justify-between px-4 py-3">
           <Link to={createPageUrl('Landing')} className="flex items-center gap-2">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center shadow-lg shadow-purple-500/50">
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center shadow-lg"
+              style={{ background: `linear-gradient(135deg, ${B.secondary}, ${B.primary})` }}>
               <GraduationCap className="w-5 h-5 text-white" />
             </div>
-            <span className="text-lg font-bold bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">EduCore</span>
+            <span className="text-lg font-bold" style={{ color: B.base }}>EduCore</span>
           </Link>
           <div className="flex items-center gap-2">
-            <button
-              onClick={() => setProfileModalOpen(true)}
-              className="p-2 rounded-lg hover:bg-white/10 text-slate-400 hover:text-white transition-colors"
-            >
+            <button onClick={() => setProfileModalOpen(true)} className="p-2 rounded-lg hover:bg-white/10 transition-colors" style={{ color: B.base }}>
               <UserIcon className="w-5 h-5" />
             </button>
-            <button
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="p-2 rounded-lg hover:bg-white/10 text-white"
-            >
+            <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="p-2 rounded-lg hover:bg-white/10 text-white">
               {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
             </button>
           </div>
         </div>
       </header>
 
+      {/* Mobile slide-in menu */}
       <AnimatePresence>
         {mobileMenuOpen && (
           <motion.div
-            className="lg:hidden fixed inset-0 z-40 bg-black/50"
+            className="lg:hidden fixed inset-0 z-40 bg-black/60"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={() => setMobileMenuOpen(false)}
           >
             <motion.div
-              className="absolute right-0 top-0 bottom-0 w-72 bg-slate-950/95 backdrop-blur-xl border-l border-white/10"
+              className="absolute right-0 top-0 bottom-0 w-72 backdrop-blur-xl"
+              style={{ background: 'rgba(8,12,26,0.97)', borderLeft: '1px solid rgba(112,145,230,0.15)' }}
               initial={{ x: '100%' }}
               animate={{ x: 0 }}
               exit={{ x: '100%' }}
@@ -318,18 +316,14 @@ export default function Layout({ children, currentPageName }) {
               onClick={e => e.stopPropagation()}
             >
               <div className="p-4 pt-20">
-                <nav className="space-y-2">
+                <nav className="space-y-1">
                   {navItems.map(item => (
                     <Link
                       key={item.page + item.name}
                       to={createPageUrl(item.page)}
                       onClick={() => setMobileMenuOpen(false)}
-                      className={cn(
-                        "flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300",
-                        currentPageName === item.page
-                          ? 'bg-gradient-to-r from-purple-500 to-blue-500 text-white shadow-lg shadow-purple-500/50'
-                          : 'text-slate-400 hover:bg-white/5 hover:text-white'
-                      )}
+                      className="flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300"
+                      style={currentPageName === item.page ? activeNavStyle : { color: B.base }}
                     >
                       <item.icon className="w-5 h-5" />
                       <span className="font-medium">{item.name}</span>
@@ -337,18 +331,19 @@ export default function Layout({ children, currentPageName }) {
                   ))}
                 </nav>
 
-                <div className="mt-8 pt-6 border-t border-white/10">
+                <div className="mt-8 pt-6" style={{ borderTop: '1px solid rgba(112,145,230,0.15)' }}>
                   <div className="flex items-center gap-3 mb-4 px-4">
-                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center text-white font-bold shadow-lg shadow-purple-500/50">
+                    <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold shadow-lg"
+                      style={{ background: `linear-gradient(135deg, ${B.primary}, ${B.secondary})` }}>
                       {user.full_name?.charAt(0) || '?'}
                     </div>
                     <div>
                       <p className="font-medium text-white">{user.full_name}</p>
-                      <p className="text-xs text-slate-400 capitalize">{user.user_type || 'User'}</p>
+                      <p className="text-xs capitalize" style={{ color: B.base }}>{user.user_type || 'User'}</p>
                     </div>
                   </div>
-                  <Button 
-                    variant="ghost" 
+                  <Button
+                    variant="ghost"
                     className="w-full justify-start text-red-400 hover:text-red-300 hover:bg-red-500/10"
                     onClick={handleLogout}
                   >
@@ -362,10 +357,7 @@ export default function Layout({ children, currentPageName }) {
         )}
       </AnimatePresence>
 
-      <main className={cn(
-        "pt-16 lg:pt-0 transition-all duration-300",
-        sidebarExpanded ? "lg:ml-64" : "lg:ml-20"
-      )}>
+      <main className={cn("pt-16 lg:pt-0 transition-all duration-300", sidebarExpanded ? "lg:ml-64" : "lg:ml-20")}>
         {children}
       </main>
 
@@ -374,11 +366,7 @@ export default function Layout({ children, currentPageName }) {
         onClose={() => setProfileModalOpen(false)}
         user={user}
         onUpdateUser={() => {
-          const refreshUser = async () => {
-            const userData = await base44.auth.me();
-            setUser(userData);
-          };
-          refreshUser();
+          base44.auth.me().then(setUser);
         }}
       />
     </div>

@@ -419,19 +419,19 @@ export default function StudentDashboard() {
 
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900/20 to-slate-900 p-6">
+    <div className="min-h-screen p-6" style={{ background: 'linear-gradient(135deg, #0c1024 0%, #151f50 50%, #0c1024 100%)' }}>
       {/* Revision Hub banner */}
       <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="max-w-7xl mx-auto mb-6">
         <Link to={createPageUrl('RevisionHub')}>
-          <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-violet-600/30 to-purple-600/20 border border-violet-500/30 p-4 flex items-center gap-4 hover:from-violet-600/40 hover:to-purple-600/30 transition-all group cursor-pointer">
-            <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-lg shadow-violet-500/30 flex-shrink-0">
+          <div className="relative overflow-hidden rounded-2xl p-4 flex items-center gap-4 transition-all group cursor-pointer" style={{ background: 'rgba(61,82,160,0.2)', border: '1px solid rgba(112,145,230,0.3)' }}>
+            <div className="w-11 h-11 rounded-xl flex items-center justify-center shadow-lg flex-shrink-0" style={{ background: 'linear-gradient(135deg, #3D52A0, #7091E6)' }}>
               <Zap className="w-6 h-6 text-white" />
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-white font-black text-base">Revision Hub ✨</p>
-              <p className="text-slate-400 text-sm">AI notebooks, flashcards, quizzes & study guides</p>
+              <p className="text-slate-400 text-sm">AI notebooks, flashcards, quizzes &amp; study guides</p>
             </div>
-            <ChevronRight className="w-5 h-5 text-violet-400 group-hover:translate-x-1 transition-transform flex-shrink-0" />
+            <ChevronRight className="w-5 h-5 group-hover:translate-x-1 transition-transform flex-shrink-0" style={{ color: '#7091E6' }} />
           </div>
         </Link>
       </motion.div>
@@ -467,7 +467,8 @@ export default function StudentDashboard() {
             </div>
             <button
               onClick={() => setJoinClassOpen(true)}
-              className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center text-white shadow-lg shadow-blue-500/30 hover:from-blue-400 hover:to-cyan-400 transition-all hover:scale-110 flex-shrink-0 mt-1"
+              className="w-10 h-10 rounded-full flex items-center justify-center text-white shadow-lg transition-all hover:scale-110 flex-shrink-0 mt-1"
+              style={{ background: 'linear-gradient(135deg, #3D52A0, #7091E6)', boxShadow: '0 4px 15px rgba(61,82,160,0.4)' }}
               title="Join a Class"
             >
               <UserPlus className="w-5 h-5" />
@@ -490,7 +491,7 @@ export default function StudentDashboard() {
             transition={{ delay: 0.1, duration: 0.3, ease: 'easeOut' }}>
             
             <GlassCard hover={false} className="p-8 text-center bg-slate-950/50 backdrop-blur-xl">
-              <div className="w-12 h-12 mx-auto mb-4 rounded-xl bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center">
+              <div className="w-12 h-12 mx-auto mb-4 rounded-xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #3D52A0, #7091E6)' }}>
                 <trend.icon className={`w-6 h-6 ${trend.color}`} />
               </div>
               <p className="text-4xl font-bold text-white mb-2 drop-shadow-lg">{trend.label}</p>
@@ -768,7 +769,8 @@ export default function StudentDashboard() {
               </div>
               <Button
                 onClick={handleJoinClass}
-                className="w-full bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-400 hover:to-cyan-400 h-11 font-semibold"
+                className="w-full h-11 font-semibold text-white"
+                style={{ background: 'linear-gradient(135deg, #3D52A0, #7091E6)' }}
                 disabled={!classJoinCode}>
                 Join Class
               </Button>

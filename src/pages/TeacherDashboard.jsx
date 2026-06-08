@@ -197,7 +197,7 @@ export default function TeacherDashboard() {
 
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900/20 to-slate-900 p-6">
+    <div className="min-h-screen p-6" style={{ background: 'linear-gradient(135deg, #0c1024 0%, #151f50 50%, #0c1024 100%)' }}>
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <motion.div
@@ -216,7 +216,8 @@ export default function TeacherDashboard() {
             </div>
             <button
               onClick={() => setNewClassOpen(true)}
-              className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center text-white shadow-lg shadow-purple-500/30 hover:from-purple-400 hover:to-blue-400 transition-all hover:scale-110 flex-shrink-0 mt-1"
+              className="w-10 h-10 rounded-full flex items-center justify-center text-white shadow-lg transition-all hover:scale-110 flex-shrink-0 mt-1"
+              style={{ background: 'linear-gradient(135deg, #3D52A0, #7091E6)', boxShadow: '0 4px 15px rgba(61,82,160,0.4)' }}
               title="Create New Class"
             >
               <Plus className="w-5 h-5" />
@@ -281,7 +282,8 @@ export default function TeacherDashboard() {
                 </Select>
               </div>
               <Button
-                className="w-full bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-400 hover:to-blue-400 h-11 font-semibold"
+                className="w-full h-11 font-semibold text-white"
+                style={{ background: 'linear-gradient(135deg, #3D52A0, #7091E6)' }}
                 onClick={() => createClassMutation.mutate()}
                 disabled={!newClassName || !selectedSubject || createClassMutation.isPending}
               >
@@ -354,7 +356,7 @@ export default function TeacherDashboard() {
               <Users className="w-12 h-12 text-slate-400 mx-auto mb-4" />
               <h3 className="font-semibold text-white mb-2">No classes yet</h3>
               <p className="text-slate-400 text-sm mb-4">Create your first class to start adding students</p>
-              <Button onClick={() => setNewClassOpen(true)} className="bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 shadow-lg shadow-purple-500/30">
+              <Button onClick={() => setNewClassOpen(true)} className="text-white shadow-lg" style={{ background: 'linear-gradient(135deg, #3D52A0, #7091E6)' }}>
                 <Plus className="w-4 h-4 mr-2" />
                 Create Class
               </Button>
@@ -373,7 +375,7 @@ export default function TeacherDashboard() {
               </div>
               <div className="flex-1">
                 <p className="font-semibold text-white">Class Knowledge Gap Dashboard</p>
-                <p className="text-sm text-slate-400">View AI-identified gaps, trigger analysis & override practice modules</p>
+                <p className="text-sm text-slate-400">View AI-identified gaps, trigger analysis &amp; override practice modules</p>
               </div>
               <ChevronRight className="w-5 h-5 text-slate-500" />
             </GlassCard>
