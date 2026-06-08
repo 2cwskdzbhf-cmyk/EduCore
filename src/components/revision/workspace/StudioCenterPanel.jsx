@@ -2,6 +2,11 @@ import React, { useState, useRef, useEffect } from 'react';
 import ExamSimulator from './ExamSimulator';
 import QuizBuilder from './QuizBuilder';
 import QuizBuilderTool from './QuizBuilderTool';
+import MindMapTool from './tools/MindMapTool';
+import ExplainerTool from './tools/ExplainerTool';
+import PodcastTool from './tools/PodcastTool';
+import VoiceTutorTool from './tools/VoiceTutorTool';
+import SummaryTool from './tools/SummaryTool';
 import { motion, AnimatePresence } from 'framer-motion';
 import { base44 } from '@/api/base44Client';
 import {
@@ -1261,10 +1266,10 @@ export default function StudioCenterPanel({ activeTool, tool, notebook, user, al
         {t === 'chemistry' && <ChemistryTool {...props} />}
         {t === 'graph' && <GraphTool {...props} />}
         {t === 'mindmap' && <MindMapTool {...props} />}
-        {t === 'explainer' && <MediaTool tool="explainer" {...props} />}
-        {t === 'podcast' && <MediaTool tool="podcast" {...props} />}
-        {t === 'voice_tutor' && <MediaTool tool="voice_tutor" {...props} />}
-        {t === 'summary' && <SimpleGenTool tool="summary" {...props} />}
+        {t === 'explainer' && <ExplainerTool {...props} />}
+        {t === 'podcast' && <PodcastTool {...props} />}
+        {t === 'voice_tutor' && <VoiceTutorTool {...props} />}
+        {t === 'summary' && <SummaryTool {...props} />}
         {t === 'notes' && <NotesTool {...props} />}
         {t === 'topic_breakdown' && <SimpleGenTool tool="topic_breakdown" {...props} />}
       </motion.div>
