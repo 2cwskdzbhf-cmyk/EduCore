@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import QuizBuilder from './QuizBuilder';
 import QuizBuilderTool from './QuizBuilderTool';
 import { motion, AnimatePresence } from 'framer-motion';
 import { base44 } from '@/api/base44Client';
@@ -1136,7 +1137,7 @@ export default function StudioCenterPanel({ activeTool, tool, notebook, user, al
       <motion.div key={t} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.15 }} className="flex flex-col h-full">
         {t === 'chat' && <AIChatTool {...props} />}
         {t === 'flashcards' && <FlashcardTool {...props} />}
-        {t === 'quiz' && <QuizBuilderTool {...props} />}
+        {t === 'quiz' && <QuizBuilder {...props} />}
         {t === 'test' && <SimpleGenTool tool="test" {...props} />}
         {t === 'exam_sim' && <SimpleGenTool tool="exam_sim" {...props} />}
         {t === 'equation' && <EquationTool {...props} />}
