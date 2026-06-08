@@ -1,6 +1,6 @@
 import React from 'react';
 import {
-  Layers, Zap, ClipboardCheck, Timer,
+  Layers, Zap, Timer,
   Calculator, FlaskConical, BarChart2, Network,
   Video, Mic2, MessageSquare,
   FileText, StickyNote, BookOpen,
@@ -19,7 +19,6 @@ export const TOOL_GROUPS = [
     items: [
       { id: 'flashcards', label: 'Flashcards', icon: Layers, color: 'from-amber-500 to-orange-500', desc: 'Spaced repetition cards' },
       { id: 'quiz', label: 'Quiz', icon: Zap, color: 'from-indigo-500 to-blue-600', desc: 'Auto-marked quiz' },
-      { id: 'test', label: 'Test', icon: ClipboardCheck, color: 'from-rose-500 to-pink-600', desc: 'Long-form exam test' },
       { id: 'exam_sim', label: 'Exam Simulation', icon: Timer, color: 'from-red-500 to-orange-600', desc: 'Timed exam + analytics' },
     ],
   },
