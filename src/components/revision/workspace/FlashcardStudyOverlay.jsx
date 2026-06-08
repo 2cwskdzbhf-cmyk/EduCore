@@ -115,8 +115,8 @@ export default function FlashcardStudyOverlay({
 
   // ── Shared gradient backgrounds ──
   const bgStyle = isFullscreen
-    ? { background: 'radial-gradient(ellipse at 50% 30%, #1e1b4b 0%, #0f0f1a 70%, #0a0a12 100%)' }
-    : { background: 'radial-gradient(ellipse at 50% 20%, rgba(30,27,75,0.8) 0%, rgba(10,10,20,0.97) 100%)' };
+    ? { background: 'linear-gradient(135deg, #EDE8F5 0%, #c8d4f5 40%, #7091E6 100%)' }
+    : { background: 'linear-gradient(135deg, #EDE8F5 0%, #c8d4f5 60%, #b0c2f0 100%)' };
 
   // ── Container classes ──
   const containerClass = isFullscreen
@@ -136,10 +136,11 @@ export default function FlashcardStudyOverlay({
             transition={{ type: 'spring', stiffness: 260, damping: 22 }}
             className="w-full max-w-md mx-auto rounded-3xl p-8 sm:p-10 text-center"
             style={{
-              background: 'rgba(255,255,255,0.05)',
-              border: '1px solid rgba(255,255,255,0.1)',
+              background: 'rgba(255,255,255,0.35)',
+              border: '1px solid rgba(255,255,255,0.5)',
               backdropFilter: 'blur(24px)',
-              boxShadow: '0 32px 64px rgba(0,0,0,0.6)',
+              WebkitBackdropFilter: 'blur(24px)',
+              boxShadow: '0 16px 48px rgba(61,82,160,0.2)',
             }}
           >
             <div className="text-6xl mb-4">{emoji}</div>
@@ -147,29 +148,29 @@ export default function FlashcardStudyOverlay({
             <p className="text-slate-400 text-sm mb-8">You reviewed all {total} cards</p>
 
             <div className="grid grid-cols-3 gap-3 mb-8">
-              <div className="rounded-2xl py-5" style={{ background: 'rgba(52,211,153,0.08)', border: '1px solid rgba(52,211,153,0.2)' }}>
-                <p className="text-emerald-400 font-black text-3xl">{correct}</p>
-                <p className="text-emerald-400/60 text-xs mt-1 font-medium">Correct</p>
+              <div className="rounded-2xl py-5" style={{ background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.3)' }}>
+                <p className="font-black text-3xl" style={{ color: '#10b981' }}>{correct}</p>
+                <p className="text-xs mt-1 font-medium" style={{ color: 'rgba(16,185,129,0.7)' }}>Correct</p>
               </div>
-              <div className="rounded-2xl py-5" style={{ background: 'rgba(248,113,113,0.08)', border: '1px solid rgba(248,113,113,0.2)' }}>
-                <p className="text-red-400 font-black text-3xl">{incorrect}</p>
-                <p className="text-red-400/60 text-xs mt-1 font-medium">Incorrect</p>
+              <div className="rounded-2xl py-5" style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)' }}>
+                <p className="font-black text-3xl" style={{ color: '#ef4444' }}>{incorrect}</p>
+                <p className="text-xs mt-1 font-medium" style={{ color: 'rgba(239,68,68,0.7)' }}>Incorrect</p>
               </div>
-              <div className="rounded-2xl py-5" style={{ background: 'rgba(167,139,250,0.1)', border: '1px solid rgba(167,139,250,0.2)' }}>
-                <p className="text-violet-300 font-black text-3xl">{pct}%</p>
-                <p className="text-violet-300/60 text-xs mt-1 font-medium">Score</p>
+              <div className="rounded-2xl py-5" style={{ background: 'rgba(112,145,230,0.15)', border: '1px solid rgba(112,145,230,0.35)' }}>
+                <p className="font-black text-3xl" style={{ color: '#3D52A0' }}>{pct}%</p>
+                <p className="text-xs mt-1 font-medium" style={{ color: '#8697C4' }}>Score</p>
               </div>
             </div>
 
             <div className="flex gap-3">
               <button onClick={onClose}
-                className="flex-1 py-3.5 rounded-2xl text-slate-300 text-sm font-semibold transition-all hover:text-white"
-                style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }}>
+                className="flex-1 py-3.5 rounded-2xl text-sm font-semibold transition-all"
+                style={{ background: 'rgba(255,255,255,0.4)', border: '1px solid rgba(255,255,255,0.5)', color: '#3D52A0' }}>
                 ← Back to Studio
               </button>
               <button onClick={restart}
                 className="flex-1 py-3.5 rounded-2xl text-white text-sm font-bold transition-all hover:brightness-110"
-                style={{ background: 'linear-gradient(135deg, #7c3aed, #6d28d9)' }}>
+                style={{ background: 'linear-gradient(135deg, #7091E6, #3D52A0)' }}>
                 <RotateCcw className="w-4 h-4 inline mr-1.5 -mt-0.5" />
                 Restart
               </button>
@@ -190,12 +191,13 @@ export default function FlashcardStudyOverlay({
       {/* ── Header ── */}
       <div
         className="flex-shrink-0 flex items-center justify-between px-4 sm:px-6 py-3.5"
-        style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}
+        style={{ borderBottom: '1px solid rgba(255,255,255,0.3)', background: 'rgba(255,255,255,0.25)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)' }}
       >
         {/* Left: back */}
         <button
           onClick={onClose}
-          className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors text-sm font-medium group"
+          className="flex items-center gap-2 transition-colors text-sm font-medium group"
+          style={{ color: '#3D52A0' }}
         >
           <ArrowLeft className="w-4 h-4 group-hover:-translate-x-0.5 transition-transform" />
           <span className={isInline ? 'hidden sm:inline' : 'hidden sm:inline'}>Studio</span>
@@ -203,20 +205,20 @@ export default function FlashcardStudyOverlay({
 
         {/* Centre: title + counter */}
         <div className="flex flex-col items-center gap-0.5 flex-1 mx-4 min-w-0">
-          <p className="text-white/90 text-sm font-semibold truncate w-full text-center max-w-xs">{title}</p>
-          <p className="text-slate-500 text-xs font-medium">
-            Card <span className="text-white/70 font-bold">{index + 1}</span> of{' '}
-            <span className="text-white/70 font-bold">{total}</span>
+          <p className="text-sm font-semibold truncate w-full text-center max-w-xs" style={{ color: '#3D52A0' }}>{title}</p>
+          <p className="text-xs font-medium" style={{ color: '#8697C4' }}>
+            Card <span className="font-bold" style={{ color: '#3D52A0' }}>{index + 1}</span> of{' '}
+            <span className="font-bold" style={{ color: '#3D52A0' }}>{total}</span>
           </p>
         </div>
 
         {/* Right: stats + fullscreen toggle */}
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2.5 text-sm font-bold">
-            <span className="flex items-center gap-1 text-emerald-400">
+            <span className="flex items-center gap-1" style={{ color: '#10b981' }}>
               <Check className="w-3.5 h-3.5" />{correct}
             </span>
-            <span className="flex items-center gap-1 text-red-400">
+            <span className="flex items-center gap-1" style={{ color: '#ef4444' }}>
               <X className="w-3.5 h-3.5" />{incorrect}
             </span>
           </div>
@@ -244,10 +246,10 @@ export default function FlashcardStudyOverlay({
       </div>
 
       {/* Progress bar */}
-      <div className="flex-shrink-0 h-0.5 w-full" style={{ background: 'rgba(255,255,255,0.05)' }}>
+      <div className="flex-shrink-0 h-1 w-full" style={{ background: 'rgba(112,145,230,0.15)' }}>
         <motion.div
           className="h-full"
-          style={{ background: 'linear-gradient(90deg, #7c3aed, #a78bfa)' }}
+          style={{ background: 'linear-gradient(90deg, #7091E6, #3D52A0)' }}
           animate={{ width: `${progress}%` }}
           transition={{ duration: 0.5, ease: 'easeOut' }}
         />
@@ -260,7 +262,8 @@ export default function FlashcardStudyOverlay({
         <motion.p
           key={flipped ? 'answer' : 'question'}
           initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3 }}
-          className="text-slate-500 text-xs tracking-widest uppercase font-medium mb-4 select-none"
+          className="text-xs tracking-widest uppercase font-medium mb-4 select-none"
+          style={{ color: '#8697C4' }}
         >
           {flipped ? 'Answer' : 'Click · Tap · Space to reveal'}
         </motion.p>
@@ -282,18 +285,20 @@ export default function FlashcardStudyOverlay({
               style={{
                 backfaceVisibility: 'hidden',
                 minHeight: isFullscreen ? '300px' : '220px',
-                background: 'linear-gradient(145deg, rgba(30,27,75,0.9) 0%, rgba(15,15,26,0.95) 100%)',
-                border: '1px solid rgba(124,58,237,0.25)',
-                boxShadow: '0 0 80px rgba(124,58,237,0.12), 0 24px 48px rgba(0,0,0,0.5)',
+                background: 'rgba(255,255,255,0.25)',
+                backdropFilter: 'blur(25px)',
+                WebkitBackdropFilter: 'blur(25px)',
+                border: '1px solid rgba(255,255,255,0.4)',
+                boxShadow: '0 4px 20px rgba(61,82,160,0.15), 0 20px 60px rgba(112,145,230,0.1)',
               }}
             >
               <div
                 className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full mb-5"
-                style={{ background: 'rgba(124,58,237,0.12)', border: '1px solid rgba(124,58,237,0.25)' }}
+                style={{ background: 'rgba(112,145,230,0.15)', border: '1px solid rgba(112,145,230,0.3)' }}
               >
-                <span className="text-violet-400 text-[10px] font-bold uppercase tracking-[0.15em]">Question</span>
+                <span className="text-[10px] font-bold uppercase tracking-[0.15em]" style={{ color: '#7091E6' }}>Question</span>
               </div>
-              <p className="text-white font-semibold text-lg sm:text-xl md:text-2xl leading-relaxed" style={{ maxWidth: '600px' }}>
+              <p className="font-semibold text-lg sm:text-xl md:text-2xl leading-relaxed" style={{ maxWidth: '600px', color: '#3D52A0' }}>
                 {cleanText(card?.front)}
               </p>
             </div>
@@ -304,18 +309,20 @@ export default function FlashcardStudyOverlay({
               style={{
                 backfaceVisibility: 'hidden',
                 transform: 'rotateY(180deg)',
-                background: 'linear-gradient(145deg, rgba(20,40,60,0.95) 0%, rgba(10,30,50,0.98) 100%)',
-                border: '1px solid rgba(52,211,153,0.2)',
-                boxShadow: '0 0 80px rgba(52,211,153,0.08), 0 24px 48px rgba(0,0,0,0.5)',
+                background: 'rgba(112,145,230,0.2)',
+                backdropFilter: 'blur(25px)',
+                WebkitBackdropFilter: 'blur(25px)',
+                border: '1px solid rgba(112,145,230,0.4)',
+                boxShadow: '0 4px 20px rgba(61,82,160,0.2), 0 20px 60px rgba(112,145,230,0.15)',
               }}
             >
               <div
                 className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full mb-5"
-                style={{ background: 'rgba(52,211,153,0.1)', border: '1px solid rgba(52,211,153,0.25)' }}
+                style={{ background: 'rgba(61,82,160,0.15)', border: '1px solid rgba(61,82,160,0.3)' }}
               >
-                <span className="text-emerald-400 text-[10px] font-bold uppercase tracking-[0.15em]">Answer</span>
+                <span className="text-[10px] font-bold uppercase tracking-[0.15em]" style={{ color: '#3D52A0' }}>Answer</span>
               </div>
-              <p className="text-white font-semibold text-lg sm:text-xl md:text-2xl leading-relaxed" style={{ maxWidth: '600px' }}>
+              <p className="font-semibold text-lg sm:text-xl md:text-2xl leading-relaxed" style={{ maxWidth: '600px', color: '#3D52A0' }}>
                 {cleanText(card?.back)}
               </p>
             </div>
@@ -329,7 +336,7 @@ export default function FlashcardStudyOverlay({
             onClick={goBack}
             disabled={index === 0}
             className="flex items-center gap-1.5 px-4 py-3 rounded-2xl text-sm font-medium transition-all disabled:opacity-25 disabled:cursor-not-allowed hover:scale-105 active:scale-95 flex-shrink-0"
-            style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#cbd5e1' }}
+            style={{ background: 'rgba(255,255,255,0.35)', border: '1px solid rgba(255,255,255,0.5)', color: '#3D52A0' }}
           >
             <ChevronLeft className="w-4 h-4" />
             <span className="hidden sm:inline">Prev</span>
@@ -348,7 +355,7 @@ export default function FlashcardStudyOverlay({
                   <button
                     onClick={() => handleMark(false)}
                     className="flex items-center gap-2 px-4 sm:px-6 py-3 rounded-2xl text-sm font-bold transition-all hover:scale-105 active:scale-95"
-                    style={{ background: 'rgba(248,113,113,0.1)', border: '1px solid rgba(248,113,113,0.3)', color: '#f87171' }}
+                    style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', color: '#ef4444' }}
                   >
                     <X className="w-4 h-4" />
                     <span>Incorrect</span>
@@ -357,7 +364,7 @@ export default function FlashcardStudyOverlay({
                   <button
                     onClick={() => handleMark(true)}
                     className="flex items-center gap-2 px-4 sm:px-6 py-3 rounded-2xl text-sm font-bold transition-all hover:scale-105 active:scale-95"
-                    style={{ background: 'rgba(52,211,153,0.1)', border: '1px solid rgba(52,211,153,0.3)', color: '#34d399' }}
+                    style={{ background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.35)', color: '#10b981' }}
                   >
                     <Check className="w-4 h-4" />
                     <span>Correct</span>
@@ -371,7 +378,7 @@ export default function FlashcardStudyOverlay({
                   transition={{ duration: 0.2 }}
                   onClick={() => setFlipped(true)}
                   className="px-8 sm:px-12 py-3 rounded-2xl text-sm font-bold transition-all hover:scale-105 active:scale-95"
-                  style={{ background: 'rgba(124,58,237,0.15)', border: '1px solid rgba(124,58,237,0.35)', color: '#c4b5fd' }}
+                  style={{ background: 'rgba(112,145,230,0.2)', border: '1px solid rgba(112,145,230,0.4)', color: '#3D52A0' }}
                 >
                   See Answer
                 </motion.button>
@@ -383,7 +390,7 @@ export default function FlashcardStudyOverlay({
           <button
             onClick={goNext}
             className="flex items-center gap-1.5 px-4 py-3 rounded-2xl text-sm font-medium transition-all hover:scale-105 active:scale-95 flex-shrink-0"
-            style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#cbd5e1' }}
+            style={{ background: 'rgba(255,255,255,0.35)', border: '1px solid rgba(255,255,255,0.5)', color: '#3D52A0' }}
           >
             <span className="hidden sm:inline">Next</span>
             <ChevronRight className="w-4 h-4" />
@@ -391,7 +398,7 @@ export default function FlashcardStudyOverlay({
         </div>
 
         {/* Keyboard hints */}
-        <p className="mt-4 text-slate-700 text-xs font-medium select-none text-center">
+        <p className="mt-4 text-xs font-medium select-none text-center" style={{ color: 'rgba(61,82,160,0.45)' }}>
           ← → navigate · Space / Enter flip · 1 incorrect · 2 correct
           {isFullscreen && ' · Esc exit'}
         </p>

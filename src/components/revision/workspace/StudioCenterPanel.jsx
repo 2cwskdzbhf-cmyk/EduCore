@@ -230,127 +230,215 @@ ${ctx ? `SOURCES:\n${ctx}` : 'No sources yet. Help with general questions.'}`;
 }
 
 // ─── Flashcard Tool ───────────────────────────────────────────────────────────
+const DIFFICULTY_PROMPTS = {
+  easy: 'Generate EASY flashcards — focus on key definitions, basic facts, and simple recall. Keep answers short and clear.',
+  medium: 'Generate MEDIUM difficulty flashcards — mix definitions, explanations, and applied questions.',
+  hard: 'Generate HARD flashcards — focus on deeper understanding, multi-step concepts, cause/effect, and comparisons.',
+  'exam-level': 'Generate EXAM-LEVEL flashcards — use precise academic language, include complex analysis, evaluation questions, and mark-scheme style answers.',
+};
+
 function FlashcardTool({ notebook, user, allSources, onResourceCreated, onOpenStudy }) {
-  const [generating, setGenerating] = useState(false);
+  const [phase, setPhase] = useState('setup'); // 'setup' | 'generating' | 'done'
+  const [difficulty, setDifficulty] = useState('medium');
+  const [cardCount, setCardCount] = useState('25');
+  const [includeDefinitions, setIncludeDefinitions] = useState(true);
+  const [includeExamples, setIncludeExamples] = useState(true);
   const [progress, setProgress] = useState(null);
-  const [cards, setCards] = useState([]);
-  const [currentIdx, setCurrentIdx] = useState(0);
-  const [flipped, setFlipped] = useState(false);
   const cancelRef = useRef({ cancelled: false });
 
   const hasContent = allSources.some(s => s.content_text);
   if (!hasContent) return <NoSources />;
 
+  const targetCount = cardCount === '200+' ? 200 : parseInt(cardCount, 10);
+
   const generate = async () => {
-    setGenerating(true); cancelRef.current.cancelled = false;
+    setPhase('generating');
+    cancelRef.current.cancelled = false;
+
     const sourceParts = allSources.filter(s => s.content_text);
-    const CHUNK = 6000;
+    const CHUNK = 7000;
     const batches = [];
     for (const src of sourceParts) {
       for (let offset = 0; offset < src.content_text.length; offset += CHUNK) {
         batches.push({ sourceName: src.name, sourceId: src.id, chunk: src.content_text.slice(offset, offset + CHUNK) });
       }
     }
+
+    const diffPrompt = DIFFICULTY_PROMPTS[difficulty] || DIFFICULTY_PROMPTS.medium;
+    const extraInstructions = [
+      includeDefinitions ? 'Include definition cards (term → definition).' : 'Do NOT include pure definition cards.',
+      includeExamples ? 'Include worked examples and real-world application cards.' : 'Do NOT include example cards.',
+    ].join(' ');
+
+    const cardsPerBatch = Math.max(5, Math.ceil(targetCount / batches.length));
     setProgress({ generated: 0, batchLabel: 'Starting…' });
     const allCreated = [];
+
     for (let i = 0; i < batches.length; i++) {
-      if (cancelRef.current.cancelled) break;
+      if (cancelRef.current.cancelled || allCreated.length >= targetCount) break;
       const batch = batches[i];
       setProgress({ generated: allCreated.length, batchLabel: `Batch ${i+1}/${batches.length} — ${batch.sourceName}` });
+
       const result = await base44.integrations.Core.InvokeLLM({
-        prompt: `Generate comprehensive revision flashcards for "${notebook.subject || notebook.name}".
-Front: clear question. Back: accurate plain text answer. No markdown symbols.
-Cover every concept, definition, formula, fact.
+        prompt: `${diffPrompt} ${extraInstructions}
+Generate up to ${cardsPerBatch} revision flashcards for "${notebook.subject || notebook.name}".
+Front: clear question or term. Back: accurate plain text answer. No markdown symbols.
 TEXT (${batch.sourceName}): ${batch.chunk}`,
         response_json_schema: {
           type: 'object',
           properties: { flashcards: { type: 'array', items: { type: 'object', properties: { front: { type: 'string' }, back: { type: 'string' } }, required: ['front','back'] } } }
         }
       });
+
       const batchCards = result?.flashcards || [];
       for (const card of batchCards) {
-        if (cancelRef.current.cancelled) break;
+        if (cancelRef.current.cancelled || allCreated.length >= targetCount) break;
         if (!card.front?.trim() || !card.back?.trim()) continue;
         const rec = await base44.entities.RevisionFlashcard.create({
           notebook_id: notebook.id, student_email: user.email,
-          front: cleanText(card.front), back: cleanText(card.back), is_ai_generated: true,
-          source_id: batch.sourceId || null,
+          front: cleanText(card.front), back: cleanText(card.back),
+          is_ai_generated: true, source_id: batch.sourceId || null,
         });
         allCreated.push(rec);
       }
       setProgress(p => ({ ...p, generated: allCreated.length }));
     }
+
     if (allCreated.length > 0) {
       const title = `${notebook.name} — Flashcards (${allCreated.length} cards)`;
       const res = await base44.entities.NotebookResource.create({
         notebook_id: notebook.id, student_email: user.email,
         title, resource_type: 'flashcards',
-        content: JSON.stringify({ totalCards: allCreated.length }),
+        content: JSON.stringify({ totalCards: allCreated.length, difficulty, includeDefinitions, includeExamples }),
         source_ids: allSources.map(s => s.id), source_count: allSources.length,
       });
       onResourceCreated(res);
-      setCards(allCreated);
-      setCurrentIdx(0); setFlipped(false);
+      onOpenStudy(allCreated, title);
     }
-    setGenerating(false); setProgress(null);
+    setPhase('setup');
+    setProgress(null);
   };
 
-  if (generating) return (
-    <div className="flex flex-col items-center justify-center h-full gap-4 p-8">
-      <Loader2 className="w-10 h-10 text-amber-400 animate-spin" />
-      <p className="text-white font-bold text-lg">Generating Flashcards</p>
-      {progress && <p className="text-slate-400 text-sm">{progress.batchLabel}</p>}
-      {progress && <p className="text-amber-400 font-bold text-2xl">{progress.generated} cards created</p>}
-      <button onClick={() => { cancelRef.current.cancelled = true; }} className="px-4 py-2 bg-red-500/20 border border-red-500/30 text-red-400 rounded-xl text-sm hover:bg-red-500/30 transition-all">
+  // ── Generating screen ──
+  if (phase === 'generating') return (
+    <div className="flex flex-col items-center justify-center h-full gap-5 p-8"
+      style={{ background: 'linear-gradient(135deg, #EDE8F5 0%, #c8d4f5 100%)' }}>
+      <div className="w-16 h-16 rounded-2xl flex items-center justify-center shadow-lg"
+        style={{ background: 'linear-gradient(135deg, #7091E6, #3D52A0)' }}>
+        <Loader2 className="w-8 h-8 text-white animate-spin" />
+      </div>
+      <p className="font-bold text-lg" style={{ color: '#3D52A0' }}>Generating Flashcards…</p>
+      {progress && <p className="text-sm" style={{ color: '#8697C4' }}>{progress.batchLabel}</p>}
+      {progress && (
+        <p className="font-black text-3xl" style={{ color: '#7091E6' }}>{progress.generated} cards</p>
+      )}
+      <div className="w-48 h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(112,145,230,0.2)' }}>
+        <motion.div className="h-full rounded-full" style={{ background: 'linear-gradient(90deg, #7091E6, #3D52A0)' }}
+          animate={{ width: progress ? `${Math.min(100, (progress.generated / targetCount) * 100)}%` : '5%' }}
+          transition={{ duration: 0.5 }} />
+      </div>
+      <button onClick={() => { cancelRef.current.cancelled = true; }}
+        className="px-4 py-2 rounded-xl text-sm font-medium transition-all"
+        style={{ background: 'rgba(220,55,55,0.1)', border: '1px solid rgba(220,55,55,0.3)', color: '#dc3535' }}>
         Cancel
       </button>
     </div>
   );
 
-  if (cards.length === 0) return (
-    <div className="flex flex-col items-center justify-center h-full gap-6 p-8 text-center">
-      <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center shadow-lg shadow-amber-500/30">
-        <Layers className="w-8 h-8 text-white" />
-      </div>
-      <div>
-        <h2 className="text-white font-bold text-xl mb-2">Flashcard Generator</h2>
-        <p className="text-slate-400 text-sm max-w-md">Automatically generates high-quality flashcards from all your sources using spaced repetition.</p>
-      </div>
-      <button onClick={generate} className="px-8 py-3 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-xl font-bold text-base hover:brightness-110 transition-all shadow-lg shadow-amber-500/25">
-        Generate Flashcards
-      </button>
-    </div>
-  );
+  // ── Setup panel ──
+  const SELECT_STYLE = {
+    background: 'rgba(255,255,255,0.5)',
+    border: '1px solid rgba(255,255,255,0.4)',
+    borderRadius: '12px',
+    color: '#3D52A0',
+    padding: '10px 14px',
+    fontSize: '14px',
+    fontWeight: '500',
+    width: '100%',
+    outline: 'none',
+    cursor: 'pointer',
+  };
 
-  const card = cards[currentIdx];
   return (
-    <div className="flex flex-col items-center justify-center h-full gap-6 p-8">
-      <div className="flex items-center gap-4 text-sm text-slate-400">
-        <span>{currentIdx + 1} / {cards.length}</span>
-        <button onClick={generate} className="flex items-center gap-1 text-xs hover:text-white transition-colors"><Reset className="w-3 h-3" /> Regenerate</button>
-        <button onClick={() => onOpenStudy(cards, `${notebook.name} Flashcards`)} className="flex items-center gap-1 text-xs text-violet-400 hover:text-violet-300 transition-colors">▶ Study Mode</button>
-      </div>
-      <div className="w-full max-w-2xl" style={{ perspective: '1000px' }}>
-        <motion.div onClick={() => setFlipped(f => !f)} className="relative cursor-pointer select-none"
-          style={{ transformStyle: 'preserve-3d', transition: 'transform 0.5s', transform: flipped ? 'rotateY(180deg)' : 'rotateY(0deg)', height: '260px' }}>
-          <div className="absolute inset-0 flex flex-col items-center justify-center p-8 bg-white/[0.06] border border-white/15 rounded-3xl" style={{ backfaceVisibility: 'hidden' }}>
-            <p className="text-xs text-slate-500 uppercase tracking-widest mb-4">Question</p>
-            <p className="text-white font-bold text-xl text-center leading-relaxed">{card.front}</p>
-            <p className="text-slate-600 text-xs mt-6">Click to reveal answer</p>
+    <div className="flex flex-col items-center justify-center h-full p-6"
+      style={{ background: 'linear-gradient(135deg, #EDE8F5 0%, #c8d4f5 100%)' }}>
+      <motion.div
+        initial={{ opacity: 0, y: 16, scale: 0.97 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ duration: 0.35, ease: [0.4, 0, 0.2, 1] }}
+        className="w-full max-w-md rounded-3xl p-8"
+        style={{
+          background: 'rgba(255,255,255,0.25)',
+          backdropFilter: 'blur(20px)',
+          WebkitBackdropFilter: 'blur(20px)',
+          border: '1px solid rgba(255,255,255,0.3)',
+          boxShadow: '0 4px 20px rgba(61,82,160,0.15)',
+        }}
+      >
+        {/* Header */}
+        <div className="flex items-center gap-3 mb-6">
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+            style={{ background: 'linear-gradient(135deg, #7091E6, #3D52A0)' }}>
+            <Layers className="w-5 h-5 text-white" />
           </div>
-          <div className="absolute inset-0 flex flex-col items-center justify-center p-8 bg-violet-500/10 border border-violet-500/30 rounded-3xl" style={{ backfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}>
-            <p className="text-xs text-violet-400 uppercase tracking-widest mb-4">Answer</p>
-            <p className="text-slate-200 text-lg text-center leading-relaxed">{card.back}</p>
+          <div>
+            <h2 className="font-black text-lg" style={{ color: '#3D52A0' }}>Flashcard Options</h2>
+            <p className="text-sm" style={{ color: '#8697C4' }}>Customise your flashcard set</p>
           </div>
-        </motion.div>
-      </div>
-      <div className="flex gap-3">
-        <button onClick={() => { setCurrentIdx(i => Math.max(0, i-1)); setFlipped(false); }} disabled={currentIdx === 0}
-          className="px-5 py-2.5 bg-white/5 border border-white/10 text-slate-400 rounded-xl text-sm disabled:opacity-30 hover:text-white transition-all">← Prev</button>
-        <button onClick={() => setFlipped(f => !f)} className="px-5 py-2.5 bg-violet-500/20 border border-violet-500/30 text-violet-300 rounded-xl text-sm hover:bg-violet-500/30 transition-all">Flip</button>
-        <button onClick={() => { setCurrentIdx(i => Math.min(cards.length-1, i+1)); setFlipped(false); }} disabled={currentIdx === cards.length-1}
-          className="px-5 py-2.5 bg-white/5 border border-white/10 text-slate-400 rounded-xl text-sm disabled:opacity-30 hover:text-white transition-all">Next →</button>
-      </div>
+        </div>
+
+        <div className="space-y-5">
+          {/* Difficulty */}
+          <div>
+            <label className="block text-xs font-bold uppercase tracking-widest mb-2" style={{ color: '#8697C4' }}>Difficulty</label>
+            <select value={difficulty} onChange={e => setDifficulty(e.target.value)} style={SELECT_STYLE}>
+              <option value="easy">Easy</option>
+              <option value="medium">Medium</option>
+              <option value="hard">Hard</option>
+              <option value="exam-level">Exam-Level</option>
+            </select>
+          </div>
+
+          {/* Number of cards */}
+          <div>
+            <label className="block text-xs font-bold uppercase tracking-widest mb-2" style={{ color: '#8697C4' }}>Number of Flashcards</label>
+            <select value={cardCount} onChange={e => setCardCount(e.target.value)} style={SELECT_STYLE}>
+              {['10','25','50','100','150','200+'].map(n => (
+                <option key={n} value={n}>{n} cards</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Toggles */}
+          <div className="space-y-3">
+            {[
+              { label: 'Include Definitions', desc: 'Term → definition cards', val: includeDefinitions, set: setIncludeDefinitions },
+              { label: 'Include Examples', desc: 'Real-world applications', val: includeExamples, set: setIncludeExamples },
+            ].map(({ label, desc, val, set }) => (
+              <div key={label} className="flex items-center justify-between p-3 rounded-2xl"
+                style={{ background: 'rgba(255,255,255,0.35)', border: '1px solid rgba(255,255,255,0.4)' }}>
+                <div>
+                  <p className="text-sm font-semibold" style={{ color: '#3D52A0' }}>{label}</p>
+                  <p className="text-xs" style={{ color: '#8697C4' }}>{desc}</p>
+                </div>
+                <button onClick={() => set(v => !v)}
+                  className="relative w-11 h-6 rounded-full transition-all duration-300 flex-shrink-0"
+                  style={{ background: val ? 'linear-gradient(135deg, #7091E6, #3D52A0)' : 'rgba(134,151,196,0.3)' }}>
+                  <motion.span animate={{ x: val ? 20 : 2 }} transition={{ type: 'spring', stiffness: 400, damping: 28 }}
+                    className="absolute top-1 w-4 h-4 rounded-full bg-white shadow-sm block" />
+                </button>
+              </div>
+            ))}
+          </div>
+
+          {/* Generate button */}
+          <button onClick={generate}
+            className="w-full py-3.5 rounded-2xl text-white font-bold text-base transition-all hover:brightness-110 active:scale-[0.98] shadow-lg"
+            style={{ background: 'linear-gradient(135deg, #7091E6, #3D52A0)', boxShadow: '0 4px 20px rgba(61,82,160,0.3)' }}>
+            ✨ Generate Flashcards
+          </button>
+        </div>
+      </motion.div>
     </div>
   );
 }
