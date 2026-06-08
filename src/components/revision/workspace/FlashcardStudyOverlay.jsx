@@ -144,8 +144,8 @@ export default function FlashcardStudyOverlay({
             }}
           >
             <div className="text-6xl mb-4">{emoji}</div>
-            <h2 className="text-white font-black text-3xl mb-1">Session Complete!</h2>
-            <p className="text-slate-400 text-sm mb-8">You reviewed all {total} cards</p>
+            <h2 className="font-black text-3xl mb-1" style={{ color: '#3D52A0' }}>Session Complete!</h2>
+            <p className="text-sm mb-8" style={{ color: '#8697C4' }}>You reviewed all {total} cards</p>
 
             <div className="grid grid-cols-3 gap-3 mb-8">
               <div className="rounded-2xl py-5" style={{ background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.3)' }}>
@@ -228,7 +228,8 @@ export default function FlashcardStudyOverlay({
             <button
               onClick={onEnterFullscreen}
               title="Enter fullscreen"
-              className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-all"
+              className="p-2 rounded-xl transition-all"
+              style={{ color: '#8697C4' }}
             >
               <Maximize2 className="w-4 h-4" />
             </button>
@@ -237,7 +238,8 @@ export default function FlashcardStudyOverlay({
             <button
               onClick={onExitFullscreen}
               title="Exit fullscreen (Esc)"
-              className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-all"
+              className="p-2 rounded-xl transition-all"
+              style={{ color: '#8697C4' }}
             >
               <Minimize2 className="w-4 h-4" />
             </button>
