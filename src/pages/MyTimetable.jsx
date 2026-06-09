@@ -15,7 +15,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import GlassCard from '@/components/ui/GlassCard';
-import { Plus, Trash2, Edit2, X, Link as LinkIcon, Calendar, Clock, ChevronRight } from 'lucide-react';
+import { Plus, Trash2, Edit2, X, Link as LinkIcon, Calendar, Clock, ChevronRight, Camera, CheckCircle2, RefreshCw } from 'lucide-react';
+import ScreenshotImporter from '@/components/timetable/ScreenshotImporter';
 
 const SUBJECTS = [
   { label: 'Maths', value: 'Maths', color: 'from-blue-500 to-blue-600' },
@@ -59,6 +60,8 @@ export default function MyTimetable() {
   const [timetableMode, setTimetableMode] = useState('1-week'); // '1-week' or '2-week'
   const [currentWeek, setCurrentWeek] = useState(1);
   const [showForm, setShowForm] = useState(false);
+  const [showImporter, setShowImporter] = useState(false);
+  const [lastImport, setLastImport] = useState(null);
   const [editingId, setEditingId] = useState(null);
   const [formData, setFormData] = useState({
     subject: '',
@@ -299,17 +302,34 @@ export default function MyTimetable() {
           )}
         </div>
 
-        {/* Add Lesson Button */}
-        <Button
-          onClick={() => {
-            resetForm();
-            setShowForm(true);
-          }}
-          className="bg-gradient-to-r from-purple-500 to-blue-500 mb-6"
-        >
-          <Plus className="w-5 h-5 mr-2" />
-          Add Lesson
-        </Button>
+        {/* Action bar */}
+        <div className="flex flex-wrap items-center gap-3 mb-6">
+          <Button
+            onClick={() => { resetForm(); setShowForm(true); }}
+            className="bg-gradient-to-r from-purple-500 to-blue-500"
+          >
+            <Plus className="w-5 h-5 mr-2" />
+            Add Lesson
+          </Button>
+
+          <button
+            onClick={() => setShowImporter(true)}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold text-white transition-all hover:opacity-90 shadow-lg"
+            style={{ background: 'linear-gradient(135deg,#7091E6,#3D52A0)' }}
+          >
+            <Camera className="w-4 h-4" />
+            Upload Screenshot
+          </button>
+
+          {lastImport && (
+            <div className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold"
+              style={{ background: 'rgba(112,145,230,0.15)', border: '1px solid rgba(112,145,230,0.3)', color: '#3D52A0' }}>
+              <CheckCircle2 className="w-4 h-4 text-[#7091E6]" />
+              Last import: {lastImport.count} lessons · {lastImport.time}
+              <button onClick={() => setShowImporter(true)} className="ml-1 text-[#7091E6] hover:underline">Re-scan</button>
+            </div>
+          )}
+        </div>
 
         {/* Add/Edit Lesson Form */}
         <AnimatePresence>
@@ -498,6 +518,37 @@ export default function MyTimetable() {
                     </Button>
                   </div>
                 </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Screenshot Importer Modal */}
+        <AnimatePresence>
+          {showImporter && (
+            <motion.div
+              className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-8"
+              style={{ background: 'rgba(61,82,160,0.4)', backdropFilter: 'blur(8px)' }}
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              onClick={() => setShowImporter(false)}
+            >
+              <motion.div
+                className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-3xl shadow-2xl"
+                initial={{ scale: 0.95, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.95, y: 20 }}
+                onClick={e => e.stopPropagation()}
+              >
+                <ScreenshotImporter
+                  user={user}
+                  onClose={() => setShowImporter(false)}
+                  onImportComplete={({ count, weekRotation }) => {
+                    setLastImport({ count, time: new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) });
+                    queryClient.invalidateQueries(['timetableLessons']);
+                    setShowImporter(false);
+                    if (weekRotation && weekRotation !== 'none') {
+                      setTimetableMode('2-week');
+                    }
+                  }}
+                />
               </motion.div>
             </motion.div>
           )}
