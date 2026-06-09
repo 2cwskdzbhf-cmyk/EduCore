@@ -15,8 +15,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import GlassCard from '@/components/ui/GlassCard';
-import { Plus, Trash2, Edit2, X, Link as LinkIcon, Calendar, Clock, ChevronRight, Camera, CheckCircle2, RefreshCw } from 'lucide-react';
-import ScreenshotImporter from '@/components/timetable/ScreenshotImporter';
+import ScreenshotTimetableImporter from '@/components/timetable/ScreenshotTimetableImporter';
+import { Plus, Trash2, Edit2, X, Link as LinkIcon, Calendar, Clock, ChevronRight, Camera, CheckCircle2 } from 'lucide-react';
 
 const SUBJECTS = [
   { label: 'Maths', value: 'Maths', color: 'from-blue-500 to-blue-600' },
@@ -524,35 +524,17 @@ export default function MyTimetable() {
         </AnimatePresence>
 
         {/* Screenshot Importer Modal */}
-        <AnimatePresence>
-          {showImporter && (
-            <motion.div
-              className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-8"
-              style={{ background: 'rgba(61,82,160,0.4)', backdropFilter: 'blur(8px)' }}
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              onClick={() => setShowImporter(false)}
-            >
-              <motion.div
-                className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-3xl shadow-2xl"
-                initial={{ scale: 0.95, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.95, y: 20 }}
-                onClick={e => e.stopPropagation()}
-              >
-                <ScreenshotImporter
-                  user={user}
-                  onClose={() => setShowImporter(false)}
-                  onImportComplete={({ count, weekRotation }) => {
-                    setLastImport({ count, time: new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) });
-                    queryClient.invalidateQueries(['timetableLessons']);
-                    setShowImporter(false);
-                    if (weekRotation && weekRotation !== 'none') {
-                      setTimetableMode('2-week');
-                    }
-                  }}
-                />
-              </motion.div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+        {showImporter && (
+          <ScreenshotTimetableImporter
+            user={user}
+            onClose={() => setShowImporter(false)}
+            onImported={() => {
+              setLastImport({ count: '✓', time: new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) });
+              queryClient.invalidateQueries(['timetableLessons']);
+              setShowImporter(false);
+            }}
+          />
+        )}
 
         {/* Timetable Grid */}
         <DragDropContext onDragEnd={handleDragEnd}>
