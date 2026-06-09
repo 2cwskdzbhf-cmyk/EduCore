@@ -1,25 +1,76 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
-import { Mic2, Copy, ChevronDown, ChevronRight } from 'lucide-react';
-import { SetupShell, ResultShell, LoadingScreen, ToolLabel, ToolSelect, TopicRow, G } from './ToolSetupShell';
+import {
+  Mic2, Play, Pause, Download, ChevronDown, ChevronRight,
+  Loader2, FileText, X, Volume2
+} from 'lucide-react';
+import { SetupShell, LoadingScreen, ToolLabel, ToolSelect, TopicRow, G } from './ToolSetupShell';
 
 function getCtx(allSources) {
-  return allSources.filter(s => s.content_text).map(s => `### ${s.name}\n${s.content_text.slice(0, 5000)}`).join('\n\n---\n\n');
+  return allSources.filter(s => s.content_text)
+    .map(s => `### ${s.name}\n${s.content_text.slice(0, 3000)}`).join('\n\n---\n\n');
 }
 
-function ChapterList({ chapters, activeChapter, setActiveChapter }) {
+// Map voice style → GenerateSpeech voice names
+const VOICE_MAP = {
+  friendly:  { alex: 'honey',  sam: 'sunny'  },
+  serious:   { alex: 'storm',  sam: 'river'  },
+  energetic: { alex: 'spark',  sam: 'sunny'  },
+};
+
+function AudioPlayer({ url, label, onDownload }) {
+  const audioRef = useRef(null);
+  const [playing, setPlaying] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [duration, setDuration] = useState(0);
+
+  useEffect(() => {
+    setPlaying(false);
+    setProgress(0);
+  }, [url]);
+
+  const toggle = () => {
+    const a = audioRef.current;
+    if (!a) return;
+    if (playing) { a.pause(); setPlaying(false); }
+    else { a.play(); setPlaying(true); }
+  };
+
+  const fmt = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+
   return (
-    <div className="mb-4">
-      <p className="text-xs font-bold uppercase tracking-widest mb-2" style={{ color: G.secondary }}>Chapters</p>
-      <div className="space-y-1">
-        {chapters.map((ch, i) => (
-          <button key={i} onClick={() => setActiveChapter(i === activeChapter ? null : i)}
-            className="w-full text-left px-3 py-2 rounded-xl flex items-center gap-2 transition-all"
-            style={{ background: activeChapter === i ? 'rgba(112,145,230,0.15)' : 'rgba(255,255,255,0.4)', border: `1px solid ${activeChapter === i ? 'rgba(112,145,230,0.35)' : 'rgba(255,255,255,0.3)'}` }}>
-            {activeChapter === i ? <ChevronDown className="w-3.5 h-3.5 flex-shrink-0" style={{ color: G.accent }} /> : <ChevronRight className="w-3.5 h-3.5 flex-shrink-0" style={{ color: G.secondary }} />}
-            <span className="text-xs font-semibold" style={{ color: G.primary }}>{ch.title}</span>
-          </button>
-        ))}
+    <div className="rounded-2xl p-4" style={{ background: 'rgba(255,255,255,0.55)', border: '1px solid rgba(255,255,255,0.4)' }}>
+      <audio ref={audioRef} src={url}
+        onTimeUpdate={e => setProgress(e.target.currentTime)}
+        onLoadedMetadata={e => setDuration(e.target.duration)}
+        onEnded={() => setPlaying(false)} />
+      <div className="flex items-center gap-3 mb-3">
+        <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+          style={{ background: 'linear-gradient(135deg,#7091E6,#3D52A0)' }}>
+          <Volume2 className="w-5 h-5 text-white" />
+        </div>
+        <p className="font-bold text-sm flex-1 truncate" style={{ color: G.primary }}>{label}</p>
+      </div>
+      <div className="flex items-center gap-3">
+        <button onClick={toggle}
+          className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 shadow-md"
+          style={{ background: 'linear-gradient(135deg,#7091E6,#3D52A0)' }}>
+          {playing
+            ? <Pause className="w-4 h-4 text-white" />
+            : <Play className="w-4 h-4 text-white ml-0.5" />}
+        </button>
+        <div className="flex-1">
+          <input type="range" min={0} max={duration || 100} value={progress} step={0.1}
+            onChange={e => { if (audioRef.current) audioRef.current.currentTime = Number(e.target.value); setProgress(Number(e.target.value)); }}
+            className="w-full accent-[#7091E6] h-1.5" />
+          <div className="flex justify-between text-xs mt-0.5" style={{ color: G.secondary }}>
+            <span>{fmt(progress)}</span><span>{fmt(duration)}</span>
+          </div>
+        </div>
+        <a href={url} download className="p-2 rounded-xl transition-all hover:bg-white/30"
+          style={{ border: '1px solid rgba(112,145,230,0.3)', color: G.accent }} title="Download">
+          <Download className="w-4 h-4" />
+        </a>
       </div>
     </div>
   );
@@ -28,32 +79,39 @@ function ChapterList({ chapters, activeChapter, setActiveChapter }) {
 export default function PodcastTool({ notebook, user, allSources, onResourceCreated }) {
   const [phase, setPhase] = useState('setup');
   const [customTopic, setCustomTopic] = useState('');
-  const [tone, setTone] = useState('exam_focused');
+  const [tone, setTone] = useState('friendly');
   const [length, setLength] = useState('medium');
   const [difficulty, setDifficulty] = useState('gcse');
   const [generating, setGenerating] = useState(false);
+  const [genStatus, setGenStatus] = useState('');
   const [chapters, setChapters] = useState([]);
+  const [audioUrls, setAudioUrls] = useState([]);
   const [activeChapter, setActiveChapter] = useState(0);
+  const [showScript, setShowScript] = useState(false);
 
   const topic = customTopic.trim() || notebook.name;
   const hasSource = allSources.some(s => s.content_text);
-  const toneMap = { fun: 'fun, enthusiastic, and humorous', serious: 'professional and informative', exam_focused: 'exam-focused, concise, and revision-driven' };
-  const lengthMap = { short: '3–4 chapters, ~300 words each', medium: '5–6 chapters, ~400 words each', long: '7–8 chapters, ~500 words each' };
+  const lengthMap = { short: '3 chapters', medium: '5 chapters', long: '7 chapters' };
   const diffMap = { simple: 'simple language', gcse: 'GCSE level', alevel: 'A-Level depth' };
+
+  // Extract plain narration text for TTS (strips "Alex:" / "Sam:" labels into one voice)
+  const toNarration = (content) =>
+    content.split('\n').filter(l => l.trim()).map(l => l.replace(/^(Alex|Sam):\s*/i, '')).join(' ');
 
   const generate = async () => {
     setGenerating(true);
+    setGenStatus('Writing podcast script…');
     const ctx = hasSource && !customTopic.trim() ? getCtx(allSources) : '';
+    const voices = VOICE_MAP[tone] || VOICE_MAP.friendly;
 
     const result = await base44.integrations.Core.InvokeLLM({
       prompt: `Write a two-host podcast episode between hosts Alex and Sam discussing: "${topic}".
-- Tone: ${toneMap[tone]}
+- Tone: ${tone}
 - Length: ${lengthMap[length]}
 - Difficulty: ${diffMap[difficulty]}
-- Structure each chapter with a title. Start with an [INTRO] and end with an [OUTRO].
-- Use natural conversational dialogue. Each speaker line starts with "Alex:" or "Sam:".
-- Make it educational and engaging.
-${ctx ? `\n\nSOURCE MATERIAL:\n${ctx.slice(0, 10000)}` : ''}`,
+- Each chapter has a title. Start with [INTRO], end with [OUTRO].
+- Each speaker line starts with "Alex:" or "Sam:". Natural conversation. Educational.
+${ctx ? `\nSOURCE MATERIAL:\n${ctx.slice(0, 8000)}` : ''}`,
       response_json_schema: {
         type: 'object',
         properties: {
@@ -72,8 +130,21 @@ ${ctx ? `\n\nSOURCE MATERIAL:\n${ctx.slice(0, 10000)}` : ''}`,
 
     const chs = result?.chapters || [];
     setChapters(chs);
-    setActiveChapter(0);
 
+    // Generate audio for each chapter
+    const urls = [];
+    for (let i = 0; i < chs.length; i++) {
+      setGenStatus(`Generating audio — chapter ${i + 1} of ${chs.length}…`);
+      const narration = toNarration(chs[i].content).slice(0, 4800);
+      const audioRes = await base44.integrations.Core.GenerateSpeech({
+        text: narration,
+        voice: voices.alex,
+      });
+      urls.push(audioRes?.url || '');
+    }
+    setAudioUrls(urls);
+
+    // Save resource
     const fullText = chs.map(ch => `## ${ch.title}\n\n${ch.content}`).join('\n\n---\n\n');
     const res = await base44.entities.NotebookResource.create({
       notebook_id: notebook.id, student_email: user.email,
@@ -82,79 +153,116 @@ ${ctx ? `\n\nSOURCE MATERIAL:\n${ctx.slice(0, 10000)}` : ''}`,
       source_ids: allSources.map(s => s.id), source_count: allSources.length,
     });
     onResourceCreated(res);
+    setActiveChapter(0);
     setGenerating(false);
+    setGenStatus('');
     setPhase('result');
   };
 
-  if (generating) return <LoadingScreen label="Writing Podcast Episode…" />;
+  if (generating) return <LoadingScreen label={genStatus || 'Generating Podcast…'} />;
 
-  if (phase === 'result' && chapters.length > 0) {
+  if (phase === 'result') {
     const ch = chapters[activeChapter];
-    // Colour Alex/Sam lines
+    const audioUrl = audioUrls[activeChapter];
+
     const renderDialogue = (text) => text.split('\n').map((line, i) => {
-      const isAlex = line.startsWith('Alex:');
-      const isSam = line.startsWith('Sam:');
+      const isAlex = /^Alex:/i.test(line);
+      const isSam = /^Sam:/i.test(line);
       if (!isAlex && !isSam) return <p key={i} className="text-xs italic mb-1" style={{ color: G.secondary }}>{line}</p>;
-      const [speaker, ...rest] = line.split(':');
+      const colon = line.indexOf(':');
+      const speaker = line.slice(0, colon);
+      const words = line.slice(colon + 1);
       return (
-        <div key={i} className="mb-2">
-          <span className="text-xs font-black mr-1" style={{ color: isAlex ? G.accent : G.primary }}>{speaker}:</span>
-          <span className="text-sm" style={{ color: G.primary }}>{rest.join(':')}</span>
+        <div key={i} className="mb-2.5 flex gap-2 items-start">
+          <span className="text-xs font-black px-2 py-0.5 rounded-lg flex-shrink-0"
+            style={{ background: isAlex ? 'rgba(112,145,230,0.15)' : 'rgba(61,82,160,0.12)', color: isAlex ? G.accent : G.primary }}>
+            {speaker}
+          </span>
+          <span className="text-sm" style={{ color: G.primary }}>{words}</span>
         </div>
       );
     });
 
     return (
-      <ResultShell
-        title={`Podcast — ${topic}`}
-        subtitle={`${chapters.length} chapters · ${tone} · ${difficulty}`}
-        onRegenerate={() => { setPhase('setup'); setChapters([]); }}
-        onBack={() => { setPhase('setup'); setChapters([]); }}
-        extraActions={
-          <button onClick={() => navigator.clipboard.writeText(chapters.map(c => `## ${c.title}\n\n${c.content}`).join('\n\n---\n\n'))}
-            className="px-3 py-1.5 rounded-xl text-xs font-semibold"
-            style={{ background: 'rgba(255,255,255,0.5)', border: '1px solid rgba(112,145,230,0.3)', color: G.primary }}>
-            <Copy className="w-3 h-3 inline mr-1" />Copy All
-          </button>
-        }
-      >
-        <ChapterList chapters={chapters} activeChapter={activeChapter} setActiveChapter={setActiveChapter} />
-        {ch && (
-          <div className="rounded-2xl p-5" style={{ background: 'rgba(255,255,255,0.55)', border: '1px solid rgba(255,255,255,0.4)' }}>
-            <h3 className="font-bold text-sm mb-3" style={{ color: G.primary }}>{ch.title}</h3>
-            <div>{renderDialogue(ch.content)}</div>
+      <div className="flex flex-col h-full" style={{ background: 'linear-gradient(135deg, #EDE8F5 0%, #c8d4f5 100%)' }}>
+        {/* Header */}
+        <div className="flex-shrink-0 px-5 py-3 flex items-center justify-between gap-3"
+          style={{ background: 'rgba(255,255,255,0.4)', backdropFilter: 'blur(16px)', borderBottom: '1px solid rgba(255,255,255,0.3)' }}>
+          <div className="flex items-center gap-2">
+            <Mic2 className="w-4 h-4" style={{ color: G.accent }} />
+            <h2 className="font-bold text-sm" style={{ color: G.primary }}>Podcast — {topic}</h2>
           </div>
-        )}
-        <div className="flex gap-2 mt-3 flex-wrap">
-          {chapters.map((_, i) => (
+          <div className="flex items-center gap-2">
+            <button onClick={() => setShowScript(v => !v)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all"
+              style={{ background: showScript ? 'rgba(112,145,230,0.2)' : 'rgba(255,255,255,0.5)', border: '1px solid rgba(112,145,230,0.3)', color: G.primary }}>
+              <FileText className="w-3.5 h-3.5" />
+              {showScript ? 'Hide Script' : 'Show Script'}
+            </button>
+            <button onClick={() => { setPhase('setup'); setChapters([]); setAudioUrls([]); }}
+              className="p-1.5 rounded-xl transition-all hover:bg-white/30" style={{ color: G.secondary }}>
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+
+        {/* Chapter tabs */}
+        <div className="flex-shrink-0 px-4 py-2 flex gap-2 overflow-x-auto"
+          style={{ borderBottom: '1px solid rgba(255,255,255,0.25)' }}>
+          {chapters.map((c, i) => (
             <button key={i} onClick={() => setActiveChapter(i)}
-              className="px-3 py-1 rounded-lg text-xs font-semibold transition-all"
-              style={{ background: activeChapter === i ? 'linear-gradient(135deg, #7091E6, #3D52A0)' : 'rgba(255,255,255,0.4)', color: activeChapter === i ? '#fff' : G.primary, border: '1px solid rgba(255,255,255,0.3)' }}>
-              {i + 1}
+              className="flex-shrink-0 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all"
+              style={{
+                background: activeChapter === i ? 'linear-gradient(135deg,#7091E6,#3D52A0)' : 'rgba(255,255,255,0.45)',
+                color: activeChapter === i ? '#fff' : G.primary,
+                border: '1px solid rgba(255,255,255,0.3)'
+              }}>
+              {i + 1}. {c.title}
             </button>
           ))}
         </div>
-      </ResultShell>
+
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto p-5 space-y-4">
+          {/* Audio player — always shown */}
+          {audioUrl ? (
+            <AudioPlayer url={audioUrl} label={ch?.title || `Chapter ${activeChapter + 1}`} />
+          ) : (
+            <div className="rounded-2xl p-4 text-center text-sm" style={{ background: 'rgba(255,255,255,0.3)', border: '1px solid rgba(255,255,255,0.3)', color: G.secondary }}>
+              Audio unavailable for this chapter.
+            </div>
+          )}
+
+          {/* Script — only if user toggled it */}
+          {showScript && ch && (
+            <div className="rounded-2xl p-5" style={{ background: 'rgba(255,255,255,0.55)', border: '1px solid rgba(255,255,255,0.4)' }}>
+              <p className="text-xs font-bold uppercase tracking-widest mb-3" style={{ color: G.secondary }}>Script</p>
+              <div>{renderDialogue(ch.content)}</div>
+            </div>
+          )}
+        </div>
+      </div>
     );
   }
 
   return (
-    <SetupShell icon={Mic2} title="Podcast Mode" subtitle="Two-host educational podcast episode" onGenerate={generate} generating={generating} generateLabel="🎙️ Generate Podcast">
+    <SetupShell icon={Mic2} title="Podcast Mode" subtitle="AI-generated audio podcast with two voices"
+      onGenerate={generate} generating={generating} generateLabel="🎙️ Generate Podcast">
       <TopicRow customTopic={customTopic} setCustomTopic={setCustomTopic} allSources={allSources} />
       <div>
-        <ToolLabel>Tone</ToolLabel>
+        <ToolLabel>Voice Style</ToolLabel>
         <ToolSelect value={tone} onChange={setTone} options={[
-          { value: 'fun', label: 'Fun & Enthusiastic 🎉' },
+          { value: 'friendly', label: 'Friendly & Warm 😊' },
           { value: 'serious', label: 'Serious & Professional 📘' },
-          { value: 'exam_focused', label: 'Exam-Focused & Concise 🎯' },
+          { value: 'energetic', label: 'Energetic & Upbeat ⚡' },
         ]} />
       </div>
       <div>
         <ToolLabel>Episode Length</ToolLabel>
         <ToolSelect value={length} onChange={setLength} options={[
-          { value: 'short', label: 'Short (3–4 chapters)' },
-          { value: 'medium', label: 'Medium (5–6 chapters)' },
-          { value: 'long', label: 'Long (7–8 chapters)' },
+          { value: 'short', label: 'Short (3 chapters)' },
+          { value: 'medium', label: 'Medium (5 chapters)' },
+          { value: 'long', label: 'Long (7 chapters)' },
         ]} />
       </div>
       <div>
