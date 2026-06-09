@@ -15,7 +15,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import GlassCard from '@/components/ui/GlassCard';
-import { Plus, Trash2, Edit2, X, Link as LinkIcon, Calendar, Clock, ChevronRight } from 'lucide-react';
+import { Plus, Trash2, Edit2, X, Link as LinkIcon, Calendar, Clock, ChevronRight, CheckCircle2, RefreshCw } from 'lucide-react';
+import SOCSPanel from '@/components/timetable/SOCSPanel';
 
 const SUBJECTS = [
   { label: 'Maths', value: 'Maths', color: 'from-blue-500 to-blue-600' },
@@ -59,6 +60,7 @@ export default function MyTimetable() {
   const [timetableMode, setTimetableMode] = useState('1-week'); // '1-week' or '2-week'
   const [currentWeek, setCurrentWeek] = useState(1);
   const [showForm, setShowForm] = useState(false);
+  const [showSOCS, setShowSOCS] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [formData, setFormData] = useState({
     subject: '',
@@ -77,6 +79,9 @@ export default function MyTimetable() {
     const fetchUser = async () => {
       const userData = await base44.auth.me();
       setUser(userData);
+      if (userData?.socs_ical_url) {
+        // Auto-restore saved iCal URL
+      }
     };
     fetchUser();
 
@@ -299,17 +304,57 @@ export default function MyTimetable() {
           )}
         </div>
 
-        {/* Add Lesson Button */}
-        <Button
-          onClick={() => {
-            resetForm();
-            setShowForm(true);
-          }}
-          className="bg-gradient-to-r from-purple-500 to-blue-500 mb-6"
-        >
-          <Plus className="w-5 h-5 mr-2" />
-          Add Lesson
-        </Button>
+        {/* Action bar */}
+        <div className="flex flex-wrap items-center gap-3 mb-4">
+          <Button
+            onClick={() => { resetForm(); setShowForm(true); }}
+            className="bg-gradient-to-r from-purple-500 to-blue-500"
+          >
+            <Plus className="w-5 h-5 mr-2" />
+            Add Lesson
+          </Button>
+
+          <button
+            onClick={() => setShowSOCS(v => !v)}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all"
+            style={{
+              background: showSOCS ? 'linear-gradient(135deg,#7091E6,#3D52A0)' : 'rgba(255,255,255,0.2)',
+              border: '1px solid rgba(255,255,255,0.3)',
+              color: showSOCS ? '#fff' : '#3D52A0',
+            }}>
+            <RefreshCw className="w-4 h-4" />
+            {user?.socs_last_sync ? 'Refresh from SOCS' : 'Connect SOCS'}
+            {user?.socs_last_sync && (
+              <span className="w-2 h-2 rounded-full bg-emerald-400 ml-1" />
+            )}
+          </button>
+
+          {user?.socs_last_sync && !showSOCS && (
+            <span className="text-xs font-medium flex items-center gap-1.5"
+              style={{ color: '#8697C4' }}>
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+              Last sync: {new Date(user.socs_last_sync).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+            </span>
+          )}
+        </div>
+
+        {/* SOCS Panel */}
+        <AnimatePresence>
+          {showSOCS && (
+            <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}
+              className="mb-6">
+              <SOCSPanel
+                user={user}
+                lastSync={user?.socs_last_sync}
+                lessonCount={user?.socs_lesson_count}
+                onSyncComplete={() => {
+                  queryClient.invalidateQueries(['timetableLessons']);
+                  base44.auth.me().then(u => { setUser(u); setShowSOCS(false); });
+                }}
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Add/Edit Lesson Form */}
         <AnimatePresence>
