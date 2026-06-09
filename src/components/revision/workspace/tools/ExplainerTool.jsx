@@ -1,115 +1,144 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import {
-  Video, Play, Pause, Download, ChevronLeft, ChevronRight,
-  Loader2, FileText, X, Volume2
+  Video, Play, Pause, Download, Loader2,
+  ChevronLeft, ChevronRight, FileText, Volume2, VolumeX
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { SetupShell, LoadingScreen, ToolLabel, ToolSelect, Toggle, TopicRow, G } from './ToolSetupShell';
 
 function getCtx(allSources) {
   return allSources.filter(s => s.content_text)
-    .map(s => `### ${s.name}\n${s.content_text.slice(0, 3000)}`).join('\n\n---\n\n');
+    .map(s => `### ${s.name}\n${s.content_text.slice(0, 4000)}`).join('\n\n---\n\n');
 }
 
-const VOICE_MAP = {
-  simple: 'honey',
-  gcse: 'river',
-  alevel: 'storm',
-};
+const VOICE_BY_STYLE = { overview: 'river', stepbystep: 'storm' };
+const DIFF_VOICE = { simple: 'sunny', gcse: 'river', alevel: 'storm' };
 
-// Animated scene card that simulates a "video frame"
-function SceneCard({ scene, active }) {
-  return (
-    <AnimatePresence mode="wait">
-      {active && (
-        <motion.div key={scene.scene_number}
-          initial={{ opacity: 0, scale: 0.97 }}
-          animate={{ opacity: 1, scale: 1 }}
-          exit={{ opacity: 0, scale: 1.02 }}
-          transition={{ duration: 0.35 }}
-          className="rounded-2xl overflow-hidden"
-          style={{ background: 'rgba(255,255,255,0.65)', border: '1px solid rgba(255,255,255,0.5)', minHeight: '200px' }}>
-          {/* Scene header bar */}
-          <div className="px-5 py-3 flex items-center gap-3"
-            style={{ background: 'linear-gradient(135deg,rgba(112,145,230,0.25),rgba(61,82,160,0.2))', borderBottom: '1px solid rgba(112,145,230,0.2)' }}>
-            <div className="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-black text-white"
-              style={{ background: 'linear-gradient(135deg,#7091E6,#3D52A0)' }}>{scene.scene_number}</div>
-            <p className="font-bold text-sm flex-1" style={{ color: G.primary }}>{scene.title}</p>
-          </div>
-          {/* Visual cue */}
-          {scene.visual_cue && (
-            <div className="mx-5 mt-4 rounded-xl px-4 py-3 flex items-start gap-2"
-              style={{ background: 'rgba(112,145,230,0.1)', border: '1px dashed rgba(112,145,230,0.35)' }}>
-              <span className="text-lg">🎬</span>
-              <p className="text-xs italic" style={{ color: G.secondary }}>{scene.visual_cue}</p>
-            </div>
-          )}
-          {/* Narration */}
-          <div className="px-5 py-4">
-            <p className="text-sm leading-relaxed" style={{ color: G.primary }}>{scene.narration}</p>
-          </div>
-          {/* Key points */}
-          {scene.key_points?.length > 0 && (
-            <div className="px-5 pb-4 space-y-1.5">
-              {scene.key_points.map((pt, i) => (
-                <motion.div key={i} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.1 }}
-                  className="flex items-start gap-2 text-xs"
-                  style={{ color: G.primary }}>
-                  <span className="w-5 h-5 rounded-full flex items-center justify-center text-white text-[10px] font-black flex-shrink-0"
-                    style={{ background: 'linear-gradient(135deg,#7091E6,#3D52A0)' }}>{i + 1}</span>
-                  {pt}
-                </motion.div>
-              ))}
-            </div>
-          )}
-        </motion.div>
-      )}
-    </AnimatePresence>
-  );
-}
-
-function AudioPlayer({ url, onDownload }) {
-  const audioRef = useRef(null);
+// Animated scene viewer — shows key points with entrance animations
+function SceneViewer({ scenes, audioUrl }) {
+  const [idx, setIdx] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
   const [duration, setDuration] = useState(0);
+  const audioRef = useRef(null);
 
-  useEffect(() => { setPlaying(false); setProgress(0); }, [url]);
-
-  const toggle = () => {
-    const a = audioRef.current;
-    if (!a) return;
-    if (playing) { a.pause(); setPlaying(false); }
-    else { a.play(); setPlaying(true); }
-  };
-
+  const scene = scenes[idx];
   const fmt = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 
+  const toggleAudio = () => {
+    const a = audioRef.current;
+    if (!a) return;
+    if (playing) { a.pause(); setPlaying(false); } else { a.play(); setPlaying(true); }
+  };
+
   return (
-    <div className="flex items-center gap-3 rounded-xl px-4 py-3"
-      style={{ background: 'rgba(255,255,255,0.4)', border: '1px solid rgba(255,255,255,0.35)' }}>
-      <audio ref={audioRef} src={url}
-        onTimeUpdate={e => setProgress(e.target.currentTime)}
-        onLoadedMetadata={e => setDuration(e.target.duration)}
-        onEnded={() => setPlaying(false)} />
-      <button onClick={toggle}
-        className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 shadow-md"
-        style={{ background: 'linear-gradient(135deg,#7091E6,#3D52A0)' }}>
-        {playing ? <Pause className="w-4 h-4 text-white" /> : <Play className="w-4 h-4 text-white ml-0.5" />}
-      </button>
-      <div className="flex-1">
-        <input type="range" min={0} max={duration || 100} value={progress} step={0.1}
-          onChange={e => { if (audioRef.current) audioRef.current.currentTime = Number(e.target.value); setProgress(Number(e.target.value)); }}
-          className="w-full accent-[#7091E6] h-1" />
-        <div className="flex justify-between text-xs mt-0.5" style={{ color: G.secondary }}>
-          <span>{fmt(progress)}</span><span>{fmt(duration)}</span>
+    <div className="space-y-3">
+      {/* Video-style scene area */}
+      <div className="relative rounded-2xl overflow-hidden"
+        style={{ background: 'linear-gradient(135deg, #3D52A0 0%, #7091E6 100%)', minHeight: 220, border: '1px solid rgba(255,255,255,0.3)' }}>
+
+        {/* Scene number badge */}
+        <div className="absolute top-3 left-3 px-2.5 py-1 rounded-lg text-xs font-bold text-white"
+          style={{ background: 'rgba(0,0,0,0.3)', backdropFilter: 'blur(8px)' }}>
+          Scene {idx + 1} / {scenes.length}
         </div>
+
+        {/* Scene content */}
+        <AnimatePresence mode="wait">
+          <motion.div key={idx}
+            initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 1.02 }}
+            transition={{ duration: 0.4 }}
+            className="flex flex-col items-center justify-center p-8 text-center min-h-[220px]">
+
+            {/* Scene title */}
+            <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.1 }}
+              className="text-white font-black text-xl mb-3 leading-tight" style={{ textShadow: '0 2px 8px rgba(0,0,0,0.3)' }}>
+              {scene?.title}
+            </motion.div>
+
+            {/* Key points with staggered animation */}
+            <div className="space-y-2 w-full max-w-xs">
+              {(scene?.key_points || []).map((pt, i) => (
+                <motion.div key={i} initial={{ x: -20, opacity: 0 }} animate={{ x: 0, opacity: 1 }}
+                  transition={{ delay: 0.2 + i * 0.12 }}
+                  className="flex items-start gap-2 text-left rounded-xl px-3 py-2"
+                  style={{ background: 'rgba(255,255,255,0.15)', backdropFilter: 'blur(8px)' }}>
+                  <span className="text-white font-black text-sm flex-shrink-0">→</span>
+                  <span className="text-white text-sm">{pt}</span>
+                </motion.div>
+              ))}
+            </div>
+
+            {/* Visual cue label */}
+            {scene?.visual_cue && (
+              <motion.div initial={{ y: 10, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.6 }}
+                className="mt-3 px-3 py-1.5 rounded-full text-xs font-semibold"
+                style={{ background: 'rgba(255,255,255,0.2)', color: 'rgba(255,255,255,0.9)', border: '1px solid rgba(255,255,255,0.3)' }}>
+                🎬 {scene.visual_cue}
+              </motion.div>
+            )}
+          </motion.div>
+        </AnimatePresence>
+
+        {/* Scene navigation arrows */}
+        <button onClick={() => setIdx(i => Math.max(0, i - 1))} disabled={idx === 0}
+          className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full flex items-center justify-center transition-all disabled:opacity-30"
+          style={{ background: 'rgba(0,0,0,0.3)', backdropFilter: 'blur(8px)' }}>
+          <ChevronLeft className="w-4 h-4 text-white" />
+        </button>
+        <button onClick={() => setIdx(i => Math.min(scenes.length - 1, i + 1))} disabled={idx === scenes.length - 1}
+          className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full flex items-center justify-center transition-all disabled:opacity-30"
+          style={{ background: 'rgba(0,0,0,0.3)', backdropFilter: 'blur(8px)' }}>
+          <ChevronRight className="w-4 h-4 text-white" />
+        </button>
       </div>
-      {url && (
-        <a href={url} download className="p-2 rounded-lg hover:bg-white/30 transition-all" style={{ color: G.accent }} title="Download narration">
-          <Download className="w-3.5 h-3.5" />
-        </a>
+
+      {/* Scene dots */}
+      <div className="flex justify-center gap-1.5">
+        {scenes.map((_, i) => (
+          <button key={i} onClick={() => setIdx(i)}
+            className="rounded-full transition-all"
+            style={{ width: i === idx ? 20 : 8, height: 8, background: i === idx ? '#7091E6' : 'rgba(112,145,230,0.3)' }} />
+        ))}
+      </div>
+
+      {/* Audio player */}
+      {audioUrl && (
+        <div className="rounded-2xl p-4 space-y-3"
+          style={{ background: 'rgba(255,255,255,0.55)', border: '1px solid rgba(255,255,255,0.4)' }}>
+          <audio ref={audioRef} src={audioUrl}
+            onTimeUpdate={() => setProgress(audioRef.current?.currentTime || 0)}
+            onLoadedMetadata={() => setDuration(audioRef.current?.duration || 0)}
+            onEnded={() => setPlaying(false)} />
+          <div className="flex items-center gap-3">
+            <button onClick={toggleAudio}
+              className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 transition-all hover:scale-105"
+              style={{ background: 'linear-gradient(135deg, #7091E6, #3D52A0)' }}>
+              {playing ? <Pause className="w-4 h-4 text-white" /> : <Play className="w-4 h-4 text-white ml-0.5" />}
+            </button>
+            <div className="flex-1 space-y-1">
+              <div className="h-1.5 rounded-full overflow-hidden cursor-pointer"
+                style={{ background: 'rgba(112,145,230,0.2)' }}
+                onClick={e => {
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  const pct = (e.clientX - rect.left) / rect.width;
+                  if (audioRef.current) audioRef.current.currentTime = pct * duration;
+                }}>
+                <div className="h-full rounded-full transition-all"
+                  style={{ width: `${duration > 0 ? (progress / duration) * 100 : 0}%`, background: 'linear-gradient(90deg, #7091E6, #3D52A0)' }} />
+              </div>
+              <div className="flex justify-between text-xs" style={{ color: G.secondary }}>
+                <span>{fmt(progress)}</span><span>🎙️ Narration</span><span>{fmt(duration)}</span>
+              </div>
+            </div>
+            <a href={audioUrl} download="explainer-narration.mp3"
+              className="w-9 h-9 rounded-full flex items-center justify-center transition-all hover:scale-105"
+              style={{ background: 'rgba(255,255,255,0.6)', border: '1px solid rgba(112,145,230,0.3)' }}>
+              <Download className="w-3.5 h-3.5" style={{ color: G.accent }} />
+            </a>
+          </div>
+        </div>
       )}
     </div>
   );
@@ -122,32 +151,30 @@ export default function ExplainerTool({ notebook, user, allSources, onResourceCr
   const [difficulty, setDifficulty] = useState('gcse');
   const [mode, setMode] = useState('overview');
   const [generating, setGenerating] = useState(false);
-  const [genStatus, setGenStatus] = useState('');
+  const [genStep, setGenStep] = useState('');
   const [scenes, setScenes] = useState([]);
-  const [audioUrls, setAudioUrls] = useState([]);
-  const [activeScene, setActiveScene] = useState(0);
+  const [audioUrl, setAudioUrl] = useState('');
+  const [fullScript, setFullScript] = useState('');
   const [showTranscript, setShowTranscript] = useState(false);
 
   const topic = customTopic.trim() || notebook.name;
   const hasSource = allSources.some(s => s.content_text);
-  const sceneCount = { short: 4, medium: 6, long: 9 };
-  const diffMap = { gcse: 'GCSE level', alevel: 'A-Level depth', simple: 'simple/beginner language' };
+  const sceneCounts = { short: 3, medium: 5, long: 7 };
 
   const generate = async () => {
     setGenerating(true);
-    setGenStatus('Writing explainer script…');
+    setGenStep('Building explainer scenes…');
     const ctx = hasSource && !customTopic.trim() ? getCtx(allSources) : '';
-    const voice = VOICE_MAP[difficulty] || 'river';
+    const numScenes = sceneCounts[length] || 5;
 
     const result = await base44.integrations.Core.InvokeLLM({
-      prompt: `Create a structured explainer video for: "${topic}".
-- Audience: ${diffMap[difficulty]}
-- Style: ${mode === 'stepbystep' ? 'step-by-step numbered process' : 'big-picture overview'}
-- Number of scenes: ${sceneCount[length] || 6}
-- Each scene needs: title, narration (2-4 sentences), visual_cue (what appears on screen), and 2-3 key_points as bullet points.
-- Start with an INTRO scene (hook the viewer).
-- End with an OUTRO scene (summary + call to action).
-${ctx ? `\nSOURCE MATERIAL:\n${ctx.slice(0, 8000)}` : ''}`,
+      prompt: `Create an animated explainer video content plan for: "${topic}".
+- Difficulty: ${difficulty}
+- Style: ${mode === 'overview' ? 'overview, big picture' : 'step-by-step numbered stages'}
+- Number of scenes: ${numScenes}
+- Each scene should have a punchy title, 2-3 key bullet points, and a visual cue description.
+- Also produce a clean narration_script for the full video (natural spoken English, no markdown, under 400 words total).
+${ctx ? `\n\nSOURCE MATERIAL:\n${ctx.slice(0, 8000)}` : ''}`,
       response_json_schema: {
         type: 'object',
         properties: {
@@ -156,144 +183,105 @@ ${ctx ? `\nSOURCE MATERIAL:\n${ctx.slice(0, 8000)}` : ''}`,
             items: {
               type: 'object',
               properties: {
-                scene_number: { type: 'number' },
                 title: { type: 'string' },
-                narration: { type: 'string' },
-                visual_cue: { type: 'string' },
                 key_points: { type: 'array', items: { type: 'string' } },
+                visual_cue: { type: 'string' },
+                narration: { type: 'string' },
               },
-              required: ['scene_number', 'title', 'narration'],
+              required: ['title', 'key_points', 'visual_cue', 'narration'],
             }
-          }
+          },
+          narration_script: { type: 'string' },
         },
-        required: ['scenes'],
+        required: ['scenes', 'narration_script'],
       }
     });
 
-    const sc = result?.scenes || [];
-    setScenes(sc);
+    const sceneData = result?.scenes || [];
+    const script = result?.narration_script || sceneData.map(s => s.narration).join(' ');
+    setScenes(sceneData);
+    setFullScript(script);
 
-    // Generate audio narration for each scene
-    const urls = [];
-    for (let i = 0; i < sc.length; i++) {
-      setGenStatus(`Generating narration — scene ${i + 1} of ${sc.length}…`);
-      const audioRes = await base44.integrations.Core.GenerateSpeech({
-        text: sc[i].narration.slice(0, 4800),
-        voice,
-      });
-      urls.push(audioRes?.url || '');
-    }
-    setAudioUrls(urls);
+    setGenStep('Generating audio narration…');
+    const voiceKey = DIFF_VOICE[difficulty] || 'river';
+    const speechResult = await base44.integrations.Core.GenerateSpeech({
+      text: script.slice(0, 4500),
+      voice: voiceKey,
+    });
+    setAudioUrl(speechResult?.url || '');
 
-    const fullText = sc.map(s => `## Scene ${s.scene_number}: ${s.title}\n\n${s.narration}\n\nVisual: ${s.visual_cue || ''}\n\nKey points:\n${(s.key_points || []).map(p => `- ${p}`).join('\n')}`).join('\n\n---\n\n');
     const res = await base44.entities.NotebookResource.create({
       notebook_id: notebook.id, student_email: user.email,
       title: `Explainer — ${topic}`,
-      resource_type: 'video_overview', content: fullText,
+      resource_type: 'video_overview', content: script,
       source_ids: allSources.map(s => s.id), source_count: allSources.length,
     });
     onResourceCreated(res);
-    setActiveScene(0);
     setGenerating(false);
-    setGenStatus('');
+    setGenStep('');
     setPhase('result');
   };
 
-  if (generating) return <LoadingScreen label={genStatus || 'Generating Explainer…'} />;
+  if (generating) return (
+    <div className="flex flex-col items-center justify-center h-64 gap-4 p-8">
+      <div className="relative w-16 h-16">
+        <div className="absolute inset-0 rounded-2xl animate-pulse"
+          style={{ background: 'linear-gradient(135deg, #7091E6, #3D52A0)' }} />
+        <Video className="absolute inset-0 m-auto w-8 h-8 text-white" />
+      </div>
+      <p className="font-semibold text-sm" style={{ color: G.primary }}>{genStep}</p>
+      <p className="text-xs" style={{ color: G.secondary }}>Building your animated explainer…</p>
+    </div>
+  );
 
   if (phase === 'result' && scenes.length > 0) {
-    const scene = scenes[activeScene];
-    const audioUrl = audioUrls[activeScene];
-
     return (
       <div className="flex flex-col h-full" style={{ background: 'linear-gradient(135deg, #EDE8F5 0%, #c8d4f5 100%)' }}>
         {/* Header */}
-        <div className="flex-shrink-0 px-5 py-3 flex items-center justify-between gap-3"
+        <div className="flex-shrink-0 px-4 py-3 flex items-center justify-between"
           style={{ background: 'rgba(255,255,255,0.4)', backdropFilter: 'blur(16px)', borderBottom: '1px solid rgba(255,255,255,0.3)' }}>
           <div className="flex items-center gap-2">
             <Video className="w-4 h-4" style={{ color: G.accent }} />
-            <h2 className="font-bold text-sm truncate" style={{ color: G.primary }}>Explainer — {topic}</h2>
+            <span className="font-bold text-sm" style={{ color: G.primary }}>Explainer — {topic}</span>
           </div>
-          <div className="flex items-center gap-2 flex-shrink-0">
+          <div className="flex items-center gap-2">
             <button onClick={() => setShowTranscript(v => !v)}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all"
               style={{ background: showTranscript ? 'rgba(112,145,230,0.2)' : 'rgba(255,255,255,0.5)', border: '1px solid rgba(112,145,230,0.3)', color: G.primary }}>
-              <FileText className="w-3.5 h-3.5" />
-              {showTranscript ? 'Hide' : 'Transcript'}
+              <FileText className="w-3 h-3" />{showTranscript ? 'Hide Transcript' : 'View Transcript'}
             </button>
-            <button onClick={() => { setPhase('setup'); setScenes([]); setAudioUrls([]); }}
-              className="p-1.5 rounded-xl hover:bg-white/30 transition-all" style={{ color: G.secondary }}>
-              <X className="w-4 h-4" />
+            <button onClick={() => { setPhase('setup'); setScenes([]); setAudioUrl(''); setFullScript(''); }}
+              className="px-3 py-1.5 rounded-xl text-xs font-semibold"
+              style={{ background: 'rgba(255,255,255,0.5)', border: '1px solid rgba(112,145,230,0.25)', color: G.secondary }}>
+              ← Back
             </button>
           </div>
         </div>
 
-        {/* Progress bar */}
-        <div className="flex-shrink-0 px-5 py-2 flex items-center gap-3"
-          style={{ borderBottom: '1px solid rgba(255,255,255,0.25)' }}>
-          <span className="text-xs font-semibold" style={{ color: G.secondary }}>Scene {activeScene + 1}/{scenes.length}</span>
-          <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(112,145,230,0.15)' }}>
-            <div className="h-full rounded-full transition-all" style={{ background: 'linear-gradient(90deg,#7091E6,#3D52A0)', width: `${((activeScene + 1) / scenes.length) * 100}%` }} />
-          </div>
-        </div>
-
-        {/* Scene content */}
-        <div className="flex-1 overflow-y-auto p-5 space-y-4">
-          {/* Audio narration */}
-          {audioUrl && <AudioPlayer url={audioUrl} />}
-
-          {/* Animated scene card */}
-          <div style={{ minHeight: '200px' }}>
-            <SceneCard scene={scene} active={true} />
-          </div>
+        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+          <SceneViewer scenes={scenes} audioUrl={audioUrl} />
 
           {/* Transcript */}
-          {showTranscript && (
-            <div className="rounded-2xl p-4 text-xs leading-relaxed"
-              style={{ background: 'rgba(255,255,255,0.4)', border: '1px solid rgba(112,145,230,0.2)', color: G.primary }}>
-              <p className="font-bold uppercase tracking-widest mb-2 text-[10px]" style={{ color: G.secondary }}>Transcript</p>
-              {scenes.map(s => (
-                <p key={s.scene_number} className="mb-2"><strong style={{ color: G.accent }}>Scene {s.scene_number} — {s.title}:</strong> {s.narration}</p>
-              ))}
+          {showTranscript && fullScript && (
+            <div className="rounded-2xl p-4" style={{ background: 'rgba(255,255,255,0.55)', border: '1px solid rgba(255,255,255,0.4)' }}>
+              <p className="text-xs font-bold uppercase tracking-widest mb-3" style={{ color: G.secondary }}>📄 Narration Transcript</p>
+              <p className="text-sm leading-relaxed whitespace-pre-wrap" style={{ color: G.primary }}>{fullScript}</p>
             </div>
           )}
-        </div>
-
-        {/* Scene navigation */}
-        <div className="flex-shrink-0 p-4 flex items-center justify-between gap-3"
-          style={{ background: 'rgba(255,255,255,0.4)', backdropFilter: 'blur(16px)', borderTop: '1px solid rgba(255,255,255,0.3)' }}>
-          <button onClick={() => setActiveScene(s => Math.max(0, s - 1))} disabled={activeScene === 0}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold transition-all disabled:opacity-30"
-            style={{ background: 'rgba(255,255,255,0.5)', border: '1px solid rgba(255,255,255,0.4)', color: G.primary }}>
-            <ChevronLeft className="w-4 h-4" /> Prev
-          </button>
-          <div className="flex gap-1.5">
-            {scenes.map((_, i) => (
-              <button key={i} onClick={() => setActiveScene(i)}
-                className="w-2 h-2 rounded-full transition-all"
-                style={{ background: i === activeScene ? G.accent : 'rgba(112,145,230,0.3)' }} />
-            ))}
-          </div>
-          <button onClick={() => setActiveScene(s => Math.min(scenes.length - 1, s + 1))} disabled={activeScene === scenes.length - 1}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold transition-all disabled:opacity-30"
-            style={{ background: 'linear-gradient(135deg,#7091E6,#3D52A0)', color: '#fff' }}>
-            Next <ChevronRight className="w-4 h-4" />
-          </button>
         </div>
       </div>
     );
   }
 
   return (
-    <SetupShell icon={Video} title="Explainer Video" subtitle="Animated scenes + narration audio for any topic"
-      onGenerate={generate} generating={generating} generateLabel="🎬 Generate Explainer">
+    <SetupShell icon={Video} title="Explainer Video" subtitle="Animated scenes with real audio narration" onGenerate={generate} generating={generating} generateLabel="🎬 Generate Explainer">
       <TopicRow customTopic={customTopic} setCustomTopic={setCustomTopic} allSources={allSources} />
       <div>
         <ToolLabel>Video Length</ToolLabel>
         <ToolSelect value={length} onChange={setLength} options={[
-          { value: 'short', label: 'Short (4 scenes)' },
-          { value: 'medium', label: 'Medium (6 scenes)' },
-          { value: 'long', label: 'Long (9 scenes)' },
+          { value: 'short', label: 'Short (3 scenes)' },
+          { value: 'medium', label: 'Medium (5 scenes)' },
+          { value: 'long', label: 'Long (7 scenes)' },
         ]} />
       </div>
       <div>
@@ -305,7 +293,7 @@ ${ctx ? `\nSOURCE MATERIAL:\n${ctx.slice(0, 8000)}` : ''}`,
         ]} />
       </div>
       <div>
-        <ToolLabel>Explanation Mode</ToolLabel>
+        <ToolLabel>Explanation Style</ToolLabel>
         <ToolSelect value={mode} onChange={setMode} options={[
           { value: 'overview', label: 'Overview — big picture' },
           { value: 'stepbystep', label: 'Step-by-Step — numbered stages' },
