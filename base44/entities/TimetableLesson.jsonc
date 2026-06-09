@@ -28,10 +28,6 @@
       "type": "string",
       "description": "Teacher name (optional)"
     },
-    "room": {
-      "type": "string",
-      "description": "Room or location (optional)"
-    },
     "day_of_week": {
       "type": "string",
       "enum": [
@@ -74,11 +70,6 @@
     "order_index": {
       "type": "number",
       "description": "Order of lesson in the day (for sorting)"
-    },
-    "socs_imported": {
-      "type": "boolean",
-      "default": false,
-      "description": "Whether this lesson was imported from SOCS iCal"
     }
   },
   "required": [
