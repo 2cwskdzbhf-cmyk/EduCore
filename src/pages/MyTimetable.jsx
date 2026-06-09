@@ -593,11 +593,22 @@ export default function MyTimetable() {
                                 >
                                   <div className="flex items-start justify-between gap-2">
                                     <div className="flex-1 min-w-0">
-                                      <h4 className="font-semibold text-white text-sm truncate">
-                                        {lesson.lesson_name}
-                                      </h4>
+                                      <div className="flex items-center gap-1.5 flex-wrap">
+                                       <h4 className="font-semibold text-white text-sm truncate">
+                                         {lesson.lesson_name}
+                                       </h4>
+                                       {lesson.socs_imported && (
+                                         <span className="text-[9px] font-bold px-1.5 py-0.5 rounded flex-shrink-0"
+                                           style={{ background: 'rgba(112,145,230,0.3)', color: '#fff' }}>
+                                           SOCS
+                                         </span>
+                                       )}
+                                      </div>
                                       {lesson.teacher_name && (
-                                        <p className="text-xs text-slate-400">{lesson.teacher_name}</p>
+                                       <p className="text-xs text-slate-400">{lesson.teacher_name}</p>
+                                      )}
+                                      {lesson.room && (
+                                       <p className="text-xs text-slate-400">📍 {lesson.room}</p>
                                       )}
                                       <div className="flex items-center gap-2 mt-2 text-xs text-slate-300">
                                         {lesson.start_time && (

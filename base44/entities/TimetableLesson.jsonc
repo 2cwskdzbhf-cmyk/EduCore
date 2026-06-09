@@ -30,7 +30,7 @@
     },
     "room": {
       "type": "string",
-      "description": "Room or location (optional, from SOCS)"
+      "description": "Room or location (optional)"
     },
     "day_of_week": {
       "type": "string",
@@ -49,8 +49,7 @@
         1,
         2
       ],
-      "default": 1,
-      "description": "Week 1 (A) or Week 2 (B) for 2-week timetables"
+      "description": "Week 1 or Week 2 (for 2-week timetables)"
     },
     "start_time": {
       "type": "string",
@@ -76,9 +75,10 @@
       "type": "number",
       "description": "Order of lesson in the day (for sorting)"
     },
-    "source": {
-      "type": "string",
-      "description": "Import source, e.g. 'socs' or 'manual'"
+    "socs_imported": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether this lesson was imported from SOCS iCal"
     }
   },
   "required": [
@@ -86,6 +86,7 @@
     "subject",
     "lesson_name",
     "day_of_week",
+    "week_number",
     "duration_minutes"
   ]
 }
